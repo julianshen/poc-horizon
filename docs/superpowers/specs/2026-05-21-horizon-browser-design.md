@@ -277,7 +277,7 @@ window.horizonAPI.on(channel, callback)
 | `navigation:stop` | `{ tabId: string }` | `void` | Stop loading |
 | `zoom:set` | `{ tabId: string, level: number }` | `number` | Set zoom (0.25-5.0) |
 | `zoom:reset` | `{ tabId: string }` | `number` | Reset zoom to 1.0 |
-| `find:start` | `{ tabId: string, text: string }` | `FindResult` | Start find |
+| `find:start` | `{ tabId: string, text: string, caseSensitive?: boolean }` | `FindResult` | Start find |
 | `find:next` | `{ tabId: string, forward?: boolean }` | `FindResult` | Find next/prev |
 | `find:stop` | `{ tabId: string }` | `void` | Stop find session |
 | `bookmark:add` | `{ url: string, title: string, parentId?: string }` | `Bookmark` | Add bookmark |
@@ -285,7 +285,7 @@ window.horizonAPI.on(channel, callback)
 | `bookmark:move` | `{ bookmarkId: string, parentId: string, index: number }` | `Bookmark` | Move bookmark |
 | `bookmark:update` | `{ bookmarkId: string, changes: Partial<Bookmark> }` | `Bookmark` | Edit bookmark |
 | `bookmark:getTree` | `{}` | `Bookmark[]` | Get full tree |
-| `history:clear` | `{ range?: 'all' \| 'hour' \| 'day' \| 'week' \| 'month' }` | `number` | Clear history |
+| `history:clear` | `{ range?: 'all' \| 'hour' \| 'day' \| 'week' \| 'month' }` | `number` | Clear history. Returns count of deleted entries. |
 | `history:search` | `{ query: string, limit?: number }` | `HistoryEntry[]` | Search history |
 | `history:getRecent` | `{ limit?: number }` | `HistoryEntry[]` | Recent history |
 | `download:pause` | `{ downloadId: string }` | `void` | Pause download |
@@ -310,9 +310,9 @@ window.horizonAPI.on(channel, callback)
 | `app:quit` | `{}` | `void` | Quit application |
 | `app:getVersion` | `{}` | `string` | App version |
 | `devtools:toggle` | `{ tabId: string }` | `void` | Toggle DevTools |
-| `devtools:open` | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'detach' }` | `void` | Open DevTools |
+| `devtools:open` | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'undocked' }` | `void` | Open DevTools |
 | `print:start` | `{ tabId: string }` | `void` | Open system print dialog (user chooses printer, PDF, etc.) |
-| `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Programmatically save page as PDF to a file path (no dialog). Errors: disk-full, permission-denied → rejected promise |
+| `print:toPDF` | `{ tabId: string, outputPath: string, options?: { marginsType?: number, pageSize?: string, printBackground?: boolean } }` | `string` (path) | Save page as PDF to `outputPath`. Errors: disk-full, permission-denied → rejected promise |
 | `permission:respond` | `{ origin: string, permission: PermissionType, allow: boolean }` | `void` | Respond to permission prompt |
 | `contentSetting:set` | `{ origin: string, setting: ContentSettingType, value: 'allow' | 'block' | 'ask' }` | `void` | Set per-site content setting |
 | `contextMenu:clicked` | `{ itemId: string }` | `void` | Context menu item selected |
@@ -322,6 +322,9 @@ window.horizonAPI.on(channel, callback)
 | `autofill:getAddresses` | `{}` | `SavedAddress[]` | List saved addresses |
 | `autofill:saveAddress` | `{ address: SavedAddress }` | `SavedAddress` | Save address |
 | `autofill:removeAddress` | `{ addressId: string }` | `void` | Remove address |
+| `bookmark:import` | `{ format: 'netscape-html', data: string }` | `Bookmark[]` | Import bookmarks from HTML |
+| `bookmark:export` | `{ format: 'netscape-html' }` | `string` | Export bookmarks to HTML |
+| `app:checkForUpdates` | `{}` | `{ version?: string, updateAvailable: boolean }` | Manually check for updates |
 | `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) - see Appendix C |
 
 ### 7.3 Main → Renderer (on/send)
@@ -346,7 +349,7 @@ window.horizonAPI.on(channel, callback)
 | `download:failed` | `{ downloadId: string, error: string }` | Download error |
 | `settings:changed` | `{ key: string, value: any }` | Setting changed externally |
 | `zoom:changed` | `{ tabId: string, level: number }` | Zoom level changed |
-| `find:result` | `{ requestId: number, matches: number, activeMatchOrdinal: number, selectionArea?: Rectangle }` | Find result |
+| `find:result` | `{ requestId: number, matches: number, activeMatchOrdinal: number, selectionArea?: { x: number, y: number, width: number, height: number } }` | Find result |
 | `fullscreen:changed` | `{ isFullscreen: boolean }` | Fullscreen state changed |
 | `keyboard:shortcut` | `{ accelerator: string }` | Global shortcut triggered |
 | `contextMenu:show` | `{ x: number, y: number, items: ContextMenuItem[] }` | Show custom context menu |
@@ -686,7 +689,7 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 
 1. **General** - startup, search engine, downloads, language
 2. **Appearance** - theme, accent color, bookmarks bar, font settings
-3. **Privacy** — cookie settings, clear data, Do Not Track
+3. **Privacy** — cookie settings, clear data, Do Not Track, proxy settings
 4. **Passwords** - saved passwords list, auto-save toggle, export/import
 5. **Search** - default engine, manage search engines, keyword shortcuts
 6. **Downloads** - default folder, ask where to save, notifications
@@ -803,6 +806,9 @@ interface SavedAddress {
 - `autofill:getAddresses` → returns `SavedAddress[]`
 - `autofill:saveAddress` → saves address
 - `autofill:removeAddress` → removes address
+- `bookmark:import` → `{ format: 'netscape-html', data: string }` → `Bookmark[]`
+- `bookmark:export` → `{ format: 'netscape-html' }` → `string`
+- `app:checkForUpdates` → `{}` → `{ version?: string, updateAvailable: boolean }`
 
 **Dropdown Positioning:**
 The autofill dropdown is a React overlay positioned absolutely within the renderer window. Coordinates are transformed from BrowserView content-space to window-space:
@@ -834,7 +840,7 @@ The autofill dropdown is a React overlay positioned absolutely within the render
 | Feature | Behavior |
 |---------|----------|
 | Toggle | `Ctrl+Shift+I` / `Cmd+Option+I` or F12 |
-| Mode | Dock right, bottom, or undocked |
+| Mode | Dock right, bottom, or undocked (detached window) |
 | Per-tab | Each tab has its own DevTools instance |
 
 ### 10.12 Pop-ups, Dialogs, and File Pickers
@@ -1322,9 +1328,9 @@ The following open questions have been resolved for v1.0:
 | `Ctrl/Cmd + -` | Zoom out |
 | `Ctrl/Cmd + 0` | Reset zoom |
 | `Ctrl/Cmd + P` | Print |
-| `Ctrl/Cmd + S` | Save page |
+| `Ctrl/Cmd + S` | Save page (MHTML snapshot, v1.1+) |
 | `F12` / `Ctrl/Cmd + Shift + I` | Toggle DevTools |
-| `Ctrl/Cmd + Shift + N` | New window |
+| `Ctrl/Cmd + Shift + N` | New window (v1.1+) |
 | `Ctrl/Cmd + Shift + W` | Close window |
 | `Ctrl/Cmd + ,` | Open settings |
 | `Ctrl/Cmd + 1..8` | Switch to tab N |

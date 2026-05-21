@@ -322,7 +322,7 @@ window.horizonAPI.on(channel, callback)
 | `autofill:getAddresses` | `{}` | `SavedAddress[]` | List saved addresses |
 | `autofill:saveAddress` | `{ address: SavedAddress }` | `SavedAddress` | Save address |
 | `autofill:removeAddress` | `{ addressId: string }` | `void` | Remove address |
-| `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) |
+| `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) - see Appendix C |
 
 ### 7.3 Main → Renderer (on/send)
 
@@ -354,7 +354,7 @@ window.horizonAPI.on(channel, callback)
 | `permission:request` | `{ origin: string, permission: PermissionType }` | Permission prompt needed |
 | `app:updateAvailable` | `{ version: string }` | Auto-update available |
 | `autofill:showDropdown` | `{ tabId: string, fieldId: string, suggestions: AutofillMatch[], position: { x: number, y: number, width: number, height: number } }` | Show autofill dropdown at given coordinates
-| `window:created` | `{ windowId: string }` | New window created (v1.1+) |
+| `window:created` | `{ windowId: string }` | New window created (v1.1+) - see Appendix C |
 | `app:updateDownloaded` | `{ version: string }` | Update ready to install |
 | `tab:hibernated` | `{ tabId: string }` | Tab was hibernated |
 | `tab:woken` | `{ tabId: string }` | Tab was restored from hibernation |
@@ -494,22 +494,24 @@ interface Settings {
     formData: boolean;
   };
   doNotTrack: boolean;
-  safeBrowsing: boolean;
-
   // Permissions (per-origin overrides stored separately)
   defaultPermissions: Record<PermissionType, 'allow' | 'block' | 'ask'>;
+  permissionOverrides: Record<string, Record<PermissionType, 'allow' | 'block' | 'ask'>>;  // origin → permission → decision
   contentSettings: Record<string, Record<ContentSettingType, 'allow' | 'block' | 'ask'>>;  // origin → setting → decision
 
   // Tabs
   autoHibernate: boolean;         // default true
   hibernationTimeoutMinutes: number;  // default 30
   maxActiveTabs: number;          // default 20
+  confirmCloseMultipleTabs: boolean;  // default true
 
   // Advanced
-  hardwareAcceleration: boolean;
-  smoothScrolling: boolean;
-  spellcheck: boolean;
-  spellcheckLanguages: string[];
+  hardwareAcceleration: boolean;  // default true
+  smoothScrolling: boolean;       // default true
+  proxyType: 'system' | 'direct' | 'manual';  // default 'system'
+  proxyRules?: string;            // e.g., "http=proxy:8080;https=proxy:8080"
+  spellcheck: boolean;            // default true
+  spellcheckLanguages: string[];  // default ['en-US']
 
   // Security
   certificateOverrides: Record<string, { allow: boolean, errorTypes: CertificateErrorType[] }>;  // origin → decision + which errors are allowed
@@ -666,7 +668,7 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 
 1. **General** - startup, search engine, downloads, language
 2. **Appearance** - theme, accent color, bookmarks bar, font settings
-3. **Privacy** - cookie settings, clear data, Do Not Track, safe browsing
+3. **Privacy** — cookie settings, clear data, Do Not Track
 4. **Passwords** - saved passwords list, auto-save toggle, export/import
 5. **Search** - default engine, manage search engines, keyword shortcuts
 6. **Downloads** - default folder, ask where to save, notifications
@@ -755,7 +757,6 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 | Feature | Behavior |
 |---------|----------|
 | Address autofill | Save addresses (name, street, city, postal code, country, phone, email). Detect form fields by heuristics (input type, name attribute, autocomplete attribute). Suggest matching addresses in dropdown. |
-| Payment autofill | Save credit cards (number, expiry, CVV, name, billing address). CVV never stored persistently - prompt each time. Card numbers encrypted with same mechanism as passwords. |
 | Password autofill | See Password Manager (Section 10.7) |
 | Form detection | Heuristic-based field type detection; respect `autocomplete` HTML attributes |
 | Trigger | Dropdown appears on focus of recognized field; arrow keys + Enter to select |
@@ -1190,6 +1191,12 @@ tests/
 - Update check on startup + every 4 hours
 - Silent download, prompt to install on next restart
 
+**Error Handling:**
+- Download failure: Retry up to 3 times with exponential backoff; show "Update failed" toast if all retries exhausted
+- Signature verification failure: Discard update, show security warning, do not prompt to install
+- Installation failure: Log error, show "Update failed" notification, retry on next check cycle
+- Offline during update check: Skip silently, retry on next scheduled check
+
 **Update Notification UI:**
 - `app:updateAvailable` → subtle dot/badge on Settings menu icon + toast notification "Update available"
 - `app:updateDownloaded` → modal dialog "Restart to update" with "Restart Now" / "Later" buttons
@@ -1202,6 +1209,17 @@ tests/
 | macOS | Apple Developer ID |
 | Windows | EV Code Signing Certificate |
 | Linux | GPG signing for packages |
+
+---
+
+## Appendix C: Future IPC Channels (v1.1+)
+
+The following channels are defined for forward-compatibility but not implemented in v1.0:
+
+| Direction | Channel | Payload | Description |
+|-----------|---------|---------|-------------|
+| Renderer → Main | `window:create` | `{ url?: string }` | Create additional BrowserWindow |
+| Main → Renderer | `window:created` | `{ windowId: string }` | New window created |
 
 ---
 
@@ -1262,7 +1280,7 @@ The following open questions have been resolved for v1.0:
 2. **Search engine partnerships:** Default to DuckDuckGo for privacy alignment. Google, Bing, and custom search engines available in settings. No revenue-sharing partnerships in v1.
 3. **Update server infrastructure:** GitHub Releases for v1 (free, reliable, integrates with electron-updater). Self-hosted update server considered for v2 if custom sync backend is built.
 4. **Crash reporting:** No crash reporting in v1.0. Goal #4 (Privacy by Design / no telemetry) takes precedence. Manual bug reports via GitHub issues. Crash reporting may be introduced in v2 as strictly opt-in.
-5. **Telemetry:** Completely absent in v1.0. The only network requests made by the browser are: (a) web page loads, (b) search queries to the user's chosen engine, (c) update checks (sends app version + OS type only, no unique identifier), (d) safe browsing checks (if enabled). All of these are user-visible and configurable.
+5. **Telemetry:** Completely absent in v1.0. The only network requests made by the browser are: (a) web page loads, (b) search queries to the user's chosen engine, (c) update checks (sends app version + OS type only, no unique identifier), All of these are user-visible and configurable.
 
 ---
 

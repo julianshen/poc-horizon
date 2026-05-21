@@ -1,17 +1,17 @@
-# Horizon Browser — Design Specification
+# Horizon Browser - Design Specification
 
-> **Status:** Draft  
-> **Date:** 2026-05-21  
-> **Scope:** v1.0 — Cross-platform desktop browser with Chrome parity (no extensions, no sync)
+> **Status:** Draft
+> **Date:** 2026-05-21
+> **Scope:** v1.0 - Cross-platform desktop browser with Chrome parity (no extensions, no sync)
 
 ---
 
 ## 1. Overview
 
-**Horizon** is a cross-platform desktop web browser built on Electron, targeting true Chromium rendering parity with a custom-branded UI. It delivers core browser functionality—tabs, navigation, bookmarks, history, downloads, settings, find-in-page, password manager, and autofill—without the backend complexity of extensions or cloud sync.
+**Horizon** is a cross-platform desktop web browser built on Electron, targeting true Chromium rendering parity with a custom-branded UI. It delivers core browser functionality-tabs, navigation, bookmarks, history, downloads, settings, find-in-page, password manager, and autofill-without the backend complexity of extensions or cloud sync.
 
-**Target Platforms:** macOS, Windows, Linux  
-**Target Timeline:** 3–6 months for v1.0  
+**Target Platforms:** macOS, Windows, Linux
+**Target Timeline:** 3-6 months for v1.0
 
 ---
 
@@ -191,9 +191,7 @@ horizon/
 │   └── constants.ts                    # App name, version, default settings, search engines
 │
 ├── resources/                          # Static app resources (not bundled by Vite)
-│   ├── icons/                          # App icon (icns, ico, png sizes)
-│   ├── locales/                        # i18n translation files (future)
-│   └── themes/                         # Theme CSS overrides
+│   └── icons/                          # App icon (icns, ico, png sizes)
 │
 ├── build/                              # Build & packaging configuration
 │   ├── entitlements.mac.plist          # macOS entitlements
@@ -277,7 +275,7 @@ window.horizonAPI.on(channel, callback)
 | `navigation:forward` | `{ tabId: string }` | `void` | Go forward |
 | `navigation:reload` | `{ tabId: string, hard?: boolean }` | `void` | Reload page |
 | `navigation:stop` | `{ tabId: string }` | `void` | Stop loading |
-| `zoom:set` | `{ tabId: string, level: number }` | `number` | Set zoom (0.25–5.0) |
+| `zoom:set` | `{ tabId: string, level: number }` | `number` | Set zoom (0.25-5.0) |
 | `zoom:reset` | `{ tabId: string }` | `number` | Reset zoom to 1.0 |
 | `find:start` | `{ tabId: string, text: string }` | `FindResult` | Start find |
 | `find:next` | `{ tabId: string, forward?: boolean }` | `FindResult` | Find next/prev |
@@ -313,8 +311,8 @@ window.horizonAPI.on(channel, callback)
 | `app:getVersion` | `{}` | `string` | App version |
 | `devtools:toggle` | `{ tabId: string }` | `void` | Toggle DevTools |
 | `devtools:open` | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'detach' }` | `void` | Open DevTools |
-| `print:start` | `{ tabId: string }` | `void` | Open print dialog |
-| `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Save page as PDF |
+| `print:start` | `{ tabId: string }` | `void` | Open system print dialog (user chooses printer, PDF, etc.) |
+| `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Programmatically save page as PDF to a file path (no dialog). Errors: disk-full, permission-denied → rejected promise |
 | `permission:respond` | `{ origin: string, permission: PermissionType, allow: boolean }` | `void` | Respond to permission prompt |
 | `contentSetting:set` | `{ origin: string, setting: ContentSettingType, value: 'allow' | 'block' | 'ask' }` | `void` | Set per-site content setting |
 | `contextMenu:clicked` | `{ itemId: string }` | `void` | Context menu item selected |
@@ -324,9 +322,6 @@ window.horizonAPI.on(channel, callback)
 | `autofill:getAddresses` | `{}` | `SavedAddress[]` | List saved addresses |
 | `autofill:saveAddress` | `{ address: SavedAddress }` | `SavedAddress` | Save address |
 | `autofill:removeAddress` | `{ addressId: string }` | `void` | Remove address |
-| `autofill:getPaymentMethods` | `{}` | `SavedPaymentMethod[]` | List saved payment methods (masked) |
-| `autofill:savePaymentMethod` | `{ method: SavedPaymentMethod }` | `SavedPaymentMethod` | Save payment method |
-| `autofill:removePaymentMethod` | `{ methodId: string }` | `void` | Remove payment method |
 | `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) |
 
 ### 7.3 Main → Renderer (on/send)
@@ -340,7 +335,7 @@ window.horizonAPI.on(channel, callback)
 | `tab:reordered` | `{ tabIds: string[] }` | Tabs reordered |
 | `navigation:state` | `{ tabId: string, canGoBack: boolean, canGoForward: boolean, isLoading: boolean, url: string }` | Navigation state change |
 | `load:started` | `{ tabId: string, url: string }` | Page load started |
-| `load:progress` | `{ tabId: string, percent: number }` | Load progress (0–100) |
+| `load:progress` | `{ tabId: string, percent: number }` | Load progress (0-100) |
 | `load:finished` | `{ tabId: string, url: string }` | Page load complete |
 | `load:failed` | `{ tabId: string, errorCode: number, errorDescription: string, validatedURL: string }` | Page load failed |
 | `page:title` | `{ tabId: string, title: string }` | Page title changed |
@@ -358,7 +353,7 @@ window.horizonAPI.on(channel, callback)
 | `certificate:error` | `{ url: string, error: string, certificate?: CertificateInfo }` | SSL certificate error |
 | `permission:request` | `{ origin: string, permission: PermissionType }` | Permission prompt needed |
 | `app:updateAvailable` | `{ version: string }` | Auto-update available |
-| `autofill:showDropdown` | `{ tabId: string, fieldId: string, suggestions: AutofillMatch[] }` | Show autofill dropdown |
+| `autofill:showDropdown` | `{ tabId: string, fieldId: string, suggestions: AutofillMatch[], position: { x: number, y: number, width: number, height: number } }` | Show autofill dropdown at given coordinates
 | `window:created` | `{ windowId: string }` | New window created (v1.1+) |
 | `app:updateDownloaded` | `{ version: string }` | Update ready to install |
 | `tab:hibernated` | `{ tabId: string }` | Tab was hibernated |
@@ -400,18 +395,18 @@ interface Tab {
   title: string;                 // Page title (or URL if empty)
   favicon?: string;              // Data URL of cached favicon
   isLoading: boolean;
-  loadProgress: number;          // 0–100
+  loadProgress: number;          // 0-100
   canGoBack: boolean;
   canGoForward: boolean;
   isPinned: boolean;
   isMuted: boolean;
   isActive: boolean;
   isHibernated: boolean;         // BrowserView destroyed, state preserved
-  zoomLevel: number;             // 0.25–5.0, default 1.0
+  zoomLevel: number;             // 0.25-5.0, default 1.0
   createdAt: number;             // timestamp
   lastAccessedAt: number;        // timestamp
   errorState?: TabErrorState;    // If load/crash occurred
-  historyStack?: { url: string, title: string }[];  // Back/forward entries for session restore
+  historyStack?: { url: string, title: string }[];  // Back/forward entries for session restore. Populated on hibernation and app quit only (not on every navigation).
 }
 
 interface TabErrorState {
@@ -483,8 +478,9 @@ interface Settings {
   theme: 'light' | 'dark' | 'system';
   accentColor: string;           // hex color
   showBookmarksBar: boolean;
-  fontSize: number;              // 12–24
-  minimumFontSize: number;       // 6–24
+  showStatusBar: boolean;        // default true
+  fontSize: number;              // 12-24
+  minimumFontSize: number;       // 6-24
   pageZoom: number;              // default zoom for new tabs
 
   // Privacy
@@ -545,6 +541,48 @@ type ContentSettingType =
   | 'plugins';
 ```
 
+### 8.6 Additional Interfaces (Referenced in IPC)
+
+```typescript
+interface FindResult {
+  requestId: number;
+  matches: number;
+  activeMatchOrdinal: number;
+  selectionArea?: { x: number; y: number; width: number; height: number };
+}
+
+interface Suggestion {
+  type: 'url' | 'history' | 'bookmark' | 'search';
+  title: string;
+  url?: string;
+  query?: string;
+  favicon?: string;
+}
+
+interface ContextMenuItem {
+  id: string;
+  label: string;
+  type?: 'normal' | 'separator';
+  enabled?: boolean;
+  accelerator?: string;
+}
+
+interface FormField {
+  id: string;
+  type: 'text' | 'email' | 'password' | 'tel' | 'number' | 'select';
+  name: string;
+  placeholder?: string;
+  autocomplete?: string;
+}
+
+interface AutofillMatch {
+  fieldId: string;
+  value: string;
+  label: string;
+  type: 'address' | 'password';
+}
+```
+
 ---
 
 ## 9. Key Components
@@ -569,10 +607,23 @@ The Omnibox combines URL display, editing, and a suggestion dropdown.
 - 🛡️ Dangerous (certificate error, malware warning)
 
 **Keyboard navigation:**
-- `Ctrl+L` / `Cmd+L` — Focus omnibox, select all
-- `Esc` — Cancel editing, revert to display mode
-- `↓/↑` — Navigate suggestion dropdown
-- `Enter` — Navigate to selected suggestion or search
+- `Ctrl+L` / `Cmd+L` - Focus omnibox, select all
+- `Esc` - Cancel editing, revert to display mode
+- `↓/↑` - Navigate suggestion dropdown
+- `Enter` - Navigate to selected suggestion or search
+
+### 9.1a OmniboxSuggestionEngine
+
+Service responsible for generating omnibox suggestions. Runs in the main process with direct access to HistoryManager, BookmarkManager, and search engine configuration.
+
+**Algorithm:**
+1. If query is empty → return top 5 frecency-ranked history URLs
+2. If query looks like a URL (contains `.` or `://`) → return direct match + history URLs starting with query
+3. Otherwise → return history matches (frecency-ranked, max 3) + bookmark matches (max 2) + search suggestion from default engine (1 item)
+
+**Search suggestions:** Fetched via HTTPS GET to the search engine's suggestion API (e.g., `https://suggestqueries.google.com/complete/search?client=chrome&q={query}`). Cached for 5 minutes per query. No API keys required for DuckDuckGo; Google suggestions use the public Chrome endpoint.
+
+**Performance:** All suggestion queries complete within 100ms. History and bookmark searches use in-memory indexes built at startup.
 
 ### 9.2 TabBar
 
@@ -605,20 +656,21 @@ contentHeight = windowHeight - contentY - (showStatusBar ? statusBarHeight : 0)
 
 **BrowserView management:**
 - Active tab: `browserView.setBounds(contentAreaBounds)`, `browserView.setAutoResize({ width: true, height: true })`
-- Inactive tabs: `browserView.setBounds({ x: 0, y: 0, width: 0, height: 0 })` or destroy
+- Inactive non-hibernated tabs: `browserView.setBounds({ x: 0, y: 0, width: 0, height: 0 })` (hidden but alive)
+- Hibernated tabs: BrowserView destroyed entirely; recreated on wake
 - On window resize: auto-resize handles active tab; recompute bounds for all hidden tabs
 
 ### 9.4 Settings Panel
 
 Slide-in panel (right side, ~400px wide) with accordion sections:
 
-1. **General** — startup, search engine, downloads, language
-2. **Appearance** — theme, accent color, bookmarks bar, font settings
-3. **Privacy** — cookie settings, clear data, Do Not Track, safe browsing
-4. **Passwords** — saved passwords list, auto-save toggle, export/import
-5. **Search** — default engine, manage search engines, keyword shortcuts
-6. **Downloads** — default folder, ask where to save, notifications
-7. **Advanced** — hardware acceleration, proxy, reset settings, about
+1. **General** - startup, search engine, downloads, language
+2. **Appearance** - theme, accent color, bookmarks bar, font settings
+3. **Privacy** - cookie settings, clear data, Do Not Track, safe browsing
+4. **Passwords** - saved passwords list, auto-save toggle, export/import
+5. **Search** - default engine, manage search engines, keyword shortcuts
+6. **Downloads** - default folder, ask where to save, notifications
+7. **Advanced** - hardware acceleration, proxy, reset settings, about
 
 ---
 
@@ -672,10 +724,10 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 | Feature | Behavior |
 |---------|----------|
 | Start download | Auto-download or prompt for location (configurable) |
-| Download bar | Bottom bar appears on active download, shows progress |
+| Download bar | Part of StatusBar. Shows download progress, file name, and actions when active downloads exist. Hidden when no active downloads.
 | Download page | Full list with status, speed, time remaining |
 | Actions | Open, show in folder, pause, resume, cancel, retry |
-| Safety | Block dangerous file types, scan with safe browsing |
+| Safety | Block dangerous file types (.exe, .dmg, .sh) via extension blacklist |
 
 ### 10.6 Find in Page
 
@@ -696,17 +748,18 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 | Auto-fill | Fill username/password on recognized login forms |
 | Storage | System keychain when available (macOS Keychain, Windows Credential Manager / DPAPI, Linux libsecret/Secret Service). Fallback: AES-256-GCM encrypted JSON file secured with OS-specific entropy. |
 | Management | View, search, edit, delete saved passwords |
-| Master password | Optional additional encryption layer (encrypts the key used for JSON fallback) |
+| Master password | Deferred to v1.2. OS keychain + AES fallback is sufficient for v1.0. |
 
 ### 10.8 Autofill
 
 | Feature | Behavior |
 |---------|----------|
 | Address autofill | Save addresses (name, street, city, postal code, country, phone, email). Detect form fields by heuristics (input type, name attribute, autocomplete attribute). Suggest matching addresses in dropdown. |
-| Payment autofill | Save credit cards (number, expiry, CVV, name, billing address). CVV never stored persistently — prompt each time. Card numbers encrypted with same mechanism as passwords. |
+| Payment autofill | Save credit cards (number, expiry, CVV, name, billing address). CVV never stored persistently - prompt each time. Card numbers encrypted with same mechanism as passwords. |
 | Password autofill | See Password Manager (Section 10.7) |
 | Form detection | Heuristic-based field type detection; respect `autocomplete` HTML attributes |
 | Trigger | Dropdown appears on focus of recognized field; arrow keys + Enter to select |
+| Payment autofill | Deferred to v1.2 |
 
 **Data Models:**
 ```typescript
@@ -724,26 +777,21 @@ interface SavedAddress {
   email?: string;
 }
 
-interface SavedPaymentMethod {
-  id: string;
-  label: string;
-  cardNumber: string;            // Last 4 digits only stored; full encrypted
-  cardNumberEncrypted: string;   // AES-256-GCM encrypted full number
-  expiryMonth: string;
-  expiryYear: string;
-  cardholderName: string;
-  billingAddressId?: string;
-  // Note: CVV is intentionally NOT stored. User is prompted for CVV at checkout each time.
-}
+// Note: SavedPaymentMethod deferred to v1.2. Payment autofill not included in v1.0.
 ```
 
 **IPC Channels:**
 - `autofill:getAddresses` → returns `SavedAddress[]`
 - `autofill:saveAddress` → saves address
 - `autofill:removeAddress` → removes address
-- `autofill:getPaymentMethods` → returns `SavedPaymentMethod[]` (masked)
-- `autofill:savePaymentMethod` → saves payment method
-- `autofill:removePaymentMethod` → removes payment method
+
+**Dropdown Positioning:**
+The autofill dropdown is a React overlay positioned absolutely within the renderer window. Coordinates are transformed from BrowserView content-space to window-space:
+1. BrowserView executes JS to get field bounding rect: `element.getBoundingClientRect()`
+2. Result sent to main via `autofill:detectFields`
+3. Main process converts BrowserView coordinates to window coordinates (adds BrowserView's own bounds offset)
+4. Renderer receives `autofill:showDropdown` with screen-space `position` and renders overlay
+5. Overlay is closed on blur, Esc, or navigation away from the field
 
 ### 10.9 Zoom
 
@@ -832,7 +880,10 @@ On app quit/crash:
 2. On next launch (if `startupBehavior: 'restore'`):
    - Read `session.json`
    - Recreate tabs with their URLs
-   - Restore back/forward history from `historyStack` by loading the current URL first, then pushing previous URLs into the history stack via `webContents.navigationHistory` API where available, or accepting that back/forward history is best-effort for v1.0
+   - Restore back/forward history from `historyStack`:
+     - Primary: Use `webContents.navigationHistory` API (Electron 28+) to push history entries programmatically
+     - Fallback: Load current URL only; back/forward history lost. User sees a single history entry
+     - This is acceptable for v1.0; full history restoration is a best-effort enhancement
    - Restore window position/size
    - Activate last active tab
    - If `session.json` is missing or corrupted, fall back to `startupBehavior: 'new-tab'`
@@ -860,7 +911,7 @@ On app quit/crash:
 |----------|----------|
 | Disk full during download | Pause download, show "insufficient disk space" error, allow retry after cleanup |
 | Favicon cache > 100MB | LRU eviction; keep most recent 500 favicons |
-| Memory pressure (macOS/Windows) | Trigger aggressive tab hibernation (reduce maxActiveTabs by 50%) |
+| Memory pressure (macOS/Windows) | Unimplemented in v1.0. Electron lacks cross-platform memory pressure API. Future: use `process.memoryUsage()` thresholds or OS-specific APIs. |
 | History > 90 days old | Auto-prune on app launch (configurable retention) |
 
 ### 11.9 Auto-reload on Reconnect
@@ -921,7 +972,7 @@ form-action 'none';
 | Open External | Ask | Prompt per-protocol |
 | Display Capture | Block | Prompt per-origin |
 
-User choices persisted in settings and honored across sessions.
+User choices are persisted in `contentSettings` (for content settings like popups, JS, images) and `defaultPermissions` (for permission prompts like geolocation, camera). Both are stored per-origin in the Settings schema and honored across sessions.
 
 ### 12.5 Certificate Handling
 
@@ -950,13 +1001,13 @@ Overrides stored per-origin in settings.
 ### 13.1 Unit Tests (Vitest)
 
 **Coverage targets:**
-- `url.ts` — normalize, extractDomain, isValidURL, etc.
-- `search-engine.ts` — query parsing, engine selection
-- `format.ts` — date, file size, duration formatting
+- `url.ts` - normalize, extractDomain, isValidURL, etc.
+- `search-engine.ts` - query parsing, engine selection
+- `format.ts` - date, file size, duration formatting
 - Pure React components (with React Testing Library)
 - Zustand store logic (with mock state)
 
-**No Electron required** — fast execution (< 1s per file).
+**No Electron required** - fast execution (< 1s per file).
 
 ### 13.2 Integration Tests (Vitest + Mocked Electron)
 
@@ -1015,14 +1066,14 @@ tests/
 
 ### 14.1 Visual Identity
 
-**Name:** Horizon  
-**Tagline:** "Explore without limits"  
+**Name:** Horizon
+**Tagline:** "Explore without limits"
 
 **Design principles:**
-1. **Familiar yet fresh** — Chrome users feel at home, but distinct visual identity
-2. **Content-first** — Chrome stays minimal; web content is the star
-3. **Responsive chrome** — UI adapts to window size, fullscreen, and theme
-4. **Accessible** — WCAG 2.1 AA compliance, keyboard-navigable, screen reader friendly
+1. **Familiar yet fresh** - Chrome users feel at home, but distinct visual identity
+2. **Content-first** - Chrome stays minimal; web content is the star
+3. **Responsive chrome** - UI adapts to window size, fullscreen, and theme
+4. **Accessible** - WCAG 2.1 AA compliance, keyboard-navigable, screen reader friendly
 
 ### 14.2 Color System (CSS Custom Properties)
 

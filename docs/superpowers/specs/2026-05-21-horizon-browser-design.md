@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-**Horizon** is a cross-platform desktop web browser built on Electron, targeting true Chromium rendering parity with a custom-branded UI. It delivers core browser functionality—tabs, navigation, bookmarks, history, downloads, settings, find-in-page, password manager, autofill, and media controls—without the backend complexity of extensions or cloud sync.
+**Horizon** is a cross-platform desktop web browser built on Electron, targeting true Chromium rendering parity with a custom-branded UI. It delivers core browser functionality—tabs, navigation, bookmarks, history, downloads, settings, find-in-page, password manager, and autofill—without the backend complexity of extensions or cloud sync.
 
 **Target Platforms:** macOS, Windows, Linux  
 **Target Timeline:** 3–6 months for v1.0  
@@ -71,7 +71,8 @@
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | BrowserView vs. webview tag | `BrowserView` | Better performance, true multi-tab isolation, closer to Chrome's model |
-| Single window + stacked BrowserViews | Yes | Fastest dev velocity; used by Arc, Brave, and most Electron browsers |
+| Primary window model | Single window + stacked BrowserViews | Fastest dev velocity; used by Arc, Brave, and most Electron browsers |
+| Multi-window support | Future (v1.1+) | WindowManager architecture supports multiple windows; v1.0 focuses on single-window polish |
 | React for chrome UI | Yes | Largest ecosystem, best hiring pool, component model fits browser chrome |
 | Zustand for state | Yes | Lightweight, no boilerplate, works well with IPC-synced state |
 | Vite for build | Yes | Fast HMR, fast production builds, native ESM |
@@ -293,12 +294,14 @@ window.horizonAPI.on(channel, callback)
 | `app:getVersion` | `{}` | `string` | App version |
 | `devtools:toggle` | `{ tabId: string }` | `void` | Toggle DevTools |
 | `devtools:open` | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'detach' }` | `void` | Open DevTools |
-| `screenshot:capture` | `{ tabId: string }` | `string` (data URL) | Capture page |
 | `print:start` | `{ tabId: string }` | `void` | Open print dialog |
 | `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Save page as PDF |
 | `permission:respond` | `{ origin: string, permission: PermissionType, allow: boolean }` | `void` | Respond to permission prompt |
 | `contextMenu:clicked` | `{ itemId: string }` | `void` | Context menu item selected |
-| `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Save page as PDF |
+| `omnibox:getSuggestions` | `{ query: string, maxResults?: number }` | `Suggestion[]` | Get omnibox suggestions |
+| `autofill:detectFields` | `{ tabId: string, fields: FormField[] }` | `AutofillMatch[]` | Match form fields to saved data |
+| `autofill:fillField` | `{ tabId: string, fieldId: string, value: string }` | `void` | Fill a form field via webContents |
+| `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) |
 
 ### 7.3 Main → Renderer (on/send)
 
@@ -328,8 +331,9 @@ window.horizonAPI.on(channel, callback)
 | `contextMenu:show` | `{ x: number, y: number, items: ContextMenuItem[] }` | Show custom context menu |
 | `certificate:error` | `{ url: string, error: string, certificate?: CertificateInfo }` | SSL certificate error |
 | `permission:request` | `{ origin: string, permission: PermissionType }` | Permission prompt needed |
-| `contextMenu:clicked` | `{ itemId: string }` | Context menu item selected |
 | `app:updateAvailable` | `{ version: string }` | Auto-update available |
+| `autofill:showDropdown` | `{ tabId: string, fieldId: string, suggestions: AutofillMatch[] }` | Show autofill dropdown |
+| `window:created` | `{ windowId: string }` | New window created (v1.1+) |
 | `app:updateDownloaded` | `{ version: string }` | Update ready to install |
 | `tab:hibernated` | `{ tabId: string }` | Tab was hibernated |
 | `tab:woken` | `{ tabId: string }` | Tab was restored from hibernation |
@@ -473,6 +477,11 @@ interface Settings {
   // Permissions (per-origin overrides stored separately)
   defaultPermissions: Record<PermissionType, 'allow' | 'block' | 'ask'>;
 
+  // Tabs
+  autoHibernate: boolean;         // default true
+  hibernationTimeoutMinutes: number;  // default 30
+  maxActiveTabs: number;          // default 20
+
   // Advanced
   hardwareAcceleration: boolean;
   smoothScrolling: boolean;
@@ -480,7 +489,7 @@ interface Settings {
   spellcheckLanguages: string[];
 
   // Security
-  certificateOverrides: Record<string, 'allow' | 'block'>;  // hostname → decision
+  certificateOverrides: Record<string, 'allow' | 'block'>;  // origin → decision
 }
 
 type PermissionType =
@@ -537,7 +546,8 @@ The Omnibox combines URL display, editing, and a suggestion dropdown.
 - Hover on tab shows full title as tooltip
 
 **Hibernation:**
-- Inactive tabs after N minutes (configurable, default 30) can be hibernated
+- Inactive tabs after N minutes can be hibernated
+- Configurable via settings: `autoHibernate` (boolean, default true), `hibernationTimeoutMinutes` (number, default 30), `maxActiveTabs` (number, default 20)
 - Hibernated tab: BrowserView destroyed, state serialized, favicon retained
 - On activation: recreate BrowserView, restore state, reload URL
 
@@ -683,6 +693,7 @@ interface SavedPaymentMethod {
   expiryYear: string;
   cardholderName: string;
   billingAddressId?: string;
+  // Note: CVV is intentionally NOT stored. User is prompted for CVV at checkout each time.
 }
 ```
 
@@ -718,6 +729,17 @@ interface SavedPaymentMethod {
 | Toggle | `Ctrl+Shift+I` / `Cmd+Option+I` or F12 |
 | Mode | Dock right, bottom, or undocked |
 | Per-tab | Each tab has its own DevTools instance |
+
+### 10.12 Pop-ups, Dialogs, and File Pickers
+
+| Feature | Behavior |
+|---------|----------|
+| `window.open()` | Blocked by default. User can allow per-site via settings. If allowed, opens in new tab (not new BrowserWindow in v1.0). |
+| `beforeunload` | Show native confirmation dialog when user attempts to close/refresh tab with unsaved changes. |
+| Alert/Confirm/Prompt | Native OS dialog, modal to the BrowserView. |
+| File picker (upload) | Native OS file picker. Renderer forwards `showOpenDialog` result to BrowserView. |
+| Color picker | Native OS color picker (on supported platforms) or HTML fallback. |
+| Date picker | BrowserView native HTML date picker (no custom overlay). |
 
 ---
 
@@ -766,11 +788,14 @@ On `unresponsive` (after ~30s):
 
 On app quit/crash:
 1. Serialize `{ tabs: [...], activeTabId, windowBounds }` to `session.json`
+   - Each tab includes `url`, `title`, `historyStack`, `zoomLevel`, `isPinned`
 2. On next launch (if `startupBehavior: 'restore'`):
    - Read `session.json`
    - Recreate tabs with their URLs
+   - Restore back/forward history from `historyStack` via `webContents.goToIndex()` where possible
    - Restore window position/size
    - Activate last active tab
+   - If `session.json` is missing or corrupted, fall back to `startupBehavior: 'new-tab'`
 
 ### 11.6 Invalid URLs
 
@@ -778,6 +803,32 @@ On app quit/crash:
 - Unknown protocol (`mailto:`, `tel:`) → `shell.openExternal()`
 - `file://` → validate path is within safe directories
 - Malformed URL → show error or search with default engine
+
+### 11.7 Corrupted / Unreadable Local Files
+
+| File | Behavior |
+|------|----------|
+| `settings.json` corrupted | Reset to defaults, log warning, show one-time notification |
+| `bookmarks.json` corrupted | Show empty bookmarks, offer import from backup |
+| `session.json` corrupted | Fall back to new-tab startup |
+| `history.db` corrupted | Delete and recreate empty database |
+| Schema version mismatch | Migrate if possible; reset with backup if migration fails |
+
+### 11.8 Disk Space & Resource Limits
+
+| Scenario | Behavior |
+|----------|----------|
+| Disk full during download | Pause download, show "insufficient disk space" error, allow retry after cleanup |
+| Favicon cache > 100MB | LRU eviction; keep most recent 500 favicons |
+| Memory pressure (macOS/Windows) | Trigger aggressive tab hibernation (reduce maxActiveTabs by 50%) |
+| History > 90 days old | Auto-prune on app launch (configurable retention) |
+
+### 11.9 Auto-reload on Reconnect
+
+When connection is restored after being offline:
+- Only the currently-active tab auto-reloads if it was showing an offline error page
+- If the user has navigated elsewhere (typed a new URL, switched tabs, or interacted with the page), no auto-reload occurs
+- Form data is not preserved across the reload; user is warned if they have unsaved form data
 
 ---
 
@@ -892,7 +943,13 @@ Overrides stored per-origin in settings.
 **Test infrastructure:**
 - Local Express server serving test pages with known content
 - Test fixtures for bookmarks, history, settings
-- Screenshot baselines per platform
+- Screenshot baselines per platform (critical chrome elements only: tab bar, omnibox)
+
+**IPC Contract Tests:**
+Every IPC channel defined in Section 7 must have at least one integration test:
+- Renderer → Main: verify payload schema, error handling, and return values
+- Main → Renderer: verify event emission and payload structure
+- Cross-cutting: verify no channel name collisions, all channels are bidirectionally symmetric
 
 ### 13.4 Test Data
 
@@ -1041,6 +1098,11 @@ tests/
 - **Linux:** Manual update notification (AppImage can self-update)
 - Update check on startup + every 4 hours
 - Silent download, prompt to install on next restart
+
+**Update Notification UI:**
+- `app:updateAvailable` → subtle dot/badge on Settings menu icon + toast notification "Update available"
+- `app:updateDownloaded` → modal dialog "Restart to update" with "Restart Now" / "Later" buttons
+- User can check for updates manually via Settings → About → "Check for updates"
 
 ### 15.3 Code Signing
 

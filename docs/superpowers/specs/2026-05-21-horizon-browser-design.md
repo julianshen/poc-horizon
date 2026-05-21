@@ -250,6 +250,8 @@ window.horizonAPI.on(channel, callback)
 | `tab:duplicate` | `{ tabId: string }` | `Tab` | Duplicate tab |
 | `tab:hibernate` | `{ tabId: string }` | `void` | Free tab memory |
 | `tab:wake` | `{ tabId: string }` | `void` | Restore hibernated tab |
+| `tab:mute` | `{ tabId: string }` | `void` | Mute tab audio |
+| `tab:unmute` | `{ tabId: string }` | `void` | Unmute tab audio |
 | `navigation:go` | `{ tabId: string, url: string }` | `void` | Navigate to URL |
 | `navigation:back` | `{ tabId: string }` | `void` | Go back |
 | `navigation:forward` | `{ tabId: string }` | `void` | Go forward |
@@ -274,6 +276,7 @@ window.horizonAPI.on(channel, callback)
 | `download:open` | `{ downloadId: string }` | `void` | Open downloaded file |
 | `download:showInFolder` | `{ downloadId: string }` | `void` | Show in file manager |
 | `download:clearCompleted` | `{}` | `void` | Clear completed from list |
+| `download:retry` | `{ downloadId: string }` | `void` | Retry failed download |
 | `settings:get` | `{ key: string }` | `any` | Get setting |
 | `settings:getAll` | `{}` | `Settings` | Get all settings |
 | `settings:set` | `{ key: string, value: any }` | `void` | Set setting |
@@ -292,6 +295,10 @@ window.horizonAPI.on(channel, callback)
 | `devtools:open` | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'detach' }` | `void` | Open DevTools |
 | `screenshot:capture` | `{ tabId: string }` | `string` (data URL) | Capture page |
 | `print:start` | `{ tabId: string }` | `void` | Open print dialog |
+| `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Save page as PDF |
+| `permission:respond` | `{ origin: string, permission: PermissionType, allow: boolean }` | `void` | Respond to permission prompt |
+| `contextMenu:clicked` | `{ itemId: string }` | `void` | Context menu item selected |
+| `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Save page as PDF |
 
 ### 7.3 Main → Renderer (on/send)
 
@@ -321,8 +328,11 @@ window.horizonAPI.on(channel, callback)
 | `contextMenu:show` | `{ x: number, y: number, items: ContextMenuItem[] }` | Show custom context menu |
 | `certificate:error` | `{ url: string, error: string, certificate?: CertificateInfo }` | SSL certificate error |
 | `permission:request` | `{ origin: string, permission: PermissionType }` | Permission prompt needed |
+| `contextMenu:clicked` | `{ itemId: string }` | Context menu item selected |
 | `app:updateAvailable` | `{ version: string }` | Auto-update available |
 | `app:updateDownloaded` | `{ version: string }` | Update ready to install |
+| `tab:hibernated` | `{ tabId: string }` | Tab was hibernated |
+| `tab:woken` | `{ tabId: string }` | Tab was restored from hibernation |
 
 ### 7.4 State Flow Patterns
 
@@ -371,6 +381,7 @@ interface Tab {
   createdAt: number;             // timestamp
   lastAccessedAt: number;        // timestamp
   errorState?: TabErrorState;    // If load/crash occurred
+  historyStack?: string[];        // Back/forward URLs for session restore
 }
 
 interface TabErrorState {
@@ -467,6 +478,9 @@ interface Settings {
   smoothScrolling: boolean;
   spellcheck: boolean;
   spellcheckLanguages: string[];
+
+  // Security
+  certificateOverrides: Record<string, 'allow' | 'block'>;  // hostname → decision
 }
 
 type PermissionType =
@@ -630,17 +644,55 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 |---------|----------|
 | Auto-save | Prompt to save on form submission (configurable) |
 | Auto-fill | Fill username/password on recognized login forms |
-| Storage | Encrypted with system keychain (macOS keychain, Windows DPAPI, Linux libsecret) |
+| Storage | System keychain when available (macOS Keychain, Windows Credential Manager / DPAPI, Linux libsecret/Secret Service). Fallback: AES-256-GCM encrypted JSON file secured with OS-specific entropy. |
 | Management | View, search, edit, delete saved passwords |
-| Master password | Optional additional encryption layer |
+| Master password | Optional additional encryption layer (encrypts the key used for JSON fallback) |
 
 ### 10.8 Autofill
 
 | Feature | Behavior |
 |---------|----------|
-| Address autofill | Save addresses, suggest in forms |
-| Payment autofill | Save cards (encrypted), suggest at checkout |
-| Password autofill | See Password Manager above |
+| Address autofill | Save addresses (name, street, city, postal code, country, phone, email). Detect form fields by heuristics (input type, name attribute, autocomplete attribute). Suggest matching addresses in dropdown. |
+| Payment autofill | Save credit cards (number, expiry, CVV, name, billing address). CVV never stored persistently — prompt each time. Card numbers encrypted with same mechanism as passwords. |
+| Password autofill | See Password Manager (Section 10.7) |
+| Form detection | Heuristic-based field type detection; respect `autocomplete` HTML attributes |
+| Trigger | Dropdown appears on focus of recognized field; arrow keys + Enter to select |
+
+**Data Models:**
+```typescript
+interface SavedAddress {
+  id: string;
+  label: string;                 // e.g., "Home", "Work"
+  name: string;
+  organization?: string;
+  street: string[];              // Line 1, Line 2, etc.
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+  phone?: string;
+  email?: string;
+}
+
+interface SavedPaymentMethod {
+  id: string;
+  label: string;
+  cardNumber: string;            // Last 4 digits only stored; full encrypted
+  cardNumberEncrypted: string;   // AES-256-GCM encrypted full number
+  expiryMonth: string;
+  expiryYear: string;
+  cardholderName: string;
+  billingAddressId?: string;
+}
+```
+
+**IPC Channels:**
+- `autofill:getAddresses` → returns `SavedAddress[]`
+- `autofill:saveAddress` → saves address
+- `autofill:removeAddress` → removes address
+- `autofill:getPaymentMethods` → returns `SavedPaymentMethod[]` (masked)
+- `autofill:savePaymentMethod` → saves payment method
+- `autofill:removePaymentMethod` → removes payment method
 
 ### 10.9 Zoom
 
@@ -708,7 +760,7 @@ On `unresponsive` (after ~30s):
 
 - Listen to `online`/`offline` events
 - Offline indicator in status bar
-- Queue navigations when offline, retry when reconnected
+- If user attempts navigation while offline, show offline error page immediately; page auto-reloads when connection restored (if tab is still active and user hasn't navigated elsewhere)
 
 ### 11.5 Session Restore
 
@@ -1008,7 +1060,7 @@ tests/
 | New tab creation | < 100ms |
 | Tab switch | < 50ms |
 | Window resize | < 16ms (60fps) |
-| Memory per tab | ~50-100MB (Chromium baseline) |
+| Memory per tab | ~50-100MB reported (Chromium baseline; monitored, not guaranteed) |
 | Hibernated tab memory | ~0MB (BrowserView destroyed) |
 | Max tabs before hibernation | 20 active (configurable) |
 
@@ -1049,13 +1101,15 @@ Architecture prepared for i18n:
 
 ---
 
-## 20. Open Questions
+## 20. Decisions
 
-1. **New-tab page content:** Should we show frequently visited sites (requires analytics), a simple search page, or a customizable dashboard?
-2. **Search engine partnerships:** Default to Google, DuckDuckGo, or a rotating choice? Revenue implications?
-3. **Update server infrastructure:** Self-hosted or GitHub Releases? Cost and reliability trade-offs.
-4. **Crash reporting:** Should we collect anonymized crash reports? If so, which service (Sentry, etc.)?
-5. **Telemetry:** Completely opt-in, completely absent, or minimal (version, OS) for update checks?
+The following open questions have been resolved for v1.0:
+
+1. **New-tab page content:** Simple, clean new-tab page with a search box (using default search engine), bookmarks bar, and a static "Getting Started" guide. No frequently-visited analytics. Future versions may add a customizable dashboard.
+2. **Search engine partnerships:** Default to DuckDuckGo for privacy alignment. Google, Bing, and custom search engines available in settings. No revenue-sharing partnerships in v1.
+3. **Update server infrastructure:** GitHub Releases for v1 (free, reliable, integrates with electron-updater). Self-hosted update server considered for v2 if custom sync backend is built.
+4. **Crash reporting:** No crash reporting in v1.0. Goal #4 (Privacy by Design / no telemetry) takes precedence. Manual bug reports via GitHub issues. Crash reporting may be introduced in v2 as strictly opt-in.
+5. **Telemetry:** Completely absent in v1.0. The only network requests made by the browser are: (a) web page loads, (b) search queries to the user's chosen engine, (c) update checks (sends app version + OS type only, no unique identifier), (d) safe browsing checks (if enabled). All of these are user-visible and configurable.
 
 ---
 
@@ -1096,17 +1150,19 @@ Architecture prepared for i18n:
 
 ## Appendix B: File Permissions & Storage
 
-| Data Type | Location | Format |
-|-----------|----------|--------|
-| Settings | `userData/settings.json` | JSON |
-| Bookmarks | `userData/bookmarks.json` | JSON |
-| History | `userData/history.db` | SQLite |
-| Passwords | `userData/passwords.json` (encrypted) | JSON + AES |
-| Downloads DB | `userData/downloads.json` | JSON |
-| Session | `userData/session.json` | JSON |
-| Favicon cache | `userData/favicons/` | PNG files |
-| Cache | `userData/Cache/` | Chromium cache |
-| Cookies | `userData/Cookies` | SQLite (Chromium) |
+| Data Type | Location | Format | Rationale |
+|-----------|----------|--------|-----------|
+| Settings | `userData/settings.json` | JSON | Small, flat structure; fast reads/writes |
+| Bookmarks | `userData/bookmarks.json` | JSON | Tree structure; loaded once at startup; full-tree operations |
+| History | `userData/history.db` | SQLite | Large dataset; requires fast range queries, full-text search, and efficient pruning |
+| Passwords | `userData/passwords.json` (encrypted) | JSON + AES | Small dataset; sensitive; encrypted at rest with OS keychain or AES-256-GCM |
+| Downloads DB | `userData/downloads.json` | JSON | Small dataset; list operations; simple append/update |
+| Session | `userData/session.json` | JSON | Transient; simple read/write at startup/quit |
+| Favicon cache | `userData/favicons/` | PNG files | Binary assets; filesystem-native storage |
+| Cache | `userData/Cache/` | Chromium cache | Managed by Chromium; do not touch |
+| Cookies | `userData/Cookies` | SQLite (Chromium) | Managed by Chromium; do not touch |
+
+**Why SQLite only for History:** History is the only dataset that grows unbounded, requires complex queries (search by text, filter by date range, deduplication, frecency scoring), and needs efficient pruning. All other datasets are small enough for in-memory JSON with simple file I/O. IfBookmarks or Downloads grow unexpectedly, they can be migrated to SQLite without breaking changes.
 
 ---
 

@@ -73,11 +73,28 @@
 | BrowserView vs. webview tag | `BrowserView` | Better performance, true multi-tab isolation, closer to Chrome's model |
 | Primary window model | Single window + stacked BrowserViews | Fastest dev velocity; used by Arc, Brave, and most Electron browsers |
 | Multi-window support | Future (v1.1+) | WindowManager architecture supports multiple windows; v1.0 focuses on single-window polish |
+| Single-instance lock | Yes | `app.requestSingleInstanceLock()` prevents multiple Horizon processes. Second launch focuses existing window or opens new tab with URL |
 | React for chrome UI | Yes | Largest ecosystem, best hiring pool, component model fits browser chrome |
 | Zustand for state | Yes | Lightweight, no boilerplate, works well with IPC-synced state |
 | Vite for build | Yes | Fast HMR, fast production builds, native ESM |
 | electron-builder for packaging | Yes | Mature, supports all target platforms, auto-updater integration |
 | No custom protocol handler for web content | Yes | Use `https://`, `http://`, `file://` natively; `horizon://` for internal pages only |
+
+### 4.3 Internal Pages (`horizon://` Protocol)
+
+The browser registers a custom `horizon://` protocol for internal pages that cannot be served over HTTP:
+
+| Page | URL | Content |
+|------|-----|---------|
+| New Tab | `horizon://newtab` | Search box, bookmarks bar, getting-started guide |
+| Error (generic) | `horizon://error` | Error message, retry button, details |
+| Error (certificate) | `horizon://error/certificate` | Cert details, override option, warning |
+| Error (offline) | `horizon://error/offline` | Offline message, auto-reload on reconnect |
+| Error (crash) | `horizon://error/crashed` | Crash message, reload button |
+| Settings | `horizon://settings` | (Alternative entry point; normally shown as overlay) |
+| About | `horizon://about` | Version, credits, update check |
+
+**Implementation:** Electron `protocol.handle('horizon://', ...)` serves static HTML generated at build time or rendered from templates in the main process. These pages run in a separate `BrowserView` with `nodeIntegration: false` and `contextIsolation: true`, same as regular web content.
 
 ---
 
@@ -239,6 +256,8 @@ window.horizonAPI.invoke(channel, data)
 window.horizonAPI.on(channel, callback)
 ```
 
+**Error Propagation:** All `invoke()` calls use standard Promise rejection. If a main-process handler throws, the error is serialized as `{ message: string, code?: string }` and rejected in the renderer. The renderer must `.catch()` all IPC calls and display user-friendly error messages. Fatal errors (e.g., `TabManager` cannot create a BrowserView due to memory exhaustion) are logged to the main process console and surfaced to the user via a toast notification.
+
 ### 7.2 Renderer → Main (invoke)
 
 | Channel | Payload | Returns | Description |
@@ -277,7 +296,7 @@ window.horizonAPI.on(channel, callback)
 | `download:open` | `{ downloadId: string }` | `void` | Open downloaded file |
 | `download:showInFolder` | `{ downloadId: string }` | `void` | Show in file manager |
 | `download:clearCompleted` | `{}` | `void` | Clear completed from list |
-| `download:retry` | `{ downloadId: string }` | `void` | Retry failed download |
+| `download:retry` | `{ downloadId: string }` | `void` | Retry failed download by re-queuing the original URL as a new download item |
 | `settings:get` | `{ key: string }` | `any` | Get setting |
 | `settings:getAll` | `{}` | `Settings` | Get all settings |
 | `settings:set` | `{ key: string, value: any }` | `void` | Set setting |
@@ -297,10 +316,17 @@ window.horizonAPI.on(channel, callback)
 | `print:start` | `{ tabId: string }` | `void` | Open print dialog |
 | `print:toPDF` | `{ tabId: string, options?: PrintToPDFOptions }` | `string` (path) | Save page as PDF |
 | `permission:respond` | `{ origin: string, permission: PermissionType, allow: boolean }` | `void` | Respond to permission prompt |
+| `contentSetting:set` | `{ origin: string, setting: ContentSettingType, value: 'allow' | 'block' | 'ask' }` | `void` | Set per-site content setting |
 | `contextMenu:clicked` | `{ itemId: string }` | `void` | Context menu item selected |
 | `omnibox:getSuggestions` | `{ query: string, maxResults?: number }` | `Suggestion[]` | Get omnibox suggestions |
 | `autofill:detectFields` | `{ tabId: string, fields: FormField[] }` | `AutofillMatch[]` | Match form fields to saved data |
 | `autofill:fillField` | `{ tabId: string, fieldId: string, value: string }` | `void` | Fill a form field via webContents |
+| `autofill:getAddresses` | `{}` | `SavedAddress[]` | List saved addresses |
+| `autofill:saveAddress` | `{ address: SavedAddress }` | `SavedAddress` | Save address |
+| `autofill:removeAddress` | `{ addressId: string }` | `void` | Remove address |
+| `autofill:getPaymentMethods` | `{}` | `SavedPaymentMethod[]` | List saved payment methods (masked) |
+| `autofill:savePaymentMethod` | `{ method: SavedPaymentMethod }` | `SavedPaymentMethod` | Save payment method |
+| `autofill:removePaymentMethod` | `{ methodId: string }` | `void` | Remove payment method |
 | `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) |
 
 ### 7.3 Main → Renderer (on/send)
@@ -385,7 +411,7 @@ interface Tab {
   createdAt: number;             // timestamp
   lastAccessedAt: number;        // timestamp
   errorState?: TabErrorState;    // If load/crash occurred
-  historyStack?: string[];        // Back/forward URLs for session restore
+  historyStack?: { url: string, title: string }[];  // Back/forward entries for session restore
 }
 
 interface TabErrorState {
@@ -476,6 +502,7 @@ interface Settings {
 
   // Permissions (per-origin overrides stored separately)
   defaultPermissions: Record<PermissionType, 'allow' | 'block' | 'ask'>;
+  contentSettings: Record<string, Record<ContentSettingType, 'allow' | 'block' | 'ask'>>;  // origin → setting → decision
 
   // Tabs
   autoHibernate: boolean;         // default true
@@ -489,8 +516,14 @@ interface Settings {
   spellcheckLanguages: string[];
 
   // Security
-  certificateOverrides: Record<string, 'allow' | 'block'>;  // origin → decision
+  certificateOverrides: Record<string, { allow: boolean, errorTypes: CertificateErrorType[] }>;  // origin → decision + which errors are allowed
 }
+
+type CertificateErrorType =
+  | 'expired'
+  | 'self-signed'
+  | 'wrong-hostname'
+  | 'authority-invalid';
 
 type PermissionType =
   | 'geolocation'
@@ -503,6 +536,13 @@ type PermissionType =
   | 'fullscreen'
   | 'openExternal'
   | 'display-capture';
+
+type ContentSettingType =
+  | 'popup'
+  | 'javascript'
+  | 'images'
+  | 'cookies'
+  | 'plugins';
 ```
 
 ---
@@ -560,7 +600,7 @@ Manages the DOM area where BrowserViews are visually embedded.
 contentX = 0
 contentY = titleBarHeight + tabBarHeight + toolbarHeight
 contentWidth = windowWidth
-contentHeight = windowHeight - contentY - statusBarHeight
+contentHeight = windowHeight - contentY - (showStatusBar ? statusBarHeight : 0)
 ```
 
 **BrowserView management:**
@@ -792,7 +832,7 @@ On app quit/crash:
 2. On next launch (if `startupBehavior: 'restore'`):
    - Read `session.json`
    - Recreate tabs with their URLs
-   - Restore back/forward history from `historyStack` via `webContents.goToIndex()` where possible
+   - Restore back/forward history from `historyStack` by loading the current URL first, then pushing previous URLs into the history stack via `webContents.navigationHistory` API where available, or accepting that back/forward history is best-effort for v1.0
    - Restore window position/size
    - Activate last active tab
    - If `session.json` is missing or corrupted, fall back to `startupBehavior: 'new-tab'`

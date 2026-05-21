@@ -583,6 +583,24 @@ interface AutofillMatch {
   label: string;
   type: 'address' | 'password';
 }
+
+interface PasswordEntry {
+  id: string;
+  origin: string;
+  username: string;
+  password: string;              // AES-256-GCM encrypted
+  createdAt: number;
+  lastUsedAt?: number;
+}
+
+interface CertificateInfo {
+  subject: string;
+  issuer: string;
+  serialNumber: string;
+  validStart: number;
+  validExpiry: number;
+  fingerprint: string;
+}
 ```
 
 ---

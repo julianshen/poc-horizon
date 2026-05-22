@@ -4,6 +4,7 @@ import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
 import { SessionManager } from './services/SessionManager';
 import { SettingsManager } from './services/SettingsManager';
+import { BookmarkManager } from './services/BookmarkManager';
 import { registerIpcHandlers } from './ipc/main-handlers';
 
 
@@ -24,6 +25,7 @@ function createWindow(): void {
   sessionManager.initialize();
 
   const settingsManager = new SettingsManager();
+  const bookmarkManager = new BookmarkManager();
 
   // Register horizon:// protocol for internal pages
   protocol.registerFileProtocol('horizon', (request, callback) => {
@@ -33,7 +35,7 @@ function createWindow(): void {
     callback({ path: filePath });
   });
 
-  registerIpcHandlers(tabManager, win, settingsManager);
+  registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager);
 
   // Create initial tab
   tabManager.createTab('https://duckduckgo.com');

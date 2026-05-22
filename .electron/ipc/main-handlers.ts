@@ -2,8 +2,9 @@ import { ipcMain, BrowserWindow } from 'electron';
 import { IPC_CHANNELS } from './channels';
 import { TabManager } from '../services/TabManager';
 import { SettingsManager } from '../services/SettingsManager';
+import { BookmarkManager } from '../services/BookmarkManager';
 
-export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager): void {
+export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager): void {
   ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (_event, { url }: { url?: string }) => {
     return tabManager.createTab(url);
   });
@@ -76,4 +77,12 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   ipcMain.handle(IPC_CHANNELS.SETTINGS_RESET, (_event, { key }: { key?: string }) => {
     settingsManager.reset(key);
   });
+
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_GET_TREE, () => bookmarkManager.getTree());
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_ADD, (_event, { url, title, parentId }: { url: string; title: string; parentId?: string }) => bookmarkManager.add(url, title, parentId));
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_REMOVE, (_event, { bookmarkId }: { bookmarkId: string }) => bookmarkManager.remove(bookmarkId));
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_MOVE, (_event, { bookmarkId, parentId, index }: { bookmarkId: string; parentId: string; index: number }) => bookmarkManager.move(bookmarkId, parentId, index));
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_UPDATE, (_event, { bookmarkId, changes }: { bookmarkId: string; changes: Partial<import('../../src/types/browser').Bookmark> }) => bookmarkManager.update(bookmarkId, changes));
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_IMPORT, (_event, { data }: { data: string }) => bookmarkManager.import(data));
+  ipcMain.handle(IPC_CHANNELS.BOOKMARK_EXPORT, () => bookmarkManager.export());
 }

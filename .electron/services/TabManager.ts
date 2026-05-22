@@ -100,6 +100,19 @@ export class TabManager {
         this.window.webContents.send('page:favicon', { tabId, faviconUrl: favicons[0] });
       }
     });
+
+    wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      if (errorCode === -3) return; // ERR_ABORTED
+      wc.loadURL(`horizon://error?code=${errorCode}&url=${encodeURIComponent(validatedURL)}`);
+      this.updateTab(tabId, {
+        errorState: { type: 'load-failed', errorCode, errorDescription, validatedURL },
+      });
+    });
+
+    wc.on('render-process-gone', () => {
+      wc.loadURL(`horizon://error/crashed?tabId=${tabId}`);
+      this.updateTab(tabId, { errorState: { type: 'crashed' } });
+    });
   }
 
   activateTab(tabId: string): void {

@@ -17,6 +17,10 @@ export class SessionManager {
     this.ses.setWindowOpenHandler(() => {
       return { action: 'deny' };
     });
+
+    this.ses.setCertificateVerifyProc((_request, callback) => {
+      callback(0); // Use Chromium's default verification
+    });
   }
 
   getSession() {

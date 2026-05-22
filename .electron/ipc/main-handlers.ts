@@ -6,8 +6,9 @@ import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
 import { DownloadManager } from '../services/DownloadManager';
 import { PasswordManager } from '../services/PasswordManager';
+import { AutofillManager } from '../services/AutofillManager';
 
-export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager, historyManager: HistoryManager, downloadManager: DownloadManager, passwordManager: PasswordManager): void {
+export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager, historyManager: HistoryManager, downloadManager: DownloadManager, passwordManager: PasswordManager, autofillManager: AutofillManager): void {
   ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (_event, { url }: { url?: string }) => {
     return tabManager.createTab(url);
   });
@@ -120,4 +121,8 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   ipcMain.handle(IPC_CHANNELS.PASSWORD_SAVE, (_event, { entry }: { entry: import('../../src/types/browser').PasswordEntry }) => passwordManager.saveEntry(entry));
   ipcMain.handle(IPC_CHANNELS.PASSWORD_REMOVE, (_event, { origin, username }: { origin: string; username: string }) => passwordManager.remove(origin, username));
   ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_FOR_ORIGIN, (_event, { origin }: { origin: string }) => passwordManager.getForOrigin(origin));
+
+  ipcMain.handle(IPC_CHANNELS.AUTOFILL_GET_ADDRESSES, () => autofillManager.getAddresses());
+  ipcMain.handle(IPC_CHANNELS.AUTOFILL_SAVE_ADDRESS, (_event, { address }: { address: import('../../src/types/browser').SavedAddress }) => autofillManager.saveAddress(address));
+  ipcMain.handle(IPC_CHANNELS.AUTOFILL_REMOVE_ADDRESS, (_event, { addressId }: { addressId: string }) => autofillManager.removeAddress(addressId));
 }

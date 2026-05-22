@@ -8,6 +8,7 @@ import { BookmarkManager } from './services/BookmarkManager';
 import { HistoryManager } from './services/HistoryManager';
 import { DownloadManager } from './services/DownloadManager';
 import { PasswordManager } from './services/PasswordManager';
+import { AutofillManager } from './services/AutofillManager';
 import { registerIpcHandlers } from './ipc/main-handlers';
 
 
@@ -31,6 +32,7 @@ function createWindow(): void {
   const historyManager = new HistoryManager();
   const downloadManager = new DownloadManager();
   const passwordManager = new PasswordManager();
+  const autofillManager = new AutofillManager();
 
   tabManager = new TabManager(win, historyManager);
 
@@ -46,7 +48,7 @@ function createWindow(): void {
     callback({ path: filePath });
   });
 
-  registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager);
+  registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager, autofillManager);
 
   // Create initial tab
   tabManager.createTab('https://duckduckgo.com');

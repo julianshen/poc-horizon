@@ -1,52 +1,62 @@
 import { app } from 'electron';
-import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
 import type { HistoryEntry } from '../../src/types/browser';
 
 export class HistoryManager {
-  private db: Database.Database;
+  private historyPath: string;
+  private entries: HistoryEntry[];
 
   constructor() {
-    const dbPath = path.join(app.getPath('userData'), 'history.db');
-    this.db = new Database(dbPath);
-    this.initialize();
+    this.historyPath = path.join(app.getPath('userData'), 'history.json');
+    this.entries = this.load();
   }
 
-  private initialize(): void {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS history (
-        id TEXT PRIMARY KEY,
-        url TEXT NOT NULL,
-        title TEXT,
-        visitTime INTEGER NOT NULL,
-        visitCount INTEGER DEFAULT 1,
-        typedCount INTEGER DEFAULT 0
-      );
-      CREATE INDEX IF NOT EXISTS idx_history_url ON history(url);
-      CREATE INDEX IF NOT EXISTS idx_history_time ON history(visitTime);
-    `);
-  }
-
-  addEntry(url: string, title: string): void {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const existing = this.db.prepare('SELECT * FROM history WHERE url = ?').get(url) as HistoryEntry | undefined;
-    if (existing) {
-      this.db.prepare('UPDATE history SET visitCount = visitCount + 1, visitTime = ?, title = ? WHERE id = ?')
-        .run(Date.now(), title, existing.id);
-    } else {
-      this.db.prepare('INSERT INTO history (id, url, title, visitTime) VALUES (?, ?, ?, ?)')
-        .run(id, url, title, Date.now());
+  private load(): HistoryEntry[] {
+    try {
+      return JSON.parse(fs.readFileSync(this.historyPath, 'utf-8'));
+    } catch {
+      return [];
     }
   }
 
+  private save(): void {
+    fs.writeFileSync(this.historyPath, JSON.stringify(this.entries, null, 2));
+  }
+
+  addEntry(url: string, title: string): void {
+    const existing = this.entries.find((e) => e.url === url);
+    if (existing) {
+      existing.visitCount += 1;
+      existing.visitTime = Date.now();
+      existing.title = title;
+    } else {
+      this.entries.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        url,
+        title,
+        visitTime: Date.now(),
+        visitCount: 1,
+        typedCount: 0,
+      });
+    }
+    // Keep only last 5000 entries
+    if (this.entries.length > 5000) {
+      this.entries = this.entries.slice(-5000);
+    }
+    this.save();
+  }
+
   search(query: string, limit = 50): HistoryEntry[] {
-    return this.db.prepare(
-      'SELECT * FROM history WHERE url LIKE ? OR title LIKE ? ORDER BY visitTime DESC LIMIT ?'
-    ).all(`%${query}%`, `%${query}%`, limit) as HistoryEntry[];
+    const q = query.toLowerCase();
+    return this.entries
+      .filter((e) => e.url.toLowerCase().includes(q) || e.title.toLowerCase().includes(q))
+      .sort((a, b) => b.visitTime - a.visitTime)
+      .slice(0, limit);
   }
 
   getRecent(limit = 50): HistoryEntry[] {
-    return this.db.prepare('SELECT * FROM history ORDER BY visitTime DESC LIMIT ?').all(limit) as HistoryEntry[];
+    return [...this.entries].sort((a, b) => b.visitTime - a.visitTime).slice(0, limit);
   }
 
   clear(range?: string): number {
@@ -57,12 +67,13 @@ export class HistoryManager {
     else if (range === 'week') cutoff = now - 604800000;
     else if (range === 'month') cutoff = now - 2592000000;
 
+    const before = this.entries.length;
     if (cutoff > 0) {
-      this.db.prepare('DELETE FROM history WHERE visitTime < ?').run(cutoff);
+      this.entries = this.entries.filter((e) => e.visitTime >= cutoff);
     } else {
-      this.db.prepare('DELETE FROM history').run();
+      this.entries = [];
     }
-    const info = this.db.prepare('SELECT changes() as count').get() as { count: number };
-    return info.count;
+    this.save();
+    return before - this.entries.length;
   }
 }

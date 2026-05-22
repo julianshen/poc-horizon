@@ -14,10 +14,6 @@ export class SessionManager {
       return permission === 'fullscreen';
     });
 
-    this.ses.setWindowOpenHandler(() => {
-      return { action: 'deny' };
-    });
-
     this.ses.setCertificateVerifyProc((_request, callback) => {
       callback(0); // Use Chromium's default verification
     });

@@ -26,6 +26,11 @@ function createWindow(): void {
   windowManager = new WindowManager();
   const win = windowManager.createWindow();
 
+  // Block pop-ups
+  win.webContents.setWindowOpenHandler(() => {
+    return { action: 'deny' };
+  });
+
   const sessionManager = new SessionManager();
   sessionManager.initialize();
 

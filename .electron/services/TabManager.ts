@@ -1,14 +1,17 @@
 import { BrowserView, BrowserWindow } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tab } from '../../src/types/browser';
+import type { HistoryManager } from './HistoryManager';
 
 export class TabManager {
   private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
   private activeTabId: string | null = null;
   private window: BrowserWindow;
+  private historyManager: HistoryManager;
 
-  constructor(window: BrowserWindow) {
+  constructor(window: BrowserWindow, historyManager: HistoryManager) {
     this.window = window;
+    this.historyManager = historyManager;
   }
 
   createTab(url = 'https://duckduckgo.com'): Tab {
@@ -72,6 +75,7 @@ export class TabManager {
         canGoBack: wc.canGoBack(),
         canGoForward: wc.canGoForward(),
       });
+      this.historyManager.addEntry(url, entry?.tab.title ?? '');
       this.window.webContents.send('navigation:state', {
         tabId,
         canGoBack: wc.canGoBack(),
@@ -83,6 +87,10 @@ export class TabManager {
 
     wc.on('page-title-updated', (_event, title) => {
       this.updateTab(tabId, { title });
+      const entry = this.tabs.get(tabId);
+      if (entry?.tab.url) {
+        this.historyManager.addEntry(entry.tab.url, title);
+      }
       this.window.webContents.send('page:title', { tabId, title });
     });
 

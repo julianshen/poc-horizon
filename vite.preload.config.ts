@@ -4,7 +4,7 @@ import path from 'path';
 export default defineConfig({
   build: {
     lib: {
-      entry: '.electron/preload.ts',
+      entry: path.resolve(__dirname, '.electron/preload.ts'),
       formats: ['cjs'],
       fileName: () => 'preload.js',
     },

@@ -24,6 +24,10 @@ export function useKeyboardShortcuts(): void {
         e.preventDefault();
         if (activeTabId) window.horizonAPI.invoke('navigation:reload', { tabId: activeTabId });
       }
+      if (mod && e.key === 'f') {
+        e.preventDefault();
+        toggleOverlay('showFindBar');
+      }
       if (mod && e.key === ',') {
         e.preventDefault();
         toggleOverlay('showSettings');

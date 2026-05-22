@@ -4,7 +4,7 @@ import path from 'path';
 export default defineConfig({
   build: {
     lib: {
-      entry: '.electron/main.ts',
+      entry: path.resolve(__dirname, '.electron/main.ts'),
       formats: ['cjs'],
       fileName: () => 'main.js',
     },

@@ -96,4 +96,22 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   ipcMain.handle(IPC_CHANNELS.DOWNLOAD_RESUME, (_event, { downloadId }: { downloadId: string }) => downloadManager.resume(downloadId));
   ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CANCEL, (_event, { downloadId }: { downloadId: string }) => downloadManager.cancel(downloadId));
   ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CLEAR_COMPLETED, () => downloadManager.clearCompleted());
+
+  ipcMain.handle(IPC_CHANNELS.FIND_START, (_event, { tabId, text, caseSensitive }: { tabId: string; text: string; caseSensitive?: boolean }) => {
+    const view = tabManager.getBrowserView(tabId);
+    if (!view) return;
+    return view.webContents.findInPage(text, { caseSensitive });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FIND_NEXT, (_event, { tabId, forward }: { tabId: string; forward?: boolean }) => {
+    const view = tabManager.getBrowserView(tabId);
+    if (!view) return;
+    view.webContents.findInPage('', { forward });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FIND_STOP, (_event, { tabId }: { tabId: string }) => {
+    const view = tabManager.getBrowserView(tabId);
+    if (!view) return;
+    view.webContents.stopFindInPage('clearSelection');
+  });
 }

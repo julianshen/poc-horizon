@@ -1,9 +1,9 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC_CHANNELS } from './channels';
 import { TabManager } from '../services/TabManager';
+import { SettingsManager } from '../services/SettingsManager';
 
-
-export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow): void {
+export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager): void {
   ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (_event, { url }: { url?: string }) => {
     return tabManager.createTab(url);
   });
@@ -58,5 +58,22 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
 
   ipcMain.handle(IPC_CHANNELS.APP_GET_VERSION, () => {
     return '1.0.0';
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_event, { key }: { key: string }) => {
+    return settingsManager.get(key);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_ALL, () => {
+    return settingsManager.getAll();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, (_event, { key, value }: { key: string; value: unknown }) => {
+    settingsManager.set(key, value);
+    window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_RESET, (_event, { key }: { key?: string }) => {
+    settingsManager.reset(key);
   });
 }

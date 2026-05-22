@@ -3,6 +3,7 @@ import path from 'path';
 import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
 import { SessionManager } from './services/SessionManager';
+import { SettingsManager } from './services/SettingsManager';
 import { registerIpcHandlers } from './ipc/main-handlers';
 
 
@@ -22,6 +23,8 @@ function createWindow(): void {
   const sessionManager = new SessionManager();
   sessionManager.initialize();
 
+  const settingsManager = new SettingsManager();
+
   // Register horizon:// protocol for internal pages
   protocol.registerFileProtocol('horizon', (request, callback) => {
     const url = new URL(request.url);
@@ -30,7 +33,7 @@ function createWindow(): void {
     callback({ path: filePath });
   });
 
-  registerIpcHandlers(tabManager, win);
+  registerIpcHandlers(tabManager, win, settingsManager);
 
   // Create initial tab
   tabManager.createTab('https://duckduckgo.com');

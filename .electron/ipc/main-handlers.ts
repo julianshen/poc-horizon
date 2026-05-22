@@ -5,8 +5,9 @@ import { SettingsManager } from '../services/SettingsManager';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
 import { DownloadManager } from '../services/DownloadManager';
+import { PasswordManager } from '../services/PasswordManager';
 
-export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager, historyManager: HistoryManager, downloadManager: DownloadManager): void {
+export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager, historyManager: HistoryManager, downloadManager: DownloadManager, passwordManager: PasswordManager): void {
   ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (_event, { url }: { url?: string }) => {
     return tabManager.createTab(url);
   });
@@ -114,4 +115,9 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
     if (!view) return;
     view.webContents.stopFindInPage('clearSelection');
   });
+
+  ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_ALL, () => passwordManager.getAll());
+  ipcMain.handle(IPC_CHANNELS.PASSWORD_SAVE, (_event, { entry }: { entry: import('../../src/types/browser').PasswordEntry }) => passwordManager.saveEntry(entry));
+  ipcMain.handle(IPC_CHANNELS.PASSWORD_REMOVE, (_event, { origin, username }: { origin: string; username: string }) => passwordManager.remove(origin, username));
+  ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_FOR_ORIGIN, (_event, { origin }: { origin: string }) => passwordManager.getForOrigin(origin));
 }

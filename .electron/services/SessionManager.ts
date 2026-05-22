@@ -13,6 +13,10 @@ export class SessionManager {
       // Default allow for fullscreen only
       return permission === 'fullscreen';
     });
+
+    this.ses.setWindowOpenHandler(() => {
+      return { action: 'deny' };
+    });
   }
 
   getSession() {

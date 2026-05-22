@@ -198,6 +198,45 @@ export class TabManager {
     return this.activeTabId;
   }
 
+  setZoom(tabId: string, level: number): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      const zoomLevel = Math.log2(level) / Math.log2(1.2);
+      entry.view.webContents.setZoomLevel(zoomLevel);
+      entry.tab.zoomLevel = level;
+    }
+  }
+
+  toggleDevTools(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      entry.view.webContents.toggleDevTools();
+    }
+  }
+
+  openDevTools(tabId: string, mode: 'right' | 'bottom' | 'undocked'): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      entry.view.webContents.openDevTools({ mode });
+    }
+  }
+
+  print(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      entry.view.webContents.print();
+    }
+  }
+
+  printToPDF(tabId: string, outputPath: string): Promise<string> {
+    const entry = this.tabs.get(tabId);
+    if (!entry) throw new Error('Tab not found');
+    return entry.view.webContents.printToPDF({}).then((data) => {
+      require('fs').writeFileSync(outputPath, data);
+      return outputPath;
+    });
+  }
+
   getBrowserView(tabId: string): BrowserView | undefined {
     return this.tabs.get(tabId)?.view;
   }

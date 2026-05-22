@@ -125,4 +125,11 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   ipcMain.handle(IPC_CHANNELS.AUTOFILL_GET_ADDRESSES, () => autofillManager.getAddresses());
   ipcMain.handle(IPC_CHANNELS.AUTOFILL_SAVE_ADDRESS, (_event, { address }: { address: import('../../src/types/browser').SavedAddress }) => autofillManager.saveAddress(address));
   ipcMain.handle(IPC_CHANNELS.AUTOFILL_REMOVE_ADDRESS, (_event, { addressId }: { addressId: string }) => autofillManager.removeAddress(addressId));
+
+  ipcMain.handle(IPC_CHANNELS.ZOOM_SET, (_event, { tabId, level }: { tabId: string; level: number }) => tabManager.setZoom(tabId, level));
+  ipcMain.handle(IPC_CHANNELS.ZOOM_RESET, (_event, { tabId }: { tabId: string }) => tabManager.setZoom(tabId, 1.0));
+  ipcMain.handle(IPC_CHANNELS.DEVTOOLS_TOGGLE, (_event, { tabId }: { tabId: string }) => tabManager.toggleDevTools(tabId));
+  ipcMain.handle(IPC_CHANNELS.DEVTOOLS_OPEN, (_event, { tabId, mode }: { tabId: string; mode: 'right' | 'bottom' | 'undocked' }) => tabManager.openDevTools(tabId, mode));
+  ipcMain.handle(IPC_CHANNELS.PRINT_START, (_event, { tabId }: { tabId: string }) => tabManager.print(tabId));
+  ipcMain.handle(IPC_CHANNELS.PRINT_TO_PDF, (_event, { tabId, outputPath }: { tabId: string; outputPath: string }) => tabManager.printToPDF(tabId, outputPath));
 }

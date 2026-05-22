@@ -1,0 +1,71 @@
+export const APP_NAME = 'Horizon';
+export const APP_VERSION = '1.0.0';
+
+export const DEFAULT_SETTINGS = {
+  schemaVersion: 1,
+  startupBehavior: 'new-tab' as const,
+  startupPages: ['https://duckduckgo.com'],
+  defaultSearchEngine: 'duckduckgo',
+  downloadPath: '', // resolved at runtime
+  askWhereToSave: false,
+  downloadNotifications: true,
+  theme: 'system' as const,
+  accentColor: '#1a73e8',
+  showBookmarksBar: true,
+  showStatusBar: true,
+  fontSize: 16,
+  minimumFontSize: 10,
+  pageZoom: 1.0,
+  blockThirdPartyCookies: true,
+  clearDataOnExit: {
+    history: false,
+    cookies: false,
+    cache: false,
+    downloads: false,
+    passwords: false,
+    formData: false,
+  },
+  doNotTrack: false,
+  defaultPermissions: {
+    geolocation: 'block',
+    camera: 'block',
+    microphone: 'block',
+    notifications: 'block',
+    midi: 'block',
+    midiSysex: 'block',
+    pointerLock: 'ask',
+    fullscreen: 'allow',
+    openExternal: 'ask',
+    'display-capture': 'block',
+  } as const,
+  permissionOverrides: {},
+  contentSettings: {},
+  autoHibernate: true,
+  hibernationTimeoutMinutes: 30,
+  maxActiveTabs: 20,
+  confirmCloseMultipleTabs: true,
+  hardwareAcceleration: true,
+  smoothScrolling: true,
+  proxyType: 'system' as const,
+  proxyRules: undefined as string | undefined,
+  spellcheck: true,
+  spellcheckLanguages: ['en-US'],
+  certificateOverrides: {},
+};
+
+export const SEARCH_ENGINES: Record<string, { name: string; url: string; suggestUrl?: string }> = {
+  duckduckgo: {
+    name: 'DuckDuckGo',
+    url: 'https://duckduckgo.com/?q={query}',
+    suggestUrl: 'https://duckduckgo.com/ac/?q={query}&type=list',
+  },
+  google: {
+    name: 'Google',
+    url: 'https://www.google.com/search?q={query}',
+    suggestUrl: 'https://suggestqueries.google.com/complete/search?client=chrome&q={query}',
+  },
+  bing: {
+    name: 'Bing',
+    url: 'https://www.bing.com/search?q={query}',
+  },
+};

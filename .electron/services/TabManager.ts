@@ -1,0 +1,204 @@
+import { BrowserView, BrowserWindow } from 'electron';
+import { v4 as uuidv4 } from 'uuid';
+import type { Tab } from '../../src/types/browser';
+
+export class TabManager {
+  private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
+  private activeTabId: string | null = null;
+  private window: BrowserWindow;
+
+  constructor(window: BrowserWindow) {
+    this.window = window;
+  }
+
+  createTab(url = 'https://duckduckgo.com'): Tab {
+    const id = uuidv4();
+    const view = new BrowserView({
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+
+    const tab: Tab = {
+      id,
+      schemaVersion: 1,
+      url,
+      title: 'New Tab',
+      isLoading: false,
+      loadProgress: 0,
+      canGoBack: false,
+      canGoForward: false,
+      isPinned: false,
+      isMuted: false,
+      isActive: false,
+      isHibernated: false,
+      zoomLevel: 1.0,
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+    };
+
+    this.tabs.set(id, { tab, view });
+    this.window.addBrowserView(view);
+    view.setAutoResize({ width: true, height: true });
+    view.webContents.loadURL(url);
+
+    this.setupWebContentsEvents(id, view);
+    this.activateTab(id);
+
+    return tab;
+  }
+
+  private setupWebContentsEvents(tabId: string, view: BrowserView): void {
+    const wc = view.webContents;
+
+    wc.on('did-start-loading', () => {
+      const entry = this.tabs.get(tabId);
+      this.updateTab(tabId, { isLoading: true, loadProgress: 0 });
+      this.window.webContents.send('load:started', { tabId, url: entry?.tab.url ?? '' });
+    });
+
+    wc.on('did-stop-loading', () => {
+      const entry = this.tabs.get(tabId);
+      this.updateTab(tabId, { isLoading: false, loadProgress: 100 });
+      this.window.webContents.send('load:finished', { tabId, url: entry?.tab.url ?? '' });
+    });
+
+    wc.on('did-navigate', (_event, url) => {
+      const entry = this.tabs.get(tabId);
+      this.updateTab(tabId, {
+        url,
+        canGoBack: wc.canGoBack(),
+        canGoForward: wc.canGoForward(),
+      });
+      this.window.webContents.send('navigation:state', {
+        tabId,
+        canGoBack: wc.canGoBack(),
+        canGoForward: wc.canGoForward(),
+        isLoading: entry?.tab.isLoading ?? false,
+        url,
+      });
+    });
+
+    wc.on('page-title-updated', (_event, title) => {
+      this.updateTab(tabId, { title });
+      this.window.webContents.send('page:title', { tabId, title });
+    });
+
+    wc.on('page-favicon-updated', (_event, favicons) => {
+      if (favicons.length > 0) {
+        this.updateTab(tabId, { favicon: favicons[0] });
+        this.window.webContents.send('page:favicon', { tabId, faviconUrl: favicons[0] });
+      }
+    });
+  }
+
+  activateTab(tabId: string): void {
+    if (this.activeTabId && this.activeTabId !== tabId) {
+      const prev = this.tabs.get(this.activeTabId);
+      if (prev) {
+        prev.tab.isActive = false;
+        prev.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      }
+    }
+
+    const current = this.tabs.get(tabId);
+    if (!current) return;
+
+    current.tab.isActive = true;
+    current.tab.lastAccessedAt = Date.now();
+    this.activeTabId = tabId;
+
+    const bounds = this.window.getBounds();
+    const chromeHeight = 116; // Approximate
+    current.view.setBounds({
+      x: 0,
+      y: chromeHeight,
+      width: bounds.width,
+      height: bounds.height - chromeHeight,
+    });
+  }
+
+  closeTab(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return;
+
+    this.window.removeBrowserView(entry.view);
+    (entry.view.webContents as any).destroy?.();
+    this.tabs.delete(tabId);
+
+    if (this.activeTabId === tabId) {
+      const remaining = Array.from(this.tabs.values());
+      if (remaining.length > 0) {
+        this.activateTab(remaining[remaining.length - 1].tab.id);
+      } else {
+        this.activeTabId = null;
+        this.window.close();
+      }
+    }
+  }
+
+  navigate(tabId: string, url: string): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      entry.view.webContents.loadURL(url);
+    }
+  }
+
+  goBack(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (entry?.view.webContents.canGoBack()) {
+      entry.view.webContents.goBack();
+    }
+  }
+
+  goForward(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (entry?.view.webContents.canGoForward()) {
+      entry.view.webContents.goForward();
+    }
+  }
+
+  reload(tabId: string, hard = false): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      if (hard) {
+        entry.view.webContents.reloadIgnoringCache();
+      } else {
+        entry.view.webContents.reload();
+      }
+    }
+  }
+
+  stop(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (entry) {
+      entry.view.webContents.stop();
+    }
+  }
+
+  getTab(tabId: string): Tab | undefined {
+    return this.tabs.get(tabId)?.tab;
+  }
+
+  getAllTabs(): Tab[] {
+    return Array.from(this.tabs.values()).map((t) => t.tab);
+  }
+
+  getActiveTabId(): string | null {
+    return this.activeTabId;
+  }
+
+  getBrowserView(tabId: string): BrowserView | undefined {
+    return this.tabs.get(tabId)?.view;
+  }
+
+  private updateTab(tabId: string, updates: Partial<Tab>): void {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return;
+    Object.assign(entry.tab, updates);
+    // Notify renderer via IPC
+    this.window.webContents.send('tab:updated', { ...entry.tab, ...updates });
+  }
+}

@@ -6,6 +6,7 @@ import { SessionManager } from './services/SessionManager';
 import { SettingsManager } from './services/SettingsManager';
 import { BookmarkManager } from './services/BookmarkManager';
 import { HistoryManager } from './services/HistoryManager';
+import { DownloadManager } from './services/DownloadManager';
 import { registerIpcHandlers } from './ipc/main-handlers';
 
 
@@ -20,7 +21,6 @@ let tabManager: TabManager;
 function createWindow(): void {
   windowManager = new WindowManager();
   const win = windowManager.createWindow();
-  tabManager = new TabManager(win, historyManager);
 
   const sessionManager = new SessionManager();
   sessionManager.initialize();
@@ -28,6 +28,13 @@ function createWindow(): void {
   const settingsManager = new SettingsManager();
   const bookmarkManager = new BookmarkManager();
   const historyManager = new HistoryManager();
+  const downloadManager = new DownloadManager();
+
+  tabManager = new TabManager(win, historyManager);
+
+  win.webContents.session.on('will-download', (event, item, webContents) => {
+    downloadManager.handleDownload(event, item, webContents);
+  });
 
   // Register horizon:// protocol for internal pages
   protocol.registerFileProtocol('horizon', (request, callback) => {
@@ -37,7 +44,7 @@ function createWindow(): void {
     callback({ path: filePath });
   });
 
-  registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager, historyManager);
+  registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager, historyManager, downloadManager);
 
   // Create initial tab
   tabManager.createTab('https://duckduckgo.com');

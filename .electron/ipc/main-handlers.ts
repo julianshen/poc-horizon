@@ -4,8 +4,9 @@ import { TabManager } from '../services/TabManager';
 import { SettingsManager } from '../services/SettingsManager';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
+import { DownloadManager } from '../services/DownloadManager';
 
-export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager, historyManager: HistoryManager): void {
+export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindow, settingsManager: SettingsManager, bookmarkManager: BookmarkManager, historyManager: HistoryManager, downloadManager: DownloadManager): void {
   ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (_event, { url }: { url?: string }) => {
     return tabManager.createTab(url);
   });
@@ -90,4 +91,9 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   ipcMain.handle(IPC_CHANNELS.HISTORY_SEARCH, (_event, { query, limit }: { query: string; limit?: number }) => historyManager.search(query, limit));
   ipcMain.handle(IPC_CHANNELS.HISTORY_GET_RECENT, (_event, { limit }: { limit?: number }) => historyManager.getRecent(limit));
   ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, (_event, { range }: { range?: string }) => historyManager.clear(range));
+
+  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_PAUSE, (_event, { downloadId }: { downloadId: string }) => downloadManager.pause(downloadId));
+  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_RESUME, (_event, { downloadId }: { downloadId: string }) => downloadManager.resume(downloadId));
+  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CANCEL, (_event, { downloadId }: { downloadId: string }) => downloadManager.cancel(downloadId));
+  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CLEAR_COMPLETED, () => downloadManager.clearCompleted());
 }

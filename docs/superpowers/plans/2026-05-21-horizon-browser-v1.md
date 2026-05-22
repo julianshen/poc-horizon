@@ -39,28 +39,27 @@ horizon/
 │   ├── index.css
 │   ├── types/
 │   │   ├── browser.ts
-│   │   └── ipc.ts
+│   │   ├── ipc.ts
+│   │   └── global.d.ts
 │   ├── stores/
 │   │   └── browserStore.ts
 │   ├── components/
-│   │   └── chrome/
-│   │       ├── TitleBar.tsx
-│   │       ├── TabBar.tsx
-│   │       ├── Tab.tsx
-│   │       ├── Toolbar.tsx
+│   │   ├── chrome/
+│   │   │   ├── TitleBar.tsx
+│   │   │   ├── TabBar.tsx
+│   │   │   ├── Tab.tsx
+│   │   │   ├── Toolbar.tsx
 │   │       ├── Omnibox.tsx
 │   │       ├── BrowserContentArea.tsx
 │   │       └── StatusBar.tsx
-│   ├── components/
-│   │   └── overlays/
-│   │       ├── Settings.tsx
-│   │       ├── BookmarksManager.tsx
-│   │       ├── History.tsx
-│   │       ├── Downloads.tsx
-│   │       ├── FindInPage.tsx
-│   │       ├── PasswordManager.tsx
-│   │       └── PageErrorOverlay.tsx
-│   ├── components/
+│   │   ├── overlays/
+│   │   │   ├── Settings.tsx
+│   │   │   ├── BookmarksManager.tsx
+│   │   │   ├── History.tsx
+│   │   │   ├── Downloads.tsx
+│   │   │   ├── FindInPage.tsx
+│   │   │   ├── PasswordManager.tsx
+│   │   │   └── PageErrorOverlay.tsx
 │   │   └── shared/
 │   │       ├── Button.tsx
 │   │       ├── Icon.tsx
@@ -1039,10 +1038,12 @@ export class TabManager {
 
     wc.on('did-start-loading', () => {
       this.updateTab(tabId, { isLoading: true, loadProgress: 0 });
+      this.window.webContents.send('load:started', { tabId, url: entry.tab.url });
     });
 
     wc.on('did-stop-loading', () => {
       this.updateTab(tabId, { isLoading: false, loadProgress: 100 });
+      this.window.webContents.send('load:finished', { tabId, url: entry.tab.url });
     });
 
     wc.on('did-navigate', (_event, url) => {
@@ -1051,15 +1052,24 @@ export class TabManager {
         canGoBack: wc.canGoBack(),
         canGoForward: wc.canGoForward(),
       });
+      this.window.webContents.send('navigation:state', {
+        tabId,
+        canGoBack: wc.canGoBack(),
+        canGoForward: wc.canGoForward(),
+        isLoading: entry.tab.isLoading,
+        url,
+      });
     });
 
     wc.on('page-title-updated', (_event, title) => {
       this.updateTab(tabId, { title });
+      this.window.webContents.send('page:title', { tabId, title });
     });
 
     wc.on('page-favicon-updated', (_event, favicons) => {
       if (favicons.length > 0) {
         this.updateTab(tabId, { favicon: favicons[0] });
+        this.window.webContents.send('page:favicon', { tabId, faviconUrl: favicons[0] });
       }
     });
   }
@@ -1160,11 +1170,16 @@ export class TabManager {
     return this.activeTabId;
   }
 
+  getBrowserView(tabId: string): BrowserView | undefined {
+    return this.tabs.get(tabId)?.view;
+  }
+
   private updateTab(tabId: string, updates: Partial<Tab>): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;
     Object.assign(entry.tab, updates);
-    // Notify renderer via IPC (handled in main-handlers)
+    // Notify renderer via IPC
+    this.window.webContents.send('tab:updated', { ...entry.tab, ...updates });
   }
 }
 ```
@@ -1291,6 +1306,8 @@ import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
 import { SessionManager } from './services/SessionManager';
 import { registerIpcHandlers } from './ipc/main-handlers';
+import { IPC_CHANNELS } from './ipc/channels';
+import path from 'path';
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -1307,6 +1324,14 @@ function createWindow(): void {
 
   const sessionManager = new SessionManager();
   sessionManager.initialize();
+
+  // Register horizon:// protocol for internal pages
+  protocol.registerFileProtocol('horizon', (request, callback) => {
+    const url = new URL(request.url);
+    const page = url.hostname || 'newtab';
+    const filePath = path.join(__dirname, '../resources/pages', `${page}.html`);
+    callback({ path: filePath });
+  });
 
   registerIpcHandlers(tabManager, win);
 
@@ -2128,21 +2153,21 @@ export class BookmarkManager {
   }
 
   import(data: string): Bookmark[] {
-    // Parse Netscape HTML format
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(data, 'text/html');
-    const links = doc.querySelectorAll('a');
+    // Parse Netscape HTML format using regex (Node.js compatible)
     const imported: Bookmark[] = [];
-    links.forEach((link, index) => {
+    const regex = /\<A HREF="([^"]+)"[^\>]*\>([^\<]*)\<\/A\>/gi;
+    let match;
+    let index = 0;
+    while ((match = regex.exec(data)) !== null) {
       imported.push({
         id: uuidv4(),
         schemaVersion: 1,
-        index,
-        title: link.textContent || link.href,
-        url: link.href,
+        index: index++,
+        title: match[2] || match[1],
+        url: match[1],
         dateAdded: Date.now(),
       });
-    });
+    }
     this.bookmarks.push(...imported);
     this.save();
     return imported;
@@ -2247,21 +2272,17 @@ export class HistoryManager {
   }
 
   clear(range?: string): number {
-    let query = 'DELETE FROM history';
-    if (range === 'hour') {
-      query += ' WHERE visitTime > ?';
-      this.db.prepare(query).run(Date.now() - 3600000);
-    } else if (range === 'day') {
-      query += ' WHERE visitTime > ?';
-      this.db.prepare(query).run(Date.now() - 86400000);
-    } else if (range === 'week') {
-      query += ' WHERE visitTime > ?';
-      this.db.prepare(query).run(Date.now() - 604800000);
-    } else if (range === 'month') {
-      query += ' WHERE visitTime > ?';
-      this.db.prepare(query).run(Date.now() - 2592000000);
+    const now = Date.now();
+    let cutoff = 0;
+    if (range === 'hour') cutoff = now - 3600000;
+    else if (range === 'day') cutoff = now - 86400000;
+    else if (range === 'week') cutoff = now - 604800000;
+    else if (range === 'month') cutoff = now - 2592000000;
+
+    if (cutoff > 0) {
+      this.db.prepare('DELETE FROM history WHERE visitTime < ?').run(cutoff);
     } else {
-      this.db.prepare(query).run();
+      this.db.prepare('DELETE FROM history').run();
     }
     const info = this.db.prepare('SELECT changes() as count').get() as { count: number };
     return info.count;
@@ -2351,6 +2372,9 @@ export class DownloadManager {
       mimeType: item.getMimeType(),
     };
 
+    // Track active downloads for pause/resume/cancel
+    (downloadItem as any)._electronItem = item;
+
     this.downloads.set(id, downloadItem);
     this.notifyListeners();
 
@@ -2375,12 +2399,35 @@ export class DownloadManager {
     return Array.from(this.downloads.values());
   }
 
-  cancel(downloadId: string): void {
-    // Cannot cancel via ID after completion; would need to track DownloadItem reference
+  pause(downloadId: string): void {
     const item = this.downloads.get(downloadId);
-    if (item && item.state === 'progressing') {
-      item.state = 'cancelled';
-      this.downloads.set(downloadId, item);
+    const electronItem = (item as any)?._electronItem as DownloadItem;
+    if (electronItem) {
+      electronItem.pause();
+      item!.state = 'interrupted';
+      this.downloads.set(downloadId, item!);
+      this.notifyListeners();
+    }
+  }
+
+  resume(downloadId: string): void {
+    const item = this.downloads.get(downloadId);
+    const electronItem = (item as any)?._electronItem as DownloadItem;
+    if (electronItem) {
+      electronItem.resume();
+      item!.state = 'progressing';
+      this.downloads.set(downloadId, item!);
+      this.notifyListeners();
+    }
+  }
+
+  cancel(downloadId: string): void {
+    const item = this.downloads.get(downloadId);
+    const electronItem = (item as any)?._electronItem as DownloadItem;
+    if (electronItem) {
+      electronItem.cancel();
+      item!.state = 'cancelled';
+      this.downloads.set(downloadId, item!);
       this.save();
       this.notifyListeners();
     }
@@ -2423,6 +2470,8 @@ win.webContents.session.on('will-download', (event, item, webContents) => {
 - [ ] **Step 3: Add download handlers to main-handlers.ts**
 
 ```typescript
+ipcMain.handle(IPC_CHANNELS.DOWNLOAD_PAUSE, (_event, { downloadId }) => downloadManager.pause(downloadId));
+ipcMain.handle(IPC_CHANNELS.DOWNLOAD_RESUME, (_event, { downloadId }) => downloadManager.resume(downloadId));
 ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CANCEL, (_event, { downloadId }) => downloadManager.cancel(downloadId));
 ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CLEAR_COMPLETED, () => downloadManager.clearCompleted());
 ```
@@ -2449,9 +2498,22 @@ git commit -m "feat: download manager with progress tracking and persistence"
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.FIND_START, (_event, { tabId, text, caseSensitive }) => {
-  const entry = tabManager.getTab(tabId);
-  if (!entry) return;
-  // Access BrowserView via TabManager internals — would need to expose getBrowserView method
+  const view = tabManager.getBrowserView(tabId);
+  if (!view) return;
+  const result = view.webContents.findInPage(text, { caseSensitive });
+  return result;
+});
+
+ipcMain.handle(IPC_CHANNELS.FIND_NEXT, (_event, { tabId, forward }) => {
+  const view = tabManager.getBrowserView(tabId);
+  if (!view) return;
+  view.webContents.findInPage('', { forward });
+});
+
+ipcMain.handle(IPC_CHANNELS.FIND_STOP, (_event, { tabId }) => {
+  const view = tabManager.getBrowserView(tabId);
+  if (!view) return;
+  view.webContents.stopFindInPage('clearSelection');
 });
 ```
 
@@ -2697,7 +2759,10 @@ git commit -m "feat: address autofill manager"
 setZoom(tabId: string, level: number): void {
   const entry = this.tabs.get(tabId);
   if (entry) {
-    entry.view.webContents.setZoomLevel(Math.log2(level) * Math.LN2);
+    // Electron zoom level: 0 = 100%, each unit = 20%
+    // level 0.25 → -4, level 1.0 → 0, level 5.0 → +8
+    const zoomLevel = Math.log2(level) / Math.log2(1.2);
+    entry.view.webContents.setZoomLevel(zoomLevel);
     entry.tab.zoomLevel = level;
   }
 }
@@ -2859,6 +2924,7 @@ git commit -m "feat: error handling, certificate verification, error overlays"
 
 ```typescript
 import { autoUpdater } from 'electron-updater';
+import { IPC_CHANNELS } from './ipc/channels';
 
 // In createWindow(), after window creation:
 autoUpdater.checkForUpdatesAndNotify();

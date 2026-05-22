@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --chrome-bg: #f1f3f4;
+  --chrome-fg: #202124;
+  --tab-bg: #ffffff;
+  --tab-bg-active: #ffffff;
+  --tab-bg-inactive: #e8eaed;
+  --toolbar-bg: #ffffff;
+  --omnibox-bg: #ffffff;
+  --omnibox-border: #dadce0;
+  --statusbar-bg: #f1f3f4;
+  --accent-primary: #1a73e8;
+  --accent-hover: #1557b0;
+  --accent-light: #e8f0fe;
+  --secure: #188038;
+  --insecure: #ea4335;
+  --warning: #f9ab00;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-base: 13px;
+  --chrome-height: 40px;
+  --tab-height: 36px;
+  --toolbar-height: 40px;
+  --statusbar-height: 24px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+[data-theme="dark"] {
+  --chrome-bg: #202124;
+  --chrome-fg: #e8eaed;
+  --tab-bg: #35363a;
+  --tab-bg-active: #202124;
+  --tab-bg-inactive: #292a2d;
+  --toolbar-bg: #35363a;
+  --omnibox-bg: #202124;
+  --omnibox-border: #5f6368;
+  --statusbar-bg: #202124;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
+  overflow: hidden;
+  user-select: none;
+}
+
+* {
+  box-sizing: border-box;
+}

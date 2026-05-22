@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol } from 'electron';
 import path from 'path';
 import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
@@ -9,6 +9,8 @@ import { HistoryManager } from './services/HistoryManager';
 import { DownloadManager } from './services/DownloadManager';
 import { PasswordManager } from './services/PasswordManager';
 import { AutofillManager } from './services/AutofillManager';
+import { autoUpdater } from 'electron-updater';
+import { IPC_CHANNELS } from './ipc/channels';
 import { registerIpcHandlers } from './ipc/main-handlers';
 
 
@@ -49,6 +51,29 @@ function createWindow(): void {
   });
 
   registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager, autofillManager);
+
+  // Auto-updater
+  autoUpdater.checkForUpdatesAndNotify();
+
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 4 * 60 * 60 * 1000); // 4 hours
+
+  autoUpdater.on('update-available', (info) => {
+    win.webContents.send(IPC_CHANNELS.APP_UPDATE_AVAILABLE, { version: info.version });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    win.webContents.send(IPC_CHANNELS.APP_UPDATE_DOWNLOADED, { version: info.version });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.APP_CHECK_FOR_UPDATES, async () => {
+    const result = await autoUpdater.checkForUpdates();
+    return {
+      updateAvailable: !!result?.updateInfo,
+      version: result?.updateInfo?.version,
+    };
+  });
 
   // Create initial tab
   tabManager.createTab('https://duckduckgo.com');

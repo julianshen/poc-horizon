@@ -1,0 +1,39 @@
+{
+  appId: 'com.horizon.browser',
+  productName: 'Horizon',
+  directories: {
+    output: 'release',
+  },
+  files: [
+    'dist',
+    'dist-electron',
+  ],
+  mac: {
+    target: [
+      { target: 'dmg', arch: ['x64', 'arm64'] },
+      { target: 'zip', arch: ['x64', 'arm64'] },
+    ],
+    category: 'public.app-category.productivity',
+    hardenedRuntime: true,
+    gatekeeperAssess: false,
+  },
+  win: {
+    target: [
+      { target: 'nsis', arch: ['x64'] },
+      { target: 'portable', arch: ['x64'] },
+    ],
+  },
+  linux: {
+    target: [
+      { target: 'AppImage', arch: ['x64'] },
+      { target: 'deb', arch: ['x64'] },
+      { target: 'rpm', arch: ['x64'] },
+    ],
+    category: 'Network',
+  },
+  publish: {
+    provider: 'github',
+    owner: 'horizon-browser',
+    repo: 'horizon',
+  },
+}

@@ -1,14 +1,10 @@
-import { app } from 'electron';
 import fs from 'fs';
-import path from 'path';
 import type { HistoryEntry } from '../../src/types/browser';
 
 export class HistoryManager {
-  private historyPath: string;
   private entries: HistoryEntry[];
 
-  constructor() {
-    this.historyPath = path.join(app.getPath('userData'), 'history.json');
+  constructor(private historyPath: string) {
     this.entries = this.load();
   }
 
@@ -69,7 +65,7 @@ export class HistoryManager {
 
     const before = this.entries.length;
     if (cutoff > 0) {
-      this.entries = this.entries.filter((e) => e.visitTime >= cutoff);
+      this.entries = this.entries.filter((e) => e.visitTime < cutoff);
     } else {
       this.entries = [];
     }

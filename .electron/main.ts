@@ -36,7 +36,7 @@ function createWindow(): void {
 
   const settingsManager = new SettingsManager(path.join(app.getPath('userData'), 'settings.json'));
   const bookmarkManager = new BookmarkManager(path.join(app.getPath('userData'), 'bookmarks.json'));
-  const historyManager = new HistoryManager();
+  const historyManager = new HistoryManager(path.join(app.getPath('userData'), 'history.json'));
   const downloadManager = new DownloadManager();
   const passwordManager = new PasswordManager();
   const autofillManager = new AutofillManager();

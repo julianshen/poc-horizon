@@ -26,6 +26,7 @@ export default defineConfig({
         'shared/**/*.ts',
         '.electron/services/SettingsManager.ts',
         '.electron/services/BookmarkManager.ts',
+        '.electron/services/HistoryManager.ts',
       ],
       exclude: ['**/*.d.ts', '**/index.ts'],
       thresholds: {

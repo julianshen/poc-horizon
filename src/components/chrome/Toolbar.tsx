@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Omnibox } from './Omnibox';
+import { AppMenu } from './AppMenu';
 import { useNavigation } from '../../hooks/useNavigation';
 
 export const Toolbar: React.FC = () => {
   const { goBack, goForward, reload, canGoBack, canGoForward, isLoading } = useNavigation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const toggleMenu = useCallback(() => setMenuOpen((v) => !v), []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   return (
     <div
-      className="h-12 flex items-center gap-1 px-3"
+      className="h-12 flex items-center gap-1 px-3 relative"
       style={{
         background: 'var(--toolbar-bg)',
         borderBottom: '1px solid var(--chrome-border)',
@@ -37,13 +41,20 @@ export const Toolbar: React.FC = () => {
         )}
       </button>
       <Omnibox />
-      <button className="icon-btn ml-auto" aria-label="Menu">
+      <button
+        className="icon-btn ml-auto"
+        aria-label="Menu"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={toggleMenu}
+      >
         <svg viewBox="0 0 24 24" aria-hidden>
           <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
           <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
           <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       </button>
+      <AppMenu open={menuOpen} onClose={closeMenu} />
     </div>
   );
 };

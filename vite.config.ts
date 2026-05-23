@@ -28,6 +28,7 @@ export default defineConfig({
         '.electron/services/SettingsManager.ts',
         '.electron/services/BookmarkManager.ts',
         '.electron/services/HistoryManager.ts',
+        '.electron/services/PasswordManager.ts',
       ],
       exclude: ['**/*.d.ts', '**/index.ts'],
       thresholds: {

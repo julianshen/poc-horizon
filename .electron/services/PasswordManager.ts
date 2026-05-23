@@ -1,14 +1,18 @@
-import { app, safeStorage } from 'electron';
 import fs from 'fs';
-import path from 'path';
 import type { PasswordEntry } from '../../src/types/browser';
 
+export interface PasswordCrypto {
+  encrypt(plain: string): string;
+  decrypt(cipher: string): string;
+}
+
 export class PasswordManager {
-  private passwordsPath: string;
   private passwords: PasswordEntry[];
 
-  constructor() {
-    this.passwordsPath = path.join(app.getPath('userData'), 'passwords.json');
+  constructor(
+    private passwordsPath: string,
+    private crypto: PasswordCrypto
+  ) {
     this.passwords = this.load();
   }
 
@@ -16,10 +20,7 @@ export class PasswordManager {
     try {
       const data = fs.readFileSync(this.passwordsPath, 'utf-8');
       const entries: PasswordEntry[] = JSON.parse(data);
-      return entries.map((e) => ({
-        ...e,
-        password: safeStorage.decryptString(Buffer.from(e.password, 'base64')),
-      }));
+      return entries.map((e) => ({ ...e, password: this.crypto.decrypt(e.password) }));
     } catch {
       return [];
     }
@@ -28,7 +29,7 @@ export class PasswordManager {
   private save(): void {
     const encrypted = this.passwords.map((e) => ({
       ...e,
-      password: safeStorage.encryptString(e.password).toString('base64'),
+      password: this.crypto.encrypt(e.password),
     }));
     fs.writeFileSync(this.passwordsPath, JSON.stringify(encrypted, null, 2));
   }
@@ -38,7 +39,9 @@ export class PasswordManager {
   }
 
   saveEntry(entry: PasswordEntry): void {
-    const existing = this.passwords.findIndex((p) => p.origin === entry.origin && p.username === entry.username);
+    const existing = this.passwords.findIndex(
+      (p) => p.origin === entry.origin && p.username === entry.username
+    );
     if (existing >= 0) {
       this.passwords[existing] = { ...entry, lastUsedAt: Date.now() };
     } else {

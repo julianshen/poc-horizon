@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, safeStorage } from 'electron';
 import path from 'path';
 import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
@@ -38,7 +38,13 @@ function createWindow(): void {
   const bookmarkManager = new BookmarkManager(path.join(app.getPath('userData'), 'bookmarks.json'));
   const historyManager = new HistoryManager(path.join(app.getPath('userData'), 'history.json'));
   const downloadManager = new DownloadManager();
-  const passwordManager = new PasswordManager();
+  const passwordManager = new PasswordManager(
+    path.join(app.getPath('userData'), 'passwords.json'),
+    {
+      encrypt: (s) => safeStorage.encryptString(s).toString('base64'),
+      decrypt: (s) => safeStorage.decryptString(Buffer.from(s, 'base64')),
+    }
+  );
   const autofillManager = new AutofillManager();
 
   tabManager = new TabManager(win, historyManager);

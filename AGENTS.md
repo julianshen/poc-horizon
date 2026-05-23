@@ -378,16 +378,90 @@ Before marking any task complete, verify:
 
 ---
 
-## 10. AI Assistant Instructions
+## 10. Task Tracking
 
-### 10.1 When Starting Work
+### 10.1 Todo Management
+
+Use the `todo` tool to track all work:
+
+```bash
+# Create a task
+todo create --subject "feat: add omnibox suggestions" --description "Implement suggestion dropdown with history + bookmarks + search"
+
+# Mark in progress
+todo update --id 42 --status in_progress --activeForm "implementing omnibox suggestion engine"
+
+# Mark complete
+todo update --id 42 --status completed
+
+# List all
+todo list
+```
+
+### 10.2 Task Lifecycle
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Task defined, not started |
+| `in_progress` | Currently being worked on |
+| `completed` | Done, tested, committed |
+| `deleted` | Cancelled or superseded |
+
+### 10.3 Task Granularity
+
+- **One feature = one task** — "Add bookmark bar" not "Build browser".
+- **Block dependencies** — Use `blockedBy` to chain tasks.
+- **Never batch completions** — Mark each task complete immediately when done.
+
+---
+
+## 11. Known Pitfalls & Lessons Learned
+
+### 11.1 Electron Gotchas
+
+| Issue | Solution |
+|-------|----------|
+| `better-sqlite3` fails to bundle with `electron-vite` | Use JSON storage for dev; add `better-sqlite3` to `rollup.external` for native module builds |
+| `setWindowOpenHandler` on `session` throws | Use `webContents.setWindowOpenHandler()` on the BrowserWindow's webContents instead |
+| `webContents.canGoBack()` is deprecated | Use `webContents.navigationHistory.canGoBack()` (Electron 28+) |
+| `app.requestSingleInstanceLock()` | Call before any other `app` API calls |
+| `protocol.registerFileProtocol` | Must be called after `app.whenReady()` |
+| Native modules with Vite bundling | Add to `rollupOptions.external` in `vite.main.config.ts` |
+
+### 11.2 Build Issues
+
+| Issue | Solution |
+|-------|----------|
+| `npm install` peer dep conflicts with `electron-vite` | Use `--legacy-peer-deps` flag |
+| Vite dev server fails to start | Ensure `index.html` exists at project root with correct script src |
+| Preload build missing types | Ensure `tsconfig.preload.json` includes the preload file |
+
+### 11.3 IPC Patterns
+
+| Anti-Pattern | Correct Pattern |
+|--------------|-----------------|
+| Emitting events from TabManager without window reference | Store `BrowserWindow` reference in service and use `win.webContents.send()` |
+| Calling `ipcRenderer.invoke` directly in renderer | Use `window.horizonAPI.invoke()` via contextBridge |
+| No cleanup for IPC listeners | Always return unsubscribe function from `window.horizonAPI.on()` |
+
+### 11.4 Security Reminders
+
+- **Never** call `require('electron')` from renderer — always go through preload.
+- **Never** use `innerHTML` or `dangerouslySetInnerHTML` with untrusted content.
+- **Always** validate IPC payloads on main side before processing.
+
+---
+
+## 12. AI Assistant Instructions
+
+### 12.1 When Starting Work
 
 1. Read `AGENTS.md` (this file).
 2. Read relevant sections of the design spec in `docs/superpowers/specs/`.
 3. Check `git log` for recent commits to understand patterns.
 4. Run existing tests to establish baseline.
 
-### 10.2 When Writing Code
+### 12.2 When Writing Code
 
 1. Write the test first.
 2. Run the test to confirm it fails.
@@ -397,13 +471,13 @@ Before marking any task complete, verify:
 6. Run full test suite to check for regressions.
 7. Commit with conventional message.
 
-### 10.3 When Uncertain
+### 12.3 When Uncertain
 
 - **Ask the user** — Do not guess on architectural decisions.
 - **Check the spec** — The design spec is the source of truth.
 - **Follow existing patterns** — Match the style of nearby code.
 
-### 10.4 Forbidden Patterns
+### 12.4 Forbidden Patterns
 
 The following will be rejected in code review:
 
@@ -414,8 +488,10 @@ The following will be rejected in code review:
 - Nested callbacks (use async/await)
 - Mutating props or state directly
 - Race conditions in async code (no unawaited Promises)
+- Native modules bundled by Vite without `external` config
+- `session.setWindowOpenHandler` (use `webContents.setWindowOpenHandler`)
 
 ---
 
 *Last updated: 2026-05-23*
-*Version: 1.0*
+*Version: 1.1*

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, safeStorage, IpcMainInvokeEvent } from 'electron';
 import path from 'path';
 import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
@@ -25,13 +25,22 @@ if (!gotTheLock) {
   app.quit();
 }
 
+// Allowlist for the horizon:// internal protocol. Anything not in this set
+// returns ERR_FILE_NOT_FOUND so we can't be tricked into serving arbitrary
+// files from the resources directory via a crafted hostname.
+const HORIZON_PAGES = new Set(['newtab', 'error']);
+
 let windowManager: WindowManager;
 // Maps a renderer webContents.id to its window's context so IPC handlers
 // can dispatch to the right TabManager / BrowserWindow.
 const contexts = new Map<number, WindowContext>();
-// Mirrors the most-recently-created non-incognito TabManager for app-level
-// hooks that don't have a sender (second-instance, etc).
+// The most-recently-created non-incognito TabManager. Acts as the fallback
+// for IPC events whose sender we can't resolve (extremely rare) and the
+// target for the OS second-instance hook.
 let primaryTabManager: TabManager;
+let primaryWindow: BrowserWindow | null = null;
+// Non-incognito tab managers — flushed once on before-quit.
+const persistableTabManagers = new Set<TabManager>();
 
 // App-wide singletons (shared between all windows).
 let settingsManager: SettingsManager;
@@ -60,39 +69,66 @@ function initSingletons(): void {
 
   protocol.registerFileProtocol('horizon', (request, callback) => {
     const url = new URL(request.url);
-    const page = url.hostname || 'newtab';
+    const page = (url.hostname || 'newtab').toLowerCase();
+    if (!HORIZON_PAGES.has(page)) {
+      // -6 = net::ERR_FILE_NOT_FOUND
+      callback({ error: -6 });
+      return;
+    }
     const filePath = path.join(__dirname, '../resources/pages', `${page}.html`);
     callback({ path: filePath });
   });
 
   permissionBroker = new PermissionBroker((prompt) => {
-    // Broadcast to all open windows — the active one will surface the UI.
+    // Broadcast to all open chrome renderers — the active one surfaces UI.
     for (const w of BrowserWindow.getAllWindows()) {
-      w.webContents.send(IPC_CHANNELS.PERMISSION_REQUEST, prompt);
+      if (w.isDestroyed()) continue;
+      const wc = w.webContents;
+      if (!wc || wc.isDestroyed()) continue;
+      wc.send(IPC_CHANNELS.PERMISSION_REQUEST, prompt);
     }
   });
   const sessionManager = new SessionManager(permissionBroker);
   sessionManager.initialize();
+
+  // One global before-quit flush — uses the live `persistableTabManagers`
+  // set so it stays correct as windows open and close.
+  app.on('before-quit', () => {
+    if (!tabSessionStore) return;
+    for (const tm of persistableTabManagers) {
+      const tabs = tm.getAllTabs().map((t: Tab) => ({
+        url: t.url,
+        title: t.title,
+        isPinned: t.isPinned,
+        isActive: t.isActive,
+      }));
+      tabSessionStore.flush(tabs);
+    }
+  });
 }
 
 function registerHandlers(): void {
-  // Resolve a per-window context from the IPC event sender. The sender's
-  // WebContents may be the chrome renderer itself, a child BrowserView,
-  // or something else — we find the owning BrowserWindow and look up its
-  // context.
-  const resolve = (event: { sender: { id: number } }): WindowContext | undefined => {
+  const resolve = (event: IpcMainInvokeEvent): WindowContext | undefined => {
+    // Direct hit — the sender is a chrome renderer we tracked at window
+    // creation.
     const direct = contexts.get(event.sender.id);
     if (direct) return direct;
-    const win = BrowserWindow.fromWebContents(event.sender as Electron.WebContents);
-    if (!win) return undefined;
-    return contexts.get(win.webContents.id);
+    // Otherwise the sender could be a BrowserView (the page inside a tab)
+    // or a child frame. Walk known windows and find the one that owns it.
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      const ctx = contexts.get(win.webContents.id);
+      if (ctx) return ctx;
+    }
+    return undefined;
   };
 
   registerIpcHandlers(
-    // Fallback values — these only fire if the resolver returns undefined,
-    // which shouldn't happen in production.
-    primaryTabManager,
-    contexts.values().next().value?.window ?? BrowserWindow.getAllWindows()[0],
+    // The fallback values are only used when `resolve` returns undefined.
+    // We use getters so the captured closure stays current as windows
+    // open/close — passing the values directly would freeze them.
+    new Proxy({} as TabManager, { get: (_, prop) => (primaryTabManager as unknown as Record<PropertyKey, unknown>)[prop] }),
+    new Proxy({} as BrowserWindow, { get: (_, prop) => (primaryWindow as unknown as Record<PropertyKey, unknown>)?.[prop] }),
     settingsManager,
     bookmarkManager,
     historyManager,
@@ -104,14 +140,17 @@ function registerHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.WINDOW_NEW_INCOGNITO, () => createWindow({ incognito: true }));
   ipcMain.handle(IPC_CHANNELS.PERMISSION_RESPOND, (_event, { id, decision }: { id: string; decision: PermissionDecision }) => {
+    if (!permissionBroker) return false;
     return permissionBroker.respond(id, decision);
   });
   ipcMain.handle(IPC_CHANNELS.APP_CHECK_FOR_UPDATES, async () => {
-    const result = await autoUpdater.checkForUpdates();
-    return {
-      updateAvailable: !!result?.updateInfo,
-      version: result?.updateInfo?.version,
-    };
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return { updateAvailable: !!result?.updateInfo, version: result?.updateInfo?.version };
+    } catch (err) {
+      console.warn('[main] checkForUpdates failed:', err);
+      return { updateAvailable: false, error: 'unavailable' as const };
+    }
   });
 }
 
@@ -123,6 +162,9 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   if (!windowManager) windowManager = new WindowManager();
   const win = windowManager.createWindow(opts);
   const incognito = opts.incognito === true;
+  // Capture identifiers eagerly — once `closed` fires, win.webContents may
+  // already be destroyed and reading .id throws "Object has been destroyed".
+  const wcId = win.webContents.id;
 
   win.webContents.setWindowOpenHandler(denyAllWindowOpens);
 
@@ -131,39 +173,30 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
     historyManager,
     incognito ? WindowManager.incognitoPartition() : undefined
   );
-  contexts.set(win.webContents.id, { tabManager: localTabManager, window: win });
-  if (!incognito) primaryTabManager = localTabManager;
-
-  win.on('closed', () => contexts.delete(win.webContents.id));
+  contexts.set(wcId, { tabManager: localTabManager, window: win });
 
   if (!incognito) {
-    const persist = (): void => {
-      tabSessionStore.scheduleSave(
-        localTabManager.getAllTabs().map((t: Tab) => ({
-          url: t.url,
-          title: t.title,
-          isPinned: t.isPinned,
-          isActive: t.isActive,
-        }))
-      );
-    };
-    const origSend = win.webContents.send.bind(win.webContents);
-    win.webContents.send = ((channel: string, ...args: unknown[]): void => {
-      origSend(channel, ...args);
-      if (channel.startsWith('tab:')) persist();
-    }) as typeof win.webContents.send;
+    primaryTabManager = localTabManager;
+    primaryWindow = win;
+    persistableTabManagers.add(localTabManager);
 
-    app.on('before-quit', () => {
-      tabSessionStore.flush(
-        localTabManager.getAllTabs().map((t: Tab) => ({
-          url: t.url,
-          title: t.title,
-          isPinned: t.isPinned,
-          isActive: t.isActive,
-        }))
-      );
+    // Persist tabs whenever TabManager fires a change event.
+    localTabManager.onChange(() => {
+      const tabs = localTabManager.getAllTabs().map((t: Tab) => ({
+        url: t.url,
+        title: t.title,
+        isPinned: t.isPinned,
+        isActive: t.isActive,
+      }));
+      tabSessionStore.scheduleSave(tabs);
     });
   }
+
+  win.once('closed', () => {
+    contexts.delete(wcId);
+    persistableTabManagers.delete(localTabManager);
+    if (primaryWindow === win) primaryWindow = null;
+  });
 
   win.webContents.session.on('will-download', (event, item, webContents) => {
     downloadManager.handleDownload(event, item, webContents);
@@ -177,9 +210,11 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   if (!incognito) {
     scheduleAutoUpdate(autoUpdater);
     autoUpdater.on('update-available', (info) => {
+      if (win.isDestroyed()) return;
       win.webContents.send(IPC_CHANNELS.APP_UPDATE_AVAILABLE, { version: info.version });
     });
     autoUpdater.on('update-downloaded', (info) => {
+      if (win.isDestroyed()) return;
       win.webContents.send(IPC_CHANNELS.APP_UPDATE_DOWNLOADED, { version: info.version });
     });
   }
@@ -223,8 +258,8 @@ app.on('activate', () => {
 });
 
 app.on('second-instance', (_event, argv) => {
-  const win = windowManager?.getWindow();
-  if (win) {
+  const win = primaryWindow ?? windowManager?.getWindow();
+  if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore();
     win.focus();
 

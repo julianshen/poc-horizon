@@ -20,7 +20,8 @@ export function useOmniboxSuggestions(query: string, enabled: boolean): HistoryE
           limit: MAX_SUGGESTIONS,
         })) as HistoryEntry[];
         if (!cancelled) setResults(Array.isArray(r) ? r : []);
-      } catch {
+      } catch (err) {
+        console.warn('[useOmniboxSuggestions] history:search failed:', err);
         if (!cancelled) setResults([]);
       }
     }, DEBOUNCE_MS);

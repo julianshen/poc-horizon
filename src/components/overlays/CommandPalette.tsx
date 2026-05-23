@@ -127,7 +127,13 @@ export const CommandPalette: React.FC = () => {
         setSel((s) => Math.max(0, s - 1));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        items[sel]?.action();
+        // The "Ask Horizon" row is sticky so items is always non-empty;
+        // clamp sel to a valid index so a stale value (from a filter that
+        // shrank the list) still picks something instead of silently doing
+        // nothing.
+        if (items.length === 0) return;
+        const idx = Math.min(sel, items.length - 1);
+        items[idx].action();
       }
     },
     [close, items, sel]

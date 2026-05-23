@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
 
 interface Message {
@@ -22,6 +22,17 @@ export const AIPanel: React.FC = () => {
   const toggleAI = useBrowserStore((s) => s.toggleAI);
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
+  // Track in-flight stub-reply timers so we cancel them on unmount and
+  // don't call setMessages on an unmounted component.
+  const pendingTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  useEffect(() => {
+    const timers = pendingTimers.current;
+    return () => {
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
 
   const send = useCallback(() => {
     const trimmed = draft.trim();
@@ -33,7 +44,8 @@ export const AIPanel: React.FC = () => {
     ]);
     setDraft('');
     // Stub: in a real build this would call out to an LLM via main process.
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      pendingTimers.current.delete(timer);
       setMessages((m) => {
         const next = m.slice();
         const lastIdx = next.length - 1;
@@ -47,6 +59,7 @@ export const AIPanel: React.FC = () => {
         return next;
       });
     }, 700);
+    pendingTimers.current.add(timer);
   }, [draft]);
 
   const onKey = useCallback(

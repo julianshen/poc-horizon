@@ -3,8 +3,8 @@ export interface IpcChannels {
   'tab:create': { url?: string; index?: number };
   'tab:close': { tabId: string };
   'tab:activate': { tabId: string };
-  'tab:reorder': { fromIndex: number; toIndex: number };
-  'tab:pin': { tabId: string };
+  'tab:reorder': { tabId: string; index: number };
+  'tab:pin': { tabId: string; pinned: boolean };
   'tab:duplicate': { tabId: string };
   'tab:hibernate': { tabId: string };
   'tab:wake': { tabId: string };
@@ -56,7 +56,8 @@ export interface IpcChannels {
   'devtools:open': { tabId: string; mode?: 'right' | 'bottom' | 'undocked' };
   'print:start': { tabId: string };
   'print:toPDF': { tabId: string; outputPath: string; options?: { marginsType?: number; pageSize?: string; printBackground?: boolean } };
-  'permission:respond': { origin: string; permission: PermissionType; allow: boolean };
+  'permission:respond': { id: string; decision: 'allow' | 'block' };
+  'window:newIncognito': Record<string, never>;
   'contentSetting:set': { origin: string; setting: ContentSettingType; value: 'allow' | 'block' | 'ask' };
   'contextMenu:clicked': { itemId: string };
   'omnibox:getSuggestions': { query: string; maxResults?: number };
@@ -71,7 +72,7 @@ export interface IpcChannels {
   'tab:closed': { tabId: string };
   'tab:activated': { tabId: string };
   'tab:updated': Partial<import('./browser').Tab>;
-  'tab:reordered': { tabIds: string[] };
+  'tab:reordered': { tabId: string; index: number };
   'tab:hibernated': { tabId: string };
   'tab:woken': { tabId: string };
   'navigation:state': { tabId: string; canGoBack: boolean; canGoForward: boolean; isLoading: boolean; url: string };
@@ -92,7 +93,7 @@ export interface IpcChannels {
   'keyboard:shortcut': { accelerator: string };
   'contextMenu:show': { x: number; y: number; items: import('./browser').ContextMenuItem[] };
   'certificate:error': { url: string; error: string; certificate?: import('./browser').CertificateInfo };
-  'permission:request': { origin: string; permission: PermissionType };
+  'permission:request': { id: string; origin: string; permission: PermissionType | string };
   'app:updateAvailable': { version: string };
   'app:updateDownloaded': { version: string };
   'autofill:showDropdown': { tabId: string; fieldId: string; suggestions: import('./browser').AutofillMatch[]; position: { x: number; y: number; width: number; height: number } };

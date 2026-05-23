@@ -6,8 +6,9 @@ describe('PermissionBroker', () => {
     const broadcast = vi.fn();
     const broker = new PermissionBroker(broadcast, () => 'req-1');
     const cb = vi.fn();
-    broker.request('geolocation', 'https://example.com', cb);
+    const id = broker.request('geolocation', 'https://example.com', cb);
 
+    expect(id).toBe('req-1');
     expect(broadcast).toHaveBeenCalledWith({
       id: 'req-1',
       permission: 'geolocation',
@@ -50,13 +51,61 @@ describe('PermissionBroker', () => {
   });
 
   it('assigns unique ids per request when using the default generator', () => {
-    const broker = new PermissionBroker(vi.fn());
     const ids = new Set<string>();
-    const broadcast = (p: { id: string }): void => {
-      ids.add(p.id);
-    };
-    const b2 = new PermissionBroker(broadcast);
-    for (let i = 0; i < 10; i++) b2.request('media', 'https://x', () => {});
+    const broker = new PermissionBroker((p) => ids.add(p.id));
+    for (let i = 0; i < 10; i++) broker.request('media', 'https://x', () => {});
     expect(ids.size).toBe(10);
+  });
+
+  it('auto-denies a pending request after the timeout fires', () => {
+    let scheduled: (() => void) | null = null;
+    const broker = new PermissionBroker(
+      vi.fn(),
+      () => 'rT',
+      (cb) => {
+        scheduled = cb;
+        return 1 as unknown as NodeJS.Timeout;
+      },
+      vi.fn(),
+      30_000
+    );
+    const cb = vi.fn();
+    broker.request('media', 'https://a', cb);
+    expect(cb).not.toHaveBeenCalled();
+    expect(scheduled).toBeTruthy();
+    scheduled!();
+    expect(cb).toHaveBeenCalledWith(false);
+    expect(broker.pendingCount()).toBe(0);
+  });
+
+  it('cancels the auto-deny timer when respond arrives first', () => {
+    const cancel = vi.fn();
+    const broker = new PermissionBroker(
+      vi.fn(),
+      () => 'rC',
+      () => 'timer-handle' as unknown as NodeJS.Timeout,
+      cancel,
+      30_000
+    );
+    const cb = vi.fn();
+    broker.request('media', 'https://a', cb);
+    broker.respond('rC', 'allow');
+    expect(cancel).toHaveBeenCalledWith('timer-handle');
+  });
+
+  it('cancelAll clears all auto-deny timers and denies', () => {
+    const cancel = vi.fn();
+    let counter = 0;
+    const broker = new PermissionBroker(
+      vi.fn(),
+      () => `r${++counter}`,
+      () => ({ tag: counter }) as unknown as NodeJS.Timeout,
+      cancel,
+      30_000
+    );
+    broker.request('media', 'https://a', vi.fn());
+    broker.request('notifications', 'https://b', vi.fn());
+    broker.cancelAll();
+    expect(cancel).toHaveBeenCalledTimes(2);
   });
 });

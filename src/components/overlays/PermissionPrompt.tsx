@@ -21,24 +21,32 @@ const LABELS: Record<string, string> = {
 };
 
 export const PermissionPrompt: React.FC = () => {
-  const [prompt, setPrompt] = useState<Prompt | null>(null);
+  // FIFO queue: a second request that arrives while the first is open
+  // gets added to the queue rather than overwriting (which would have
+  // leaked the in-flight broker callback).
+  const [queue, setQueue] = useState<Prompt[]>([]);
 
   useEffect(() => {
-    return window.horizonAPI.on('permission:request', (p: Prompt) => setPrompt(p));
+    return window.horizonAPI.on('permission:request', (p: Prompt) =>
+      setQueue((q) => [...q, p])
+    );
   }, []);
+
+  const current = queue[0];
 
   const respond = useCallback(
     (decision: 'allow' | 'block') => {
-      if (!prompt) return;
-      window.horizonAPI.invoke('permission:respond', { id: prompt.id, decision });
-      setPrompt(null);
+      if (!current) return;
+      window.horizonAPI.invoke('permission:respond', { id: current.id, decision });
+      setQueue((q) => q.slice(1));
     },
-    [prompt]
+    [current]
   );
 
-  if (!prompt) return null;
+  if (!current) return null;
 
-  const label = LABELS[prompt.permission] ?? `use ${prompt.permission}`;
+  const label = LABELS[current.permission] ?? `use ${current.permission}`;
+  const remaining = queue.length - 1;
 
   return (
     <div
@@ -56,10 +64,15 @@ export const PermissionPrompt: React.FC = () => {
       }}
     >
       <div className="text-sm font-semibold mb-1" style={{ color: 'var(--chrome-fg)' }}>
-        {prompt.origin || 'This site'} wants to {label}
+        {current.origin || 'This site'} wants to {label}
       </div>
       <div className="text-xs mb-3" style={{ color: 'var(--chrome-fg-muted)' }}>
-        Permission · {prompt.permission}
+        Permission · {current.permission}
+        {remaining > 0 && (
+          <span className="ml-2" style={{ color: 'var(--accent-primary)' }}>
+            +{remaining} more
+          </span>
+        )}
       </div>
       <div className="flex gap-2 justify-end">
         <button

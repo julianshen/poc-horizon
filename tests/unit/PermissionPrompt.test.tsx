@@ -51,4 +51,25 @@ describe('PermissionPrompt', () => {
     act(() => api().emit('permission:request', { id: 'r4', permission: 'fancy-feature', origin: 'https://c' }));
     expect(screen.getByText(/use fancy-feature/i)).toBeTruthy();
   });
+
+  it('queues a second request and shows "+N more" while the first is open', () => {
+    render(<PermissionPrompt />);
+    act(() => api().emit('permission:request', { id: 'q1', permission: 'media', origin: 'https://a' }));
+    act(() => api().emit('permission:request', { id: 'q2', permission: 'geolocation', origin: 'https://b' }));
+    // First prompt still rendered; counter shows the queued one.
+    expect(screen.getByText(/use your camera and microphone/i)).toBeTruthy();
+    expect(screen.getByText(/\+1 more/)).toBeTruthy();
+  });
+
+  it('advances to the next queued prompt after responding to the current one', () => {
+    render(<PermissionPrompt />);
+    act(() => api().emit('permission:request', { id: 'q1', permission: 'media', origin: 'https://a' }));
+    act(() => api().emit('permission:request', { id: 'q2', permission: 'geolocation', origin: 'https://b' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    // After Allow, q1 is dismissed and q2 is shown.
+    expect(screen.getByText(/know your location/i)).toBeTruthy();
+    expect(api().invokes).toEqual([
+      { channel: 'permission:respond', payload: { id: 'q1', decision: 'allow' } },
+    ]);
+  });
 });

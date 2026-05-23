@@ -11,8 +11,13 @@ export function useBookmarks(): {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
 
   const refresh = useCallback(async () => {
-    const tree = (await window.horizonAPI.invoke('bookmark:getTree', {})) as Bookmark[];
-    setBookmarks(Array.isArray(tree) ? tree.filter((b) => !!b.url) : []);
+    try {
+      const tree = (await window.horizonAPI.invoke('bookmark:getTree', {})) as Bookmark[];
+      setBookmarks(Array.isArray(tree) ? tree.filter((b) => !!b.url) : []);
+    } catch (err) {
+      console.warn('[useBookmarks] refresh failed:', err);
+      setBookmarks([]);
+    }
   }, []);
 
   useEffect(() => {

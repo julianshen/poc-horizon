@@ -10,6 +10,7 @@ export class TabManager {
   private window: BrowserWindow;
   private historyManager: HistoryManager;
   private readonly partition?: string;
+  private changeListeners = new Set<() => void>();
 
   constructor(window: BrowserWindow, historyManager: HistoryManager, partition?: string) {
     this.window = window;
@@ -20,6 +21,31 @@ export class TabManager {
   /** True if this manager's tabs use a non-default (incognito) partition. */
   isIncognito(): boolean {
     return this.partition === 'incognito';
+  }
+
+  /** Subscribe to any change in the tab set (create/close/activate/update/reorder/pin/mute). */
+  onChange(fn: () => void): () => void {
+    this.changeListeners.add(fn);
+    return () => this.changeListeners.delete(fn);
+  }
+
+  private emitChange(): void {
+    for (const fn of this.changeListeners) {
+      try {
+        fn();
+      } catch {
+        /* listener errors are not fatal */
+      }
+    }
+  }
+
+  /** Send to the chrome renderer if the window/webContents is still alive. */
+  private safeSend(channel: string, payload: unknown): void {
+    if (this.window.isDestroyed()) return;
+    const wc = this.window.webContents;
+    if (!wc || wc.isDestroyed()) return;
+    wc.send(channel, payload);
+    this.emitChange();
   }
 
   createTab(url = 'horizon://newtab'): Tab {
@@ -57,7 +83,7 @@ export class TabManager {
     view.webContents.loadURL(url);
 
     this.setupWebContentsEvents(id, view);
-    this.window.webContents.send('tab:created', tab);
+    this.safeSend('tab:created', tab);
     this.activateTab(id);
 
     return tab;
@@ -69,13 +95,13 @@ export class TabManager {
     wc.on('did-start-loading', () => {
       const entry = this.tabs.get(tabId);
       this.updateTab(tabId, { isLoading: true, loadProgress: 0 });
-      this.window.webContents.send('load:started', { tabId, url: entry?.tab.url ?? '' });
+      this.safeSend('load:started', { tabId, url: entry?.tab.url ?? '' });
     });
 
     wc.on('did-stop-loading', () => {
       const entry = this.tabs.get(tabId);
       this.updateTab(tabId, { isLoading: false, loadProgress: 100 });
-      this.window.webContents.send('load:finished', { tabId, url: entry?.tab.url ?? '' });
+      this.safeSend('load:finished', { tabId, url: entry?.tab.url ?? '' });
     });
 
     wc.on('did-navigate', (_event, url) => {
@@ -84,7 +110,7 @@ export class TabManager {
       const canGoForward = wc.navigationHistory.canGoForward();
       this.updateTab(tabId, { url, canGoBack, canGoForward });
       if (!this.isIncognito()) this.historyManager.addEntry(url, entry?.tab.title ?? '');
-      this.window.webContents.send('navigation:state', {
+      this.safeSend('navigation:state', {
         tabId,
         canGoBack,
         canGoForward,
@@ -99,13 +125,13 @@ export class TabManager {
       if (entry?.tab.url && !this.isIncognito()) {
         this.historyManager.addEntry(entry.tab.url, title);
       }
-      this.window.webContents.send('page:title', { tabId, title });
+      this.safeSend('page:title', { tabId, title });
     });
 
     wc.on('page-favicon-updated', (_event, favicons) => {
       if (favicons.length > 0) {
         this.updateTab(tabId, { favicon: favicons[0] });
-        this.window.webContents.send('page:favicon', { tabId, faviconUrl: favicons[0] });
+        this.safeSend('page:favicon', { tabId, faviconUrl: favicons[0] });
       }
     });
 
@@ -151,17 +177,25 @@ export class TabManager {
       height: Math.max(0, bounds.height - chromeHeight - inset),
     });
 
-    this.window.webContents.send('tab:activated', { tabId });
+    this.safeSend('tab:activated', { tabId });
   }
 
   closeTab(tabId: string): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;
 
-    this.window.removeBrowserView(entry.view);
-    (entry.view.webContents as any).destroy?.();
+    if (!this.window.isDestroyed()) {
+      this.window.removeBrowserView(entry.view);
+    }
+    const wc = entry.view.webContents as Electron.WebContents & { destroy?: () => void };
+    if (wc && !wc.isDestroyed()) {
+      // Electron's BrowserView webContents has a destroy() method that
+      // releases the renderer process. Optional-chain on the off-chance
+      // it's been renamed in a future API revision.
+      wc.destroy?.();
+    }
     this.tabs.delete(tabId);
-    this.window.webContents.send('tab:closed', { tabId });
+    this.safeSend('tab:closed', { tabId });
 
     if (this.activeTabId === tabId) {
       const remaining = Array.from(this.tabs.values());
@@ -296,13 +330,23 @@ export class TabManager {
 
   /**
    * Reorder the tab map so the tab with `tabId` lands at `targetIndex`.
-   * The Map preserves insertion order, so we rebuild it in the new order.
+   *
+   * Pinned tabs are kept ahead of unpinned in the underlying Map order: a
+   * pinned tab is clamped into the pinned region [0, pinnedCount-1] and
+   * an unpinned one into [pinnedCount, length-1]. This matches the
+   * render-side sort in TabBar and means restored sessions can't come
+   * back with a broken pin order.
    */
   reorder(tabId: string, targetIndex: number): void {
     const ids = Array.from(this.tabs.keys());
     const from = ids.indexOf(tabId);
     if (from === -1) return;
-    const clamped = Math.max(0, Math.min(ids.length - 1, targetIndex));
+
+    const isPinned = !!this.tabs.get(tabId)?.tab.isPinned;
+    const pinnedCount = Array.from(this.tabs.values()).filter((t) => t.tab.isPinned).length;
+    const min = isPinned ? 0 : pinnedCount;
+    const max = isPinned ? Math.max(0, pinnedCount - 1) : ids.length - 1;
+    const clamped = Math.max(min, Math.min(max, targetIndex));
     if (from === clamped) return;
 
     ids.splice(from, 1);
@@ -314,7 +358,7 @@ export class TabManager {
       if (entry) next.set(id, entry);
     }
     this.tabs = next;
-    this.window.webContents.send('tab:reordered', { tabId, index: clamped });
+    this.safeSend('tab:reordered', { tabId, index: clamped });
   }
 
   private updateTab(tabId: string, updates: Partial<Tab>): void {
@@ -322,6 +366,6 @@ export class TabManager {
     if (!entry) return;
     Object.assign(entry.tab, updates);
     // Notify renderer via IPC
-    this.window.webContents.send('tab:updated', { ...entry.tab, ...updates });
+    this.safeSend('tab:updated', { ...entry.tab, ...updates });
   }
 }

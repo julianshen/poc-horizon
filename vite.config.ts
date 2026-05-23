@@ -35,6 +35,7 @@ export default defineConfig({
         '.electron/services/AutofillManager.ts',
         '.electron/services/DownloadStore.ts',
         '.electron/services/permissionPolicy.ts',
+        '.electron/ipc/main-handlers.ts',
       ],
       exclude: ['**/*.d.ts', '**/index.ts'],
       thresholds: {

@@ -19,13 +19,14 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     environment: 'node',
+    setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       include: [
         'src/utils/**/*.ts',
         'src/stores/**/*.ts',
-        'src/hooks/useTabs.ts',
+        'src/hooks/**/*.ts',
         'shared/**/*.ts',
         '.electron/services/SettingsManager.ts',
         '.electron/services/BookmarkManager.ts',

@@ -18,12 +18,14 @@ describe('Omnibox', () => {
 
   it('shows a lock for https and a warning for non-https', () => {
     useBrowserStore.setState({ ...initialState, url: 'https://example.com' });
-    const { rerender } = render(<Omnibox />);
-    expect(screen.getByText('🔒')).toBeTruthy();
+    const { container, rerender } = render(<Omnibox />);
+    const secureStroke = container.querySelector('svg')?.getAttribute('stroke');
+    expect(secureStroke).toBe('var(--secure)');
 
     useBrowserStore.setState({ ...initialState, url: 'http://insecure.example' });
     rerender(<Omnibox />);
-    expect(screen.getByText('⚠️')).toBeTruthy();
+    const warnStroke = container.querySelector('svg')?.getAttribute('stroke');
+    expect(warnStroke).toBe('var(--warning)');
   });
 
   it('switches to the editing buffer on focus and back on blur', () => {

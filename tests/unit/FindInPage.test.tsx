@@ -46,9 +46,9 @@ describe('FindInPage', () => {
     render(<FindInPage />);
     const input = screen.getByPlaceholderText('Find in page') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'q' } });
-    fireEvent.click(screen.getByText('↑'));
+    fireEvent.click(screen.getByLabelText('Previous match'));
     expect(api().invokes.at(-1)).toEqual({ channel: 'find:next', payload: { tabId: 't1', forward: false } });
-    fireEvent.click(screen.getByText('↓'));
+    fireEvent.click(screen.getByLabelText('Next match'));
     expect(api().invokes.at(-1)).toEqual({ channel: 'find:next', payload: { tabId: 't1', forward: true } });
   });
 
@@ -90,7 +90,7 @@ describe('FindInPage', () => {
   it('✕ button closes the find bar via toggleOverlay', () => {
     useBrowserStore.setState({ ...initialState, showFindBar: true });
     render(<FindInPage />);
-    fireEvent.click(screen.getByText('✕'));
+    fireEvent.click(screen.getByLabelText('Close find bar'));
     expect(useBrowserStore.getState().showFindBar).toBe(false);
   });
 });

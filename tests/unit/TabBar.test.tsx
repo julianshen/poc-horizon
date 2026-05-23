@@ -94,6 +94,6 @@ describe('TabBar', () => {
       tabs: [sampleTab('a', { isLoading: true })],
     });
     const { container } = render(<TabBar />);
-    expect(container.querySelector('.animate-spin')).toBeTruthy();
+    expect(container.querySelector('.spinner')).toBeTruthy();
   });
 });

@@ -32,6 +32,26 @@ export function useKeyboardShortcuts(): void {
         e.preventDefault();
         toggleOverlay('showSettings');
       }
+      if (mod && e.key === 'p') {
+        e.preventDefault();
+        if (activeTabId) window.horizonAPI.invoke('print:start', { tabId: activeTabId });
+      }
+      if (mod && e.shiftKey && (e.key === 'I' || e.key === 'i')) {
+        e.preventDefault();
+        if (activeTabId) window.horizonAPI.invoke('devtools:toggle', { tabId: activeTabId });
+      }
+      if (mod && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        if (activeTabId) window.horizonAPI.invoke('zoom:set', { tabId: activeTabId, level: 1.2 });
+      }
+      if (mod && e.key === '-') {
+        e.preventDefault();
+        if (activeTabId) window.horizonAPI.invoke('zoom:set', { tabId: activeTabId, level: 0.9 });
+      }
+      if (mod && e.key === '0') {
+        e.preventDefault();
+        if (activeTabId) window.horizonAPI.invoke('zoom:reset', { tabId: activeTabId });
+      }
     };
 
     window.addEventListener('keydown', handler);

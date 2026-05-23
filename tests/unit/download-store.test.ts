@@ -31,6 +31,13 @@ describe('DownloadStore', () => {
     expect(ds.getAll()[0].id).toBe('a');
   });
 
+  it('get(id) returns the record or undefined', () => {
+    const ds = new DownloadStore(downloadsPath());
+    ds.upsert(sample('a'));
+    expect(ds.get('a')?.id).toBe('a');
+    expect(ds.get('missing')).toBeUndefined();
+  });
+
   it('upsert() adds a new item and notifies listeners', () => {
     const ds = new DownloadStore(downloadsPath());
     const listener = vi.fn();

@@ -33,7 +33,7 @@ export class DownloadManager {
     this.store.upsert(record);
 
     item.on('updated', (_e, state) => {
-      const current = this.store.getAll().find((d) => d.id === id);
+      const current = this.store.get(id);
       if (!current) return;
       this.store.upsert({
         ...current,

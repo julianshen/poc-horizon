@@ -32,11 +32,19 @@ export class DownloadStore {
     return Array.from(this.items.values());
   }
 
+  get(id: string): DownloadItem | undefined {
+    return this.items.get(id);
+  }
+
   upsert(item: DownloadItem): void {
     this.items.set(item.id, item);
     this.notify();
   }
 
+  // Transient state change for pause/resume — intentionally NOT persisted.
+  // A reload sees the last finalize() state ("progressing"); an in-flight
+  // download interrupted by a crash should resume as "interrupted" via
+  // the Electron download handle, not the JSON snapshot.
   setState(id: string, state: DownloadItem['state']): void {
     const item = this.items.get(id);
     if (!item) return;

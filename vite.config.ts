@@ -36,6 +36,7 @@ export default defineConfig({
         '.electron/services/DownloadStore.ts',
         '.electron/services/permissionPolicy.ts',
         '.electron/ipc/main-handlers.ts',
+        '.electron/preload.ts',
       ],
       exclude: ['**/*.d.ts', '**/index.ts'],
       thresholds: {

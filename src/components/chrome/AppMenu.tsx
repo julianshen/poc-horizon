@@ -57,6 +57,7 @@ export const AppMenu: React.FC<Props> = ({ open, onClose }) => {
       }}
     >
       <MenuRow label="New Tab" hint="⌘T" onClick={() => { window.horizonAPI.invoke('tab:create', {}); onClose(); }} />
+      <MenuRow label="New Incognito Window" hint="⌘⇧N" onClick={() => { window.horizonAPI.invoke('window:newIncognito', {}); onClose(); }} />
       <Divider />
       <MenuRow label="Bookmarks" onClick={() => open_('showBookmarks')} />
       <MenuRow label="History" onClick={() => open_('showHistory')} />

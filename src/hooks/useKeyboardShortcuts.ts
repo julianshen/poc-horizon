@@ -12,6 +12,10 @@ export function useKeyboardShortcuts(): void {
         e.preventDefault();
         window.horizonAPI.invoke('tab:create', {});
       }
+      if (mod && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+        e.preventDefault();
+        window.horizonAPI.invoke('window:newIncognito', {});
+      }
       if (mod && e.key === 'w') {
         e.preventDefault();
         if (activeTabId) window.horizonAPI.invoke('tab:close', { tabId: activeTabId });

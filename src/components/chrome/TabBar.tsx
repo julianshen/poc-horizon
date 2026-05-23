@@ -1,9 +1,11 @@
 import React from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
 import { Tab } from './Tab';
+import { useIncognito } from '../../hooks/useIncognito';
 
 export const TabBar: React.FC = () => {
   const { tabs, activeTabId } = useBrowserStore();
+  const incognito = useIncognito();
 
   const createTab = () => {
     window.horizonAPI.invoke('tab:create', {});
@@ -14,6 +16,27 @@ export const TabBar: React.FC = () => {
       className="h-[30px] flex items-center overflow-x-auto px-3 gap-px shrink-0"
       style={{ background: 'transparent', WebkitAppRegion: 'drag' }}
     >
+      {incognito && (
+        <span
+          data-testid="incognito-badge"
+          className="ml-20 mr-2 flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider"
+          style={{
+            background: 'var(--accent-soft)',
+            color: 'var(--accent-primary)',
+            letterSpacing: '0.08em',
+            WebkitAppRegion: 'no-drag',
+          }}
+          aria-label="Incognito window"
+        >
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 13l9-9 9 9" />
+            <path d="M5 13h14v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6z" />
+            <circle cx="9" cy="17" r="1.2" />
+            <circle cx="15" cy="17" r="1.2" />
+          </svg>
+          Incognito
+        </span>
+      )}
       <div className="flex items-center gap-px flex-1" style={{ WebkitAppRegion: 'no-drag' }}>
         {[...tabs]
           .sort((a, b) => Number(b.isPinned) - Number(a.isPinned))

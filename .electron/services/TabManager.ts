@@ -9,10 +9,17 @@ export class TabManager {
   private activeTabId: string | null = null;
   private window: BrowserWindow;
   private historyManager: HistoryManager;
+  private readonly partition?: string;
 
-  constructor(window: BrowserWindow, historyManager: HistoryManager) {
+  constructor(window: BrowserWindow, historyManager: HistoryManager, partition?: string) {
     this.window = window;
     this.historyManager = historyManager;
+    this.partition = partition;
+  }
+
+  /** True if this manager's tabs use a non-default (incognito) partition. */
+  isIncognito(): boolean {
+    return this.partition === 'incognito';
   }
 
   createTab(url = 'horizon://newtab'): Tab {
@@ -22,6 +29,7 @@ export class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        partition: this.partition,
       },
     });
 
@@ -75,7 +83,7 @@ export class TabManager {
       const canGoBack = wc.navigationHistory.canGoBack();
       const canGoForward = wc.navigationHistory.canGoForward();
       this.updateTab(tabId, { url, canGoBack, canGoForward });
-      this.historyManager.addEntry(url, entry?.tab.title ?? '');
+      if (!this.isIncognito()) this.historyManager.addEntry(url, entry?.tab.title ?? '');
       this.window.webContents.send('navigation:state', {
         tabId,
         canGoBack,
@@ -88,7 +96,7 @@ export class TabManager {
     wc.on('page-title-updated', (_event, title) => {
       this.updateTab(tabId, { title });
       const entry = this.tabs.get(tabId);
-      if (entry?.tab.url) {
+      if (entry?.tab.url && !this.isIncognito()) {
         this.historyManager.addEntry(entry.tab.url, title);
       }
       this.window.webContents.send('page:title', { tabId, title });

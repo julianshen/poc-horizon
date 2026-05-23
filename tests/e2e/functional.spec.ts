@@ -16,7 +16,16 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app?.close();
+  // Force-destroy every BrowserWindow first so app.close() doesn't hang
+  // on lingering incognito windows.
+  try {
+    await app?.evaluate(({ BrowserWindow: BW }) => {
+      for (const w of BW.getAllWindows()) w.destroy();
+    });
+  } catch {
+    /* app might already be closed */
+  }
+  await app?.close().catch(() => undefined);
 });
 
 test('initial tab is rendered with the New Tab title', async () => {
@@ -123,7 +132,14 @@ test('Cmd+J opens the downloads view (empty state OK)', async () => {
 });
 
 test('pinning a tab moves it to the front of the bar', async () => {
-  // Start clean — close all but one tab, then add two more.
+  // Start clean — unpin everything, then close all but one tab.
+  let safety = 10;
+  while (safety-- > 0) {
+    const tab = win.locator('[data-testid="tab"]').filter({ hasNot: win.getByTestId('tab-close') }).first();
+    if ((await tab.count()) === 0) break;
+    await tab.click({ button: 'right' });
+    await win.getByRole('menuitem', { name: /Unpin tab/ }).click();
+  }
   while ((await win.getByTestId('tab').count()) > 1) {
     const last = win.getByTestId('tab').last();
     await last.hover();
@@ -160,4 +176,25 @@ test('typing in omnibox dispatches navigation:go on Enter', async () => {
   await omnibox.press('Enter');
   const url = await navigated;
   expect(url).toMatch(/example\.com/);
+});
+
+test('Cmd+Shift+N opens a second window with the incognito badge', async () => {
+  const before = app.windows().length;
+  await win.keyboard.press('ControlOrMeta+Shift+N');
+  await expect.poll(() => app.windows().length, { timeout: 8000 }).toBe(before + 1);
+  // The Playwright app.windows() list also includes per-tab BrowserViews,
+  // so pick the chrome of the new window by its incognito=1 query string.
+  const chromeWindow = app.windows().find((w) => w !== win && /incognito=1/.test(w.url()));
+  expect(chromeWindow, 'chrome window with incognito flag').toBeDefined();
+  await expect(chromeWindow!.getByTestId('incognito-badge')).toBeVisible();
+  // Original window should NOT show the badge.
+  await expect(win.getByTestId('incognito-badge')).toHaveCount(0);
+  // Force-close the spawned BrowserWindow so afterAll's app.close() doesn't
+  // block on it. We do this via evaluate-on-main since Page.close()
+  // doesn't always tear down the parent BrowserWindow under Electron.
+  await app.evaluate(({ BrowserWindow: BW }) => {
+    for (const w of BW.getAllWindows()) {
+      if (w.webContents.getURL().includes('incognito=1')) w.destroy();
+    }
+  });
 });

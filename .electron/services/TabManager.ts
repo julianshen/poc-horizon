@@ -169,6 +169,9 @@ export class TabManager {
   navigate(tabId: string, url: string): void {
     const entry = this.tabs.get(tabId);
     if (entry) {
+      // Update tab.url eagerly so the immediately-following did-start-loading
+      // event reports the URL we are *navigating to*, not the previous one.
+      this.updateTab(tabId, { url });
       entry.view.webContents.loadURL(url);
     }
   }

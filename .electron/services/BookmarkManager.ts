@@ -79,7 +79,7 @@ export class BookmarkManager {
   import(data: string): Bookmark[] {
     // Parse Netscape HTML format using regex (Node.js compatible)
     const imported: Bookmark[] = [];
-    const regex = /\<A HREF="([^"]+)"[^\>]*\>([^\<]*)\<\/A\>/gi;
+    const regex = /<A HREF="([^"]+)"[^>]*>([^<]*)<\/A>/gi;
     let match;
     let index = 0;
     while ((match = regex.exec(data)) !== null) {

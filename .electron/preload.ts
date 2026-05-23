@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from './ipc/channels';
 
 const api = {
   invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
+import { normalizeUrl } from '../../utils/url';
 
 export const Omnibox: React.FC = () => {
   const { url, activeTabId } = useBrowserStore();
@@ -15,14 +16,9 @@ export const Omnibox: React.FC = () => {
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (!activeTabId || !inputValue.trim()) return;
-
-      let url = inputValue.trim();
-      if (!url.includes('://') && !url.includes('.')) {
-        url = `https://duckduckgo.com/?q=${encodeURIComponent(url)}`;
-      } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = `https://${url}`;
-      }
+      if (!activeTabId) return;
+      const url = normalizeUrl(inputValue);
+      if (!url) return;
 
       window.horizonAPI.invoke('navigation:go', { tabId: activeTabId, url });
       setIsEditing(false);

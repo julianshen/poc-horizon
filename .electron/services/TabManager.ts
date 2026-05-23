@@ -1,4 +1,5 @@
 import { BrowserView, BrowserWindow } from 'electron';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tab } from '../../src/types/browser';
 import type { HistoryManager } from './HistoryManager';
@@ -245,7 +246,7 @@ export class TabManager {
     const entry = this.tabs.get(tabId);
     if (!entry) throw new Error('Tab not found');
     return entry.view.webContents.printToPDF({}).then((data) => {
-      require('fs').writeFileSync(outputPath, data);
+      fs.writeFileSync(outputPath, data);
       return outputPath;
     });
   }

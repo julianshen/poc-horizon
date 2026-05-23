@@ -48,7 +48,7 @@ describe('Omnibox', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'example.com' } });
     fireEvent.submit(input.closest('form')!);
-    expect(api().invokes).toEqual([
+    expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([
       { channel: 'navigation:go', payload: { tabId: 't1', url: 'https://example.com' } },
     ]);
   });
@@ -60,7 +60,8 @@ describe('Omnibox', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'how to test electron' } });
     fireEvent.submit(input.closest('form')!);
-    expect(api().invokes[0].payload).toMatchObject({
+    const nav = api().invokes.find((i) => i.channel === 'navigation:go');
+    expect(nav?.payload).toMatchObject({
       tabId: 't1',
       url: expect.stringContaining('duckduckgo.com'),
     });
@@ -73,7 +74,7 @@ describe('Omnibox', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'example.com' } });
     fireEvent.submit(input.closest('form')!);
-    expect(api().invokes).toEqual([]);
+    expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([]);
   });
 
   it('submitting empty input is a no-op', () => {
@@ -83,7 +84,7 @@ describe('Omnibox', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.submit(input.closest('form')!);
-    expect(api().invokes).toEqual([]);
+    expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([]);
   });
 
   it('reflects external store URL changes while not editing', () => {

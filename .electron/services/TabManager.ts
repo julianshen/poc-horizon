@@ -134,7 +134,7 @@ export class TabManager {
     this.activeTabId = tabId;
 
     const bounds = this.window.getBounds();
-    const chromeHeight = 116; // Approximate
+    const chromeHeight = 152; // title 28 + toolbar 48 + bookmarks 36 + tabs 40
     current.view.setBounds({
       x: 0,
       y: chromeHeight,

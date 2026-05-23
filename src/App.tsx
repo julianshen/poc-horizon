@@ -2,6 +2,7 @@ import React from 'react';
 import { TitleBar } from './components/chrome/TitleBar';
 import { Toolbar } from './components/chrome/Toolbar';
 import { TabBar } from './components/chrome/TabBar';
+import { BookmarksBar } from './components/chrome/BookmarksBar';
 import { BrowserContentArea } from './components/chrome/BrowserContentArea';
 import { FindInPage } from './components/overlays/FindInPage';
 import { PageErrorOverlay } from './components/overlays/PageErrorOverlay';
@@ -27,6 +28,7 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-[var(--chrome-bg)] relative">
       <TitleBar />
       <Toolbar />
+      <BookmarksBar />
       <TabBar />
       <BrowserContentArea />
       {errorState && (

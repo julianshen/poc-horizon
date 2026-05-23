@@ -7,6 +7,9 @@ import { BrowserContentArea } from './components/chrome/BrowserContentArea';
 import { FindInPage } from './components/overlays/FindInPage';
 import { PageErrorOverlay } from './components/overlays/PageErrorOverlay';
 import { DownloadsShelf } from './components/overlays/DownloadsShelf';
+import { HistoryPanel } from './components/overlays/HistoryPanel';
+import { BookmarksPanel } from './components/overlays/BookmarksPanel';
+import { SettingsPanel } from './components/overlays/SettingsPanel';
 import { useBrowserStore } from './stores/browserStore';
 import { useTabs } from './hooks/useTabs';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -42,6 +45,9 @@ const App: React.FC = () => {
       )}
       <FindInPage />
       <DownloadsShelf />
+      <HistoryPanel />
+      <BookmarksPanel />
+      <SettingsPanel />
     </div>
   );
 };

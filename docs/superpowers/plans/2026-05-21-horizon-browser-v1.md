@@ -112,7 +112,7 @@ horizon/
 - Create: `.gitignore`
 - Create: `README.md`
 
-- [ ] **Step 1: Write package.json**
+- [x] **Step 1: Write package.json**
 
 ```json
 {
@@ -160,7 +160,7 @@ horizon/
 }
 ```
 
-- [ ] **Step 2: Write tsconfig.json**
+- [x] **Step 2: Write tsconfig.json**
 
 ```json
 {
@@ -191,7 +191,7 @@ horizon/
 }
 ```
 
-- [ ] **Step 3: Write tsconfig.main.json**
+- [x] **Step 3: Write tsconfig.main.json**
 
 ```json
 {
@@ -214,7 +214,7 @@ horizon/
 }
 ```
 
-- [ ] **Step 4: Write tsconfig.preload.json**
+- [x] **Step 4: Write tsconfig.preload.json**
 
 ```json
 {
@@ -237,7 +237,7 @@ horizon/
 }
 ```
 
-- [ ] **Step 5: Write vite.config.ts**
+- [x] **Step 5: Write vite.config.ts**
 
 ```typescript
 import { defineConfig } from 'vite';
@@ -259,7 +259,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 6: Write vite.main.config.ts**
+- [x] **Step 6: Write vite.main.config.ts**
 
 ```typescript
 import { defineConfig } from 'vite';
@@ -286,7 +286,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 7: Write vite.preload.config.ts**
+- [x] **Step 7: Write vite.preload.config.ts**
 
 ```typescript
 import { defineConfig } from 'vite';
@@ -313,7 +313,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 8: Write tailwind.config.ts**
+- [x] **Step 8: Write tailwind.config.ts**
 
 ```typescript
 import type { Config } from 'tailwindcss';
@@ -334,7 +334,7 @@ export default {
 } satisfies Config;
 ```
 
-- [ ] **Step 9: Write electron-builder.json5**
+- [x] **Step 9: Write electron-builder.json5**
 
 ```json5
 {
@@ -380,7 +380,7 @@ export default {
 }
 ```
 
-- [ ] **Step 10: Write .gitignore**
+- [x] **Step 10: Write .gitignore**
 
 ```
 node_modules/
@@ -396,12 +396,12 @@ coverage/
 .idea/
 ```
 
-- [ ] **Step 11: Install dependencies**
+- [x] **Step 11: Install dependencies**
 
 Run: `npm install`
 Expected: `node_modules/` created, no errors.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add package.json tsconfig*.json vite*.config.ts tailwind.config.ts electron-builder.json5 .gitignore README.md
@@ -417,7 +417,7 @@ git commit -m "chore: project scaffold with Electron, React, TypeScript, Vite"
 - Create: `src/types/browser.ts`
 - Create: `src/types/ipc.ts`
 
-- [ ] **Step 1: Write shared/constants.ts**
+- [x] **Step 1: Write shared/constants.ts**
 
 ```typescript
 export const APP_NAME = 'Horizon';
@@ -493,7 +493,7 @@ export const SEARCH_ENGINES: Record<string, { name: string; url: string; suggest
 };
 ```
 
-- [ ] **Step 2: Write src/types/browser.ts**
+- [x] **Step 2: Write src/types/browser.ts**
 
 ```typescript
 export interface Tab {
@@ -686,7 +686,7 @@ export type ContentSettingType = 'popup' | 'javascript' | 'images' | 'cookies' |
 export type CertificateErrorType = 'expired' | 'self-signed' | 'wrong-hostname' | 'authority-invalid';
 ```
 
-- [ ] **Step 3: Write src/types/ipc.ts**
+- [x] **Step 3: Write src/types/ipc.ts**
 
 ```typescript
 export interface IpcChannels {
@@ -793,7 +793,7 @@ type PermissionType = import('./browser').PermissionType;
 type ContentSettingType = import('./browser').ContentSettingType;
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add shared/constants.ts src/types/browser.ts src/types/ipc.ts
@@ -813,7 +813,7 @@ git commit -m "feat: shared constants and type definitions"
 - Create: `.electron/preload.ts`
 - Create: `.electron/main.ts`
 
-- [ ] **Step 1: Write .electron/ipc/channels.ts**
+- [x] **Step 1: Write .electron/ipc/channels.ts**
 
 ```typescript
 export const IPC_CHANNELS = {
@@ -917,7 +917,7 @@ export const IPC_CHANNELS = {
 } as const;
 ```
 
-- [ ] **Step 2: Write .electron/services/WindowManager.ts**
+- [x] **Step 2: Write .electron/services/WindowManager.ts**
 
 ```typescript
 import { BrowserWindow, screen } from 'electron';
@@ -978,7 +978,7 @@ export class WindowManager {
 }
 ```
 
-- [ ] **Step 3: Write .electron/services/TabManager.ts**
+- [x] **Step 3: Write .electron/services/TabManager.ts**
 
 ```typescript
 import { BrowserView, BrowserWindow } from 'electron';
@@ -1184,7 +1184,7 @@ export class TabManager {
 }
 ```
 
-- [ ] **Step 4: Write .electron/services/SessionManager.ts**
+- [x] **Step 4: Write .electron/services/SessionManager.ts**
 
 ```typescript
 import { session } from 'electron';
@@ -1210,7 +1210,7 @@ export class SessionManager {
 }
 ```
 
-- [ ] **Step 5: Write .electron/ipc/main-handlers.ts**
+- [x] **Step 5: Write .electron/ipc/main-handlers.ts**
 
 ```typescript
 import { ipcMain, BrowserWindow } from 'electron';
@@ -1277,7 +1277,7 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
 }
 ```
 
-- [ ] **Step 6: Write .electron/preload.ts**
+- [x] **Step 6: Write .electron/preload.ts**
 
 ```typescript
 import { contextBridge, ipcRenderer } from 'electron';
@@ -1297,7 +1297,7 @@ contextBridge.exposeInMainWorld('horizonAPI', api);
 export type HorizonAPI = typeof api;
 ```
 
-- [ ] **Step 7: Write .electron/main.ts**
+- [x] **Step 7: Write .electron/main.ts**
 
 ```typescript
 import { app, BrowserWindow } from 'electron';
@@ -1367,12 +1367,12 @@ app.on('second-instance', (_event, argv) => {
 });
 ```
 
-- [ ] **Step 8: Install uuid dependency**
+- [x] **Step 8: Install uuid dependency**
 
 Run: `npm install uuid && npm install -D @types/uuid`
 Expected: uuid installed, package.json updated.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add .electron/ package.json package-lock.json
@@ -1398,7 +1398,7 @@ git commit -m "feat: Electron main process with WindowManager, TabManager, IPC h
 - Create: `src/hooks/useNavigation.ts`
 - Create: `src/hooks/useKeyboardShortcuts.ts`
 
-- [ ] **Step 1: Write src/index.css**
+- [x] **Step 1: Write src/index.css**
 
 ```css
 @tailwind base;
@@ -1458,7 +1458,7 @@ body {
 }
 ```
 
-- [ ] **Step 2: Write src/main.tsx**
+- [x] **Step 2: Write src/main.tsx**
 
 ```tsx
 import React from 'react';
@@ -1473,7 +1473,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 );
 ```
 
-- [ ] **Step 3: Write src/stores/browserStore.ts**
+- [x] **Step 3: Write src/stores/browserStore.ts**
 
 ```typescript
 import { create } from 'zustand';
@@ -1531,7 +1531,7 @@ export const useBrowserStore = create<BrowserState>((set) => ({
 }));
 ```
 
-- [ ] **Step 4: Write src/App.tsx**
+- [x] **Step 4: Write src/App.tsx**
 
 ```tsx
 import React from 'react';
@@ -1559,7 +1559,7 @@ const App: React.FC = () => {
 export default App;
 ```
 
-- [ ] **Step 5: Write src/components/chrome/TitleBar.tsx**
+- [x] **Step 5: Write src/components/chrome/TitleBar.tsx**
 
 ```tsx
 import React from 'react';
@@ -1576,7 +1576,7 @@ export const TitleBar: React.FC = () => {
 };
 ```
 
-- [ ] **Step 6: Write src/components/chrome/Toolbar.tsx**
+- [x] **Step 6: Write src/components/chrome/Toolbar.tsx**
 
 ```tsx
 import React from 'react';
@@ -1617,7 +1617,7 @@ export const Toolbar: React.FC = () => {
 };
 ```
 
-- [ ] **Step 7: Write src/components/chrome/Omnibox.tsx**
+- [x] **Step 7: Write src/components/chrome/Omnibox.tsx**
 
 ```tsx
 import React, { useState, useEffect, useCallback } from 'react';
@@ -1676,7 +1676,7 @@ export const Omnibox: React.FC = () => {
 };
 ```
 
-- [ ] **Step 8: Write src/components/chrome/TabBar.tsx**
+- [x] **Step 8: Write src/components/chrome/TabBar.tsx**
 
 ```tsx
 import React from 'react';
@@ -1706,7 +1706,7 @@ export const TabBar: React.FC = () => {
 };
 ```
 
-- [ ] **Step 9: Write src/components/chrome/Tab.tsx**
+- [x] **Step 9: Write src/components/chrome/Tab.tsx**
 
 ```tsx
 import React from 'react';
@@ -1752,7 +1752,7 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
 };
 ```
 
-- [ ] **Step 10: Write src/components/chrome/BrowserContentArea.tsx**
+- [x] **Step 10: Write src/components/chrome/BrowserContentArea.tsx**
 
 ```tsx
 import React from 'react';
@@ -1764,7 +1764,7 @@ export const BrowserContentArea: React.FC = () => {
 };
 ```
 
-- [ ] **Step 11: Write src/hooks/useTabs.ts**
+- [x] **Step 11: Write src/hooks/useTabs.ts**
 
 ```typescript
 import { useEffect } from 'react';
@@ -1832,7 +1832,7 @@ export function useTabs(): void {
 }
 ```
 
-- [ ] **Step 12: Write src/hooks/useNavigation.ts**
+- [x] **Step 12: Write src/hooks/useNavigation.ts**
 
 ```typescript
 import { useCallback } from 'react';
@@ -1863,7 +1863,7 @@ export function useNavigation() {
 }
 ```
 
-- [ ] **Step 13: Write src/hooks/useKeyboardShortcuts.ts**
+- [x] **Step 13: Write src/hooks/useKeyboardShortcuts.ts**
 
 ```typescript
 import { useEffect } from 'react';
@@ -1904,7 +1904,7 @@ export function useKeyboardShortcuts(): void {
 }
 ```
 
-- [ ] **Step 14: Add global type declaration for horizonAPI**
+- [x] **Step 14: Add global type declaration for horizonAPI**
 
 Create: `src/types/global.d.ts`
 
@@ -1918,7 +1918,7 @@ declare global {
 }
 ```
 
-- [ ] **Step 15: Write index.html**
+- [x] **Step 15: Write index.html**
 
 Create: `index.html`
 
@@ -1938,12 +1938,12 @@ Create: `index.html`
 </html>
 ```
 
-- [ ] **Step 16: Run dev server and verify**
+- [x] **Step 16: Run dev server and verify**
 
 Run: `npm run dev`
 Expected: Electron window opens with title bar, toolbar, tab bar, and a DuckDuckGo tab loads.
 
-- [ ] **Step 17: Commit**
+- [x] **Step 17: Commit**
 
 ```bash
 git add src/ index.html
@@ -1960,7 +1960,7 @@ git commit -m "feat: React browser chrome with tabs, omnibox, navigation, keyboa
 - Create: `.electron/services/SettingsManager.ts`
 - Modify: `.electron/ipc/main-handlers.ts` — add settings handlers
 
-- [ ] **Step 1: Write .electron/services/SettingsManager.ts**
+- [x] **Step 1: Write .electron/services/SettingsManager.ts**
 
 ```typescript
 import { app } from 'electron';
@@ -2019,7 +2019,7 @@ export class SettingsManager {
 }
 ```
 
-- [ ] **Step 2: Add settings handlers to main-handlers.ts**
+- [x] **Step 2: Add settings handlers to main-handlers.ts**
 
 Add after existing handlers:
 
@@ -2046,7 +2046,7 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
 }
 ```
 
-- [ ] **Step 3: Update main.ts to pass SettingsManager**
+- [x] **Step 3: Update main.ts to pass SettingsManager**
 
 ```typescript
 import { SettingsManager } from './services/SettingsManager';
@@ -2056,7 +2056,7 @@ const settingsManager = new SettingsManager();
 registerIpcHandlers(tabManager, win, settingsManager);
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .electron/services/SettingsManager.ts .electron/ipc/main-handlers.ts .electron/main.ts
@@ -2071,7 +2071,7 @@ git commit -m "feat: settings persistence with JSON storage"
 - Create: `.electron/services/BookmarkManager.ts`
 - Modify: `.electron/ipc/main-handlers.ts`
 
-- [ ] **Step 1: Write .electron/services/BookmarkManager.ts**
+- [x] **Step 1: Write .electron/services/BookmarkManager.ts**
 
 ```typescript
 import { app } from 'electron';
@@ -2189,7 +2189,7 @@ ${links}
 }
 ```
 
-- [ ] **Step 2: Add bookmark handlers to main-handlers.ts**
+- [x] **Step 2: Add bookmark handlers to main-handlers.ts**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.BOOKMARK_GET_TREE, () => bookmarkManager.getTree());
@@ -2201,7 +2201,7 @@ ipcMain.handle(IPC_CHANNELS.BOOKMARK_IMPORT, (_event, { data }) => bookmarkManag
 ipcMain.handle(IPC_CHANNELS.BOOKMARK_EXPORT, () => bookmarkManager.export());
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .electron/services/BookmarkManager.ts .electron/ipc/main-handlers.ts
@@ -2217,7 +2217,7 @@ git commit -m "feat: bookmark manager with CRUD, import/export"
 - Modify: `.electron/ipc/main-handlers.ts`
 - Modify: `.electron/services/TabManager.ts` — hook into navigation events
 
-- [ ] **Step 1: Write .electron/services/HistoryManager.ts**
+- [x] **Step 1: Write .electron/services/HistoryManager.ts**
 
 ```typescript
 import { app } from 'electron';
@@ -2290,16 +2290,16 @@ export class HistoryManager {
 }
 ```
 
-- [ ] **Step 2: Install better-sqlite3**
+- [x] **Step 2: Install better-sqlite3**
 
 Run: `npm install better-sqlite3 && npm install -D @types/better-sqlite3`
 Expected: Package installed.
 
-- [ ] **Step 3: Hook HistoryManager into TabManager**
+- [x] **Step 3: Hook HistoryManager into TabManager**
 
 In `.electron/services/TabManager.ts`, add a HistoryManager parameter and call `historyManager.addEntry(url, title)` in the `did-navigate` and `page-title-updated` handlers.
 
-- [ ] **Step 4: Add history handlers to main-handlers.ts**
+- [x] **Step 4: Add history handlers to main-handlers.ts**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.HISTORY_SEARCH, (_event, { query, limit }) => historyManager.search(query, limit));
@@ -2307,7 +2307,7 @@ ipcMain.handle(IPC_CHANNELS.HISTORY_GET_RECENT, (_event, { limit }) => historyMa
 ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, (_event, { range }) => historyManager.clear(range));
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .electron/services/HistoryManager.ts .electron/ipc/main-handlers.ts .electron/services/TabManager.ts package.json package-lock.json
@@ -2323,7 +2323,7 @@ git commit -m "feat: history manager with SQLite, search, pruning"
 - Modify: `.electron/ipc/main-handlers.ts`
 - Modify: `.electron/main.ts`
 
-- [ ] **Step 1: Write .electron/services/DownloadManager.ts**
+- [x] **Step 1: Write .electron/services/DownloadManager.ts**
 
 ```typescript
 import { app, DownloadItem, Event, WebContents } from 'electron';
@@ -2455,7 +2455,7 @@ export class DownloadManager {
 }
 ```
 
-- [ ] **Step 2: Hook into main.ts session events**
+- [x] **Step 2: Hook into main.ts session events**
 
 ```typescript
 import { DownloadManager } from './services/DownloadManager';
@@ -2467,7 +2467,7 @@ win.webContents.session.on('will-download', (event, item, webContents) => {
 });
 ```
 
-- [ ] **Step 3: Add download handlers to main-handlers.ts**
+- [x] **Step 3: Add download handlers to main-handlers.ts**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.DOWNLOAD_PAUSE, (_event, { downloadId }) => downloadManager.pause(downloadId));
@@ -2476,7 +2476,7 @@ ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CANCEL, (_event, { downloadId }) => downloa
 ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CLEAR_COMPLETED, () => downloadManager.clearCompleted());
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .electron/services/DownloadManager.ts .electron/ipc/main-handlers.ts .electron/main.ts package.json package-lock.json
@@ -2494,7 +2494,7 @@ git commit -m "feat: download manager with progress tracking and persistence"
 - Create: `src/components/overlays/FindInPage.tsx`
 - Modify: `src/App.tsx` — include FindInPage overlay
 
-- [ ] **Step 1: Add find handlers to main-handlers.ts**
+- [x] **Step 1: Add find handlers to main-handlers.ts**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.FIND_START, (_event, { tabId, text, caseSensitive }) => {
@@ -2519,7 +2519,7 @@ ipcMain.handle(IPC_CHANNELS.FIND_STOP, (_event, { tabId }) => {
 
 Note: TabManager needs a `getBrowserView(tabId)` method. Add it.
 
-- [ ] **Step 2: Write src/components/overlays/FindInPage.tsx**
+- [x] **Step 2: Write src/components/overlays/FindInPage.tsx**
 
 ```tsx
 import React, { useState, useCallback, useEffect } from 'react';
@@ -2575,7 +2575,7 @@ export const FindInPage: React.FC = () => {
 };
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/components/overlays/FindInPage.tsx src/App.tsx .electron/ipc/main-handlers.ts .electron/services/TabManager.ts
@@ -2590,7 +2590,7 @@ git commit -m "feat: find in page with match counter and navigation"
 - Create: `.electron/services/PasswordManager.ts`
 - Modify: `.electron/ipc/main-handlers.ts`
 
-- [ ] **Step 1: Write .electron/services/PasswordManager.ts**
+- [x] **Step 1: Write .electron/services/PasswordManager.ts**
 
 ```typescript
 import { app, safeStorage } from 'electron';
@@ -2653,7 +2653,7 @@ export class PasswordManager {
 }
 ```
 
-- [ ] **Step 2: Add password handlers to main-handlers.ts**
+- [x] **Step 2: Add password handlers to main-handlers.ts**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_ALL, () => passwordManager.getAll());
@@ -2662,7 +2662,7 @@ ipcMain.handle(IPC_CHANNELS.PASSWORD_REMOVE, (_event, { origin, username }) => p
 ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_FOR_ORIGIN, (_event, { origin }) => passwordManager.getForOrigin(origin));
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .electron/services/PasswordManager.ts .electron/ipc/main-handlers.ts
@@ -2677,7 +2677,7 @@ git commit -m "feat: password manager with OS keychain encryption"
 - Create: `.electron/services/AutofillManager.ts`
 - Modify: `.electron/ipc/main-handlers.ts`
 
-- [ ] **Step 1: Write .electron/services/AutofillManager.ts**
+- [x] **Step 1: Write .electron/services/AutofillManager.ts**
 
 ```typescript
 import { app } from 'electron';
@@ -2730,7 +2730,7 @@ export class AutofillManager {
 }
 ```
 
-- [ ] **Step 2: Add autofill handlers to main-handlers.ts**
+- [x] **Step 2: Add autofill handlers to main-handlers.ts**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.AUTOFILL_GET_ADDRESSES, () => autofillManager.getAddresses());
@@ -2738,7 +2738,7 @@ ipcMain.handle(IPC_CHANNELS.AUTOFILL_SAVE_ADDRESS, (_event, { address }) => auto
 ipcMain.handle(IPC_CHANNELS.AUTOFILL_REMOVE_ADDRESS, (_event, { addressId }) => autofillManager.removeAddress(addressId));
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .electron/services/AutofillManager.ts .electron/ipc/main-handlers.ts
@@ -2753,7 +2753,7 @@ git commit -m "feat: address autofill manager"
 - Modify: `.electron/ipc/main-handlers.ts`
 - Modify: `.electron/services/TabManager.ts` — add zoom, devtools, print methods
 
-- [ ] **Step 1: Add TabManager methods**
+- [x] **Step 1: Add TabManager methods**
 
 ```typescript
 setZoom(tabId: string, level: number): void {
@@ -2798,7 +2798,7 @@ printToPDF(tabId: string, outputPath: string): Promise<string> {
 }
 ```
 
-- [ ] **Step 2: Add IPC handlers**
+- [x] **Step 2: Add IPC handlers**
 
 ```typescript
 ipcMain.handle(IPC_CHANNELS.ZOOM_SET, (_event, { tabId, level }) => tabManager.setZoom(tabId, level));
@@ -2809,7 +2809,7 @@ ipcMain.handle(IPC_CHANNELS.PRINT_START, (_event, { tabId }) => tabManager.print
 ipcMain.handle(IPC_CHANNELS.PRINT_TO_PDF, (_event, { tabId, outputPath }) => tabManager.printToPDF(tabId, outputPath));
 ```
 
-- [ ] **Step 3: Add pop-up blocking in SessionManager**
+- [x] **Step 3: Add pop-up blocking in SessionManager**
 
 ```typescript
 this.ses.setWindowOpenHandler(({ url }) => {
@@ -2819,7 +2819,7 @@ this.ses.setWindowOpenHandler(({ url }) => {
 });
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .electron/services/TabManager.ts .electron/services/SessionManager.ts .electron/ipc/main-handlers.ts
@@ -2837,7 +2837,7 @@ git commit -m "feat: zoom, print, devtools, pop-up blocking"
 - Modify: `.electron/services/SessionManager.ts` — add certificate handling
 - Create: `src/components/overlays/PageErrorOverlay.tsx`
 
-- [ ] **Step 1: Add error handling to TabManager**
+- [x] **Step 1: Add error handling to TabManager**
 
 In `setupWebContentsEvents`, add:
 
@@ -2856,7 +2856,7 @@ wc.on('render-process-gone', () => {
 });
 ```
 
-- [ ] **Step 2: Add certificate handling to SessionManager**
+- [x] **Step 2: Add certificate handling to SessionManager**
 
 ```typescript
 this.ses.setCertificateVerifyProc((_request, callback) => {
@@ -2865,7 +2865,7 @@ this.ses.setCertificateVerifyProc((_request, callback) => {
 });
 ```
 
-- [ ] **Step 3: Write src/components/overlays/PageErrorOverlay.tsx**
+- [x] **Step 3: Write src/components/overlays/PageErrorOverlay.tsx**
 
 ```tsx
 import React from 'react';
@@ -2905,7 +2905,7 @@ export const PageErrorOverlay: React.FC<PageErrorOverlayProps> = ({
 };
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .electron/services/TabManager.ts .electron/services/SessionManager.ts src/components/overlays/PageErrorOverlay.tsx
@@ -2920,7 +2920,7 @@ git commit -m "feat: error handling, certificate verification, error overlays"
 - Modify: `.electron/main.ts`
 - Install: `electron-updater`
 
-- [ ] **Step 1: Add auto-update logic to main.ts**
+- [x] **Step 1: Add auto-update logic to main.ts**
 
 ```typescript
 import { autoUpdater } from 'electron-updater';
@@ -2950,7 +2950,7 @@ ipcMain.handle(IPC_CHANNELS.APP_CHECK_FOR_UPDATES, async () => {
 });
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .electron/main.ts

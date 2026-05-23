@@ -72,16 +72,14 @@ export class TabManager {
 
     wc.on('did-navigate', (_event, url) => {
       const entry = this.tabs.get(tabId);
-      this.updateTab(tabId, {
-        url,
-        canGoBack: wc.canGoBack(),
-        canGoForward: wc.canGoForward(),
-      });
+      const canGoBack = wc.navigationHistory.canGoBack();
+      const canGoForward = wc.navigationHistory.canGoForward();
+      this.updateTab(tabId, { url, canGoBack, canGoForward });
       this.historyManager.addEntry(url, entry?.tab.title ?? '');
       this.window.webContents.send('navigation:state', {
         tabId,
-        canGoBack: wc.canGoBack(),
-        canGoForward: wc.canGoForward(),
+        canGoBack,
+        canGoForward,
         isLoading: entry?.tab.isLoading ?? false,
         url,
       });
@@ -177,15 +175,15 @@ export class TabManager {
 
   goBack(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry?.view.webContents.canGoBack()) {
-      entry.view.webContents.goBack();
+    if (entry?.view.webContents.navigationHistory.canGoBack()) {
+      entry.view.webContents.navigationHistory.goBack();
     }
   }
 
   goForward(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry?.view.webContents.canGoForward()) {
-      entry.view.webContents.goForward();
+    if (entry?.view.webContents.navigationHistory.canGoForward()) {
+      entry.view.webContents.navigationHistory.goForward();
     }
   }
 

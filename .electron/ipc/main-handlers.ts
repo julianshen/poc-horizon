@@ -66,7 +66,7 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   });
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_event, { key }: { key: string }) => {
-    return settingsManager.get(key);
+    return settingsManager.get(key as Parameters<typeof settingsManager.get>[0]);
   });
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_ALL, () => {
@@ -74,12 +74,12 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
   });
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, (_event, { key, value }: { key: string; value: unknown }) => {
-    settingsManager.set(key, value);
+    settingsManager.set(key as Parameters<typeof settingsManager.set>[0], value as never);
     window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
   });
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_RESET, (_event, { key }: { key?: string }) => {
-    settingsManager.reset(key);
+    settingsManager.reset(key as Parameters<typeof settingsManager.reset>[0]);
   });
 
   ipcMain.handle(IPC_CHANNELS.BOOKMARK_GET_TREE, () => bookmarkManager.getTree());

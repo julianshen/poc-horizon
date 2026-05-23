@@ -1,5 +1,15 @@
 import fs from 'fs';
-import type { HistoryEntry } from '../../src/types/browser';
+import { v4 as uuidv4 } from 'uuid';
+import type { HistoryEntry, HistoryClearRange } from '../../src/types/browser';
+
+const MAX_ENTRIES = 5000;
+
+const CLEAR_RANGE_OFFSETS: Record<HistoryClearRange, number> = {
+  hour: 3_600_000,
+  day: 86_400_000,
+  week: 604_800_000,
+  month: 2_592_000_000,
+};
 
 export class HistoryManager {
   private entries: HistoryEntry[];
@@ -28,7 +38,7 @@ export class HistoryManager {
       existing.title = title;
     } else {
       this.entries.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: uuidv4(),
         url,
         title,
         visitTime: Date.now(),
@@ -36,9 +46,8 @@ export class HistoryManager {
         typedCount: 0,
       });
     }
-    // Keep only last 5000 entries
-    if (this.entries.length > 5000) {
-      this.entries = this.entries.slice(-5000);
+    if (this.entries.length > MAX_ENTRIES) {
+      this.entries = this.entries.slice(-MAX_ENTRIES);
     }
     this.save();
   }
@@ -55,16 +64,10 @@ export class HistoryManager {
     return [...this.entries].sort((a, b) => b.visitTime - a.visitTime).slice(0, limit);
   }
 
-  clear(range?: string): number {
-    const now = Date.now();
-    let cutoff = 0;
-    if (range === 'hour') cutoff = now - 3600000;
-    else if (range === 'day') cutoff = now - 86400000;
-    else if (range === 'week') cutoff = now - 604800000;
-    else if (range === 'month') cutoff = now - 2592000000;
-
+  clear(range?: HistoryClearRange): number {
     const before = this.entries.length;
-    if (cutoff > 0) {
+    if (range) {
+      const cutoff = Date.now() - CLEAR_RANGE_OFFSETS[range];
       this.entries = this.entries.filter((e) => e.visitTime < cutoff);
     } else {
       this.entries = [];

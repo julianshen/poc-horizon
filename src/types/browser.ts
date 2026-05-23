@@ -47,6 +47,8 @@ export interface HistoryEntry {
   typedCount: number;
 }
 
+export type HistoryClearRange = 'hour' | 'day' | 'week' | 'month';
+
 export interface DownloadItem {
   id: string;
   filename: string;

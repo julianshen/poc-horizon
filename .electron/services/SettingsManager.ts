@@ -26,22 +26,22 @@ export class SettingsManager {
     fs.writeFileSync(this.settingsPath, JSON.stringify(this.settings, null, 2));
   }
 
-  get(key: string): unknown {
-    return (this.settings as Record<string, unknown>)[key];
+  get<K extends keyof Settings>(key: K): Settings[K] {
+    return this.settings[key];
   }
 
   getAll(): Settings {
     return { ...this.settings };
   }
 
-  set(key: string, value: unknown): void {
-    (this.settings as Record<string, unknown>)[key] = value;
+  set<K extends keyof Settings>(key: K, value: Settings[K]): void {
+    this.settings[key] = value;
     this.save();
   }
 
-  reset(key?: string): void {
+  reset<K extends keyof Settings>(key?: K): void {
     if (key) {
-      (this.settings as Record<string, unknown>)[key] = (DEFAULT_SETTINGS as Record<string, unknown>)[key];
+      this.settings[key] = DEFAULT_SETTINGS[key] as Settings[K];
     } else {
       this.settings = { ...DEFAULT_SETTINGS };
     }

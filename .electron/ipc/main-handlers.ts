@@ -21,6 +21,22 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
     tabManager.activateTab(tabId);
   });
 
+  ipcMain.handle(IPC_CHANNELS.TAB_PIN, (_event, { tabId, pinned }: { tabId: string; pinned: boolean }) => {
+    tabManager.setPinned(tabId, pinned);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.TAB_MUTE, (_event, { tabId }: { tabId: string }) => {
+    tabManager.setMuted(tabId, true);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.TAB_UNMUTE, (_event, { tabId }: { tabId: string }) => {
+    tabManager.setMuted(tabId, false);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.TAB_DUPLICATE, (_event, { tabId }: { tabId: string }) => {
+    return tabManager.duplicate(tabId);
+  });
+
   ipcMain.handle(IPC_CHANNELS.NAVIGATION_GO, (_event, { tabId, url }: { tabId: string; url: string }) => {
     tabManager.navigate(tabId, url);
   });

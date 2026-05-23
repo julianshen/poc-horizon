@@ -259,6 +259,29 @@ export class TabManager {
     return this.tabs.get(tabId)?.view;
   }
 
+  setPinned(tabId: string, pinned: boolean): void {
+    this.updateTab(tabId, { isPinned: pinned });
+  }
+
+  setMuted(tabId: string, muted: boolean): void {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return;
+    entry.view.webContents.setAudioMuted(muted);
+    this.updateTab(tabId, { isMuted: muted });
+  }
+
+  duplicate(tabId: string): Tab | undefined {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return undefined;
+    return this.createTab(entry.tab.url);
+  }
+
+  closeOthers(tabId: string): void {
+    for (const id of Array.from(this.tabs.keys())) {
+      if (id !== tabId) this.closeTab(id);
+    }
+  }
+
   private updateTab(tabId: string, updates: Partial<Tab>): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;

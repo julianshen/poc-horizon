@@ -36,7 +36,13 @@ export const Omnibox: React.FC = () => {
     setIsFocused(false);
   }, []);
 
+  const isInternal = url.startsWith('horizon://');
   const isSecure = url.startsWith('https');
+  const displayValue = isEditing
+    ? inputValue
+    : isInternal
+      ? ''
+      : url.replace(/^https?:\/\//, '');
 
   return (
     <form onSubmit={handleSubmit} className="flex-1 max-w-3xl mx-3">
@@ -52,7 +58,7 @@ export const Omnibox: React.FC = () => {
           WebkitAppRegion: 'no-drag',
         }}
       >
-        <svg
+        {!isInternal && <svg
           viewBox="0 0 24 24"
           width={14}
           height={14}
@@ -75,10 +81,10 @@ export const Omnibox: React.FC = () => {
               <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             </>
           )}
-        </svg>
+        </svg>}
         <input
           type="text"
-          value={isEditing ? inputValue : url.replace(/^https?:\/\//, '')}
+          value={displayValue}
           onChange={(e) => setInputValue(e.target.value)}
           onFocus={handleFocus}
           onBlur={handleBlur}

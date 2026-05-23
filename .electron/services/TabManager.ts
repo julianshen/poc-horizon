@@ -15,7 +15,7 @@ export class TabManager {
     this.historyManager = historyManager;
   }
 
-  createTab(url = 'https://duckduckgo.com'): Tab {
+  createTab(url = 'horizon://newtab'): Tab {
     const id = uuidv4();
     const view = new BrowserView({
       webPreferences: {

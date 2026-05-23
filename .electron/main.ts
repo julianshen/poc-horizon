@@ -87,7 +87,7 @@ function createWindow(): void {
   // first paint). Without this wait, the tab:created broadcast fires
   // into the void and the TabBar never sees the initial tab.
   win.webContents.once('did-finish-load', () => {
-    tabManager.createTab('https://duckduckgo.com');
+    tabManager.createTab('horizon://newtab');
   });
 }
 

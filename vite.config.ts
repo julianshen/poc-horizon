@@ -27,6 +27,7 @@ export default defineConfig({
         'src/utils/**/*.ts',
         'src/stores/**/*.ts',
         'src/hooks/**/*.ts',
+        'src/hooks/**/*.tsx',
         'src/components/chrome/Omnibox.tsx',
         'src/components/chrome/TabBar.tsx',
         'src/components/chrome/Tab.tsx',

@@ -16,6 +16,7 @@ import { registerIpcHandlers, WindowContext } from './ipc/main-handlers';
 import { denyAllWindowOpens } from './services/windowOpenPolicy';
 import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 import { TabSessionStore } from './services/TabSessionStore';
+import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
 import type { Tab } from '../src/types/browser';
 
 
@@ -40,6 +41,7 @@ let downloadManager: DownloadManager;
 let passwordManager: PasswordManager;
 let autofillManager: AutofillManager;
 let tabSessionStore: TabSessionStore;
+let permissionBroker: PermissionBroker;
 
 function initSingletons(): void {
   if (settingsManager) return;
@@ -63,7 +65,13 @@ function initSingletons(): void {
     callback({ path: filePath });
   });
 
-  const sessionManager = new SessionManager();
+  permissionBroker = new PermissionBroker((prompt) => {
+    // Broadcast to all open windows — the active one will surface the UI.
+    for (const w of BrowserWindow.getAllWindows()) {
+      w.webContents.send(IPC_CHANNELS.PERMISSION_REQUEST, prompt);
+    }
+  });
+  const sessionManager = new SessionManager(permissionBroker);
   sessionManager.initialize();
 }
 
@@ -95,6 +103,9 @@ function registerHandlers(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.WINDOW_NEW_INCOGNITO, () => createWindow({ incognito: true }));
+  ipcMain.handle(IPC_CHANNELS.PERMISSION_RESPOND, (_event, { id, decision }: { id: string; decision: PermissionDecision }) => {
+    return permissionBroker.respond(id, decision);
+  });
   ipcMain.handle(IPC_CHANNELS.APP_CHECK_FOR_UPDATES, async () => {
     const result = await autoUpdater.checkForUpdates();
     return {

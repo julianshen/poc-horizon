@@ -41,6 +41,7 @@ export default defineConfig({
         '.electron/services/AutofillManager.ts',
         '.electron/services/DownloadStore.ts',
         '.electron/services/TabSessionStore.ts',
+        '.electron/services/PermissionBroker.ts',
         '.electron/services/permissionPolicy.ts',
         '.electron/services/windowOpenPolicy.ts',
         '.electron/services/autoUpdateScheduler.ts',

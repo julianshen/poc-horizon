@@ -12,6 +12,7 @@ import { BookmarksPanel } from './components/overlays/BookmarksPanel';
 import { SettingsPanel } from './components/overlays/SettingsPanel';
 import { AIPanel } from './components/overlays/AIPanel';
 import { CommandPalette } from './components/overlays/CommandPalette';
+import { PermissionPrompt } from './components/overlays/PermissionPrompt';
 import { useBrowserStore } from './stores/browserStore';
 import { useTabs } from './hooks/useTabs';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -63,6 +64,7 @@ const App: React.FC = () => {
       <BookmarksPanel />
       <SettingsPanel />
       <CommandPalette />
+      <PermissionPrompt />
     </div>
   );
 };

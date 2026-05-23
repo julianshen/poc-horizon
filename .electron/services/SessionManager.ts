@@ -1,12 +1,24 @@
 import { session } from 'electron';
-import { defaultRequestResponse, shouldAutoAllow } from './permissionPolicy';
+import { shouldAutoAllow } from './permissionPolicy';
+import type { PermissionBroker } from './PermissionBroker';
 
 export class SessionManager {
   private ses = session.defaultSession;
 
+  constructor(private readonly broker?: PermissionBroker) {}
+
   initialize(): void {
-    this.ses.setPermissionRequestHandler((_wc, permission, callback) => {
-      callback(defaultRequestResponse(permission));
+    this.ses.setPermissionRequestHandler((wc, permission, callback) => {
+      if (shouldAutoAllow(permission)) {
+        callback(true);
+        return;
+      }
+      if (this.broker) {
+        const origin = safeOrigin(wc.getURL());
+        this.broker.request(permission, origin, callback);
+        return;
+      }
+      callback(false);
     });
 
     this.ses.setPermissionCheckHandler((_wc, permission) => {
@@ -20,5 +32,13 @@ export class SessionManager {
 
   getSession() {
     return this.ses;
+  }
+}
+
+function safeOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
   }
 }

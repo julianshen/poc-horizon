@@ -19,7 +19,14 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app?.close();
+  try {
+    await app?.evaluate(({ BrowserWindow }) => {
+      for (const w of BrowserWindow.getAllWindows()) w.destroy();
+    });
+  } catch {
+    /* app might already be closed */
+  }
+  await app?.close().catch(() => undefined);
 });
 
 test('app launches and shows the browser chrome', async () => {

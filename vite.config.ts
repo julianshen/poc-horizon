@@ -27,6 +27,7 @@ export default defineConfig({
         'src/utils/**/*.ts',
         'src/stores/**/*.ts',
         'src/hooks/**/*.ts',
+        'src/components/chrome/Omnibox.tsx',
         'shared/**/*.ts',
         '.electron/services/SettingsManager.ts',
         '.electron/services/BookmarkManager.ts',

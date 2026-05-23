@@ -40,6 +40,8 @@ export default defineConfig({
         '.electron/services/AutofillManager.ts',
         '.electron/services/DownloadStore.ts',
         '.electron/services/permissionPolicy.ts',
+        '.electron/services/windowOpenPolicy.ts',
+        '.electron/services/autoUpdateScheduler.ts',
         '.electron/ipc/main-handlers.ts',
         '.electron/preload.ts',
       ],

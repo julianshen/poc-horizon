@@ -13,6 +13,8 @@ import { AutofillManager } from './services/AutofillManager';
 import { autoUpdater } from 'electron-updater';
 import { IPC_CHANNELS } from './ipc/channels';
 import { registerIpcHandlers } from './ipc/main-handlers';
+import { denyAllWindowOpens } from './services/windowOpenPolicy';
+import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -27,10 +29,7 @@ function createWindow(): void {
   windowManager = new WindowManager();
   const win = windowManager.createWindow();
 
-  // Block pop-ups
-  win.webContents.setWindowOpenHandler(() => {
-    return { action: 'deny' };
-  });
+  win.webContents.setWindowOpenHandler(denyAllWindowOpens);
 
   const sessionManager = new SessionManager();
   sessionManager.initialize();
@@ -65,12 +64,7 @@ function createWindow(): void {
 
   registerIpcHandlers(tabManager, win, settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager, autofillManager);
 
-  // Auto-updater
-  autoUpdater.checkForUpdatesAndNotify();
-
-  setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify();
-  }, 4 * 60 * 60 * 1000); // 4 hours
+  scheduleAutoUpdate(autoUpdater);
 
   autoUpdater.on('update-available', (info) => {
     win.webContents.send(IPC_CHANNELS.APP_UPDATE_AVAILABLE, { version: info.version });

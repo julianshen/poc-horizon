@@ -3114,7 +3114,7 @@ git commit -m "test: unit and e2e test scaffold"
 - [ ] Zoom changes apply
 - [ ] Print dialog opens
 - [ ] DevTools toggle works
-- [ ] Pop-ups are blocked
+- [x] Pop-ups are blocked
 - [x] Error pages show on load failure
-- [ ] Auto-update checks on startup
+- [x] Auto-update checks on startup
 - [x] Build produces distributable (`npm run dist`)

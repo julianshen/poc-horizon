@@ -134,12 +134,15 @@ export class TabManager {
     this.activeTabId = tabId;
 
     const bounds = this.window.getBounds();
-    const chromeHeight = 152; // title 28 + toolbar 48 + bookmarks 36 + tabs 40
+    // Dia layout: titlebar 36 + tabbar 30 + toolbar 48 + bookmarks 32 = 146
+    // Content sits in a floating card with 12px side/bottom inset.
+    const chromeHeight = 146;
+    const inset = 12;
     current.view.setBounds({
-      x: 0,
+      x: inset,
       y: chromeHeight,
-      width: bounds.width,
-      height: bounds.height - chromeHeight,
+      width: Math.max(0, bounds.width - inset * 2),
+      height: Math.max(0, bounds.height - chromeHeight - inset),
     });
 
     this.window.webContents.send('tab:activated', { tabId });

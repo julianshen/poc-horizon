@@ -16,10 +16,9 @@ export const BookmarksBar: React.FC = () => {
 
   return (
     <div
-      className="h-9 flex items-center px-3 gap-1 overflow-x-auto"
+      className="h-8 flex items-center px-3.5 gap-1 overflow-x-auto shrink-0"
       style={{
-        background: 'var(--toolbar-bg)',
-        borderBottom: '1px solid var(--chrome-border)',
+        background: 'transparent',
       }}
       role="toolbar"
       aria-label="Bookmarks bar"

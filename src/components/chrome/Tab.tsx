@@ -37,7 +37,7 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
     [tab.id, tab.isMuted]
   );
 
-  const width = tab.isPinned ? 'w-10 min-w-[40px]' : 'min-w-[140px] max-w-[220px]';
+  const width = tab.isPinned ? 'w-9 min-w-[36px] max-w-[36px]' : 'min-w-[80px] max-w-[180px]';
 
   return (
     <>
@@ -46,40 +46,51 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
         data-tab-id={tab.id}
         onClick={activate}
         onContextMenu={openMenu}
-        className={`group h-9 px-3 flex items-center gap-2 cursor-pointer text-xs select-none relative ${width}`}
+        className={`group h-[26px] px-2.5 flex items-center gap-2 cursor-pointer text-xs select-none ${width}`}
         style={{
           background: isActive ? 'var(--tab-bg-active)' : 'var(--tab-bg-inactive)',
-          color: isActive ? 'var(--chrome-fg)' : 'var(--chrome-fg-muted)',
-          borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
+          color: isActive ? 'var(--chrome-fg)' : 'var(--chrome-fg-subtle)',
+          borderRadius: 'var(--radius-sm)',
           boxShadow: isActive ? 'var(--tab-shadow-active)' : 'none',
           transition: 'background var(--transition-fast), color var(--transition-fast)',
           WebkitAppRegion: 'no-drag',
+          fontWeight: 500,
+          letterSpacing: '-0.005em',
         }}
         onMouseEnter={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'var(--tab-bg-hover)';
+          if (!isActive) {
+            e.currentTarget.style.background = 'var(--tab-bg-hover)';
+            e.currentTarget.style.color = 'var(--chrome-fg)';
+          }
         }}
         onMouseLeave={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'var(--tab-bg-inactive)';
+          if (!isActive) {
+            e.currentTarget.style.background = 'var(--tab-bg-inactive)';
+            e.currentTarget.style.color = 'var(--chrome-fg-subtle)';
+          }
         }}
       >
         {tab.isLoading ? (
           <span className="spinner shrink-0" />
         ) : tab.favicon ? (
-          <img src={tab.favicon} alt="" className="w-4 h-4 shrink-0 rounded-sm" />
+          <img src={tab.favicon} alt="" className="w-[14px] h-[14px] shrink-0 rounded-[4px]" />
         ) : (
-          <span className="w-4 h-4 rounded-sm shrink-0" style={{ background: 'var(--chrome-border)' }} />
+          <span
+            className="w-[14px] h-[14px] rounded-[4px] shrink-0 flex items-center justify-center text-[9px] font-bold text-white"
+            style={{ background: 'var(--accent-primary)' }}
+          >
+            {(tab.title || '?').charAt(0).toUpperCase()}
+          </span>
         )}
-        {!tab.isPinned && (
-          <span className="flex-1 truncate font-medium">{tab.title || 'New Tab'}</span>
-        )}
+        {!tab.isPinned && <span className="flex-1 truncate">{tab.title || 'New Tab'}</span>}
         {tab.isMuted && (
           <button
             onClick={toggleMute}
             aria-label="Unmute tab"
-            className="w-4 h-4 shrink-0 flex items-center justify-center"
-            style={{ color: 'var(--chrome-fg-muted)' }}
+            className="w-3.5 h-3.5 shrink-0 flex items-center justify-center"
+            style={{ color: 'var(--chrome-fg-subtle)' }}
           >
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
               <line x1="23" y1="9" x2="17" y2="15" />
               <line x1="17" y1="9" x2="23" y2="15" />
@@ -91,21 +102,24 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
             data-testid="tab-close"
             aria-label={`Close ${tab.title || 'tab'}`}
             onClick={close}
-            className="w-5 h-5 rounded-full flex items-center justify-center text-sm leading-none opacity-0 group-hover:opacity-100"
+            className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center opacity-0 group-hover:opacity-55"
             style={{
               color: 'var(--chrome-fg-muted)',
               transition: 'opacity var(--transition-fast), background var(--transition-fast)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--tab-bg-hover)';
-              e.currentTarget.style.color = 'var(--chrome-fg)';
+              e.currentTarget.style.background = 'rgba(125,125,125,0.18)';
+              e.currentTarget.style.opacity = '1';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'var(--chrome-fg-muted)';
+              e.currentTarget.style.opacity = '0.55';
             }}
           >
-            ×
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
           </button>
         )}
       </div>

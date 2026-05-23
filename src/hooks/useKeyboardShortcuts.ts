@@ -32,6 +32,14 @@ export function useKeyboardShortcuts(): void {
         e.preventDefault();
         toggleOverlay('showSettings');
       }
+      if (mod && e.key === 'k') {
+        e.preventDefault();
+        toggleOverlay('showCmd');
+      }
+      if (mod && e.key === 'j') {
+        e.preventDefault();
+        toggleOverlay('showDownloads');
+      }
       if (mod && e.key === 'p') {
         e.preventDefault();
         if (activeTabId) window.horizonAPI.invoke('print:start', { tabId: activeTabId });

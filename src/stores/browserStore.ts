@@ -14,13 +14,16 @@ interface BrowserState {
   showHistory: boolean;
   showDownloads: boolean;
   showFindBar: boolean;
+  showAI: boolean;
+  showCmd: boolean;
+  toggleAI: () => void;
   setTabs: (tabs: Tab[]) => void;
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
   removeTab: (tabId: string) => void;
   setNavigationState: (state: { canGoBack: boolean; canGoForward: boolean; isLoading: boolean; url: string }) => void;
   setLoadProgress: (progress: number) => void;
-  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar') => void;
+  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd') => void;
 }
 
 export const useBrowserStore = create<BrowserState>((set) => ({
@@ -36,6 +39,9 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   showHistory: false,
   showDownloads: false,
   showFindBar: false,
+  showAI: false,
+  showCmd: false,
+  toggleAI: () => set((state) => ({ showAI: !state.showAI })),
 
   setTabs: (tabs) => set({ tabs }),
   setActiveTab: (activeTabId) => set({ activeTabId }),

@@ -85,15 +85,15 @@ export const Omnibox: React.FC = () => {
   const displayValue = isEditing ? inputValue : isInternal ? '' : url.replace(/^https?:\/\//, '');
 
   return (
-    <form onSubmit={handleSubmit} className="flex-1 max-w-3xl mx-3 relative">
+    <form onSubmit={handleSubmit} className="flex-1 max-w-3xl mx-2 relative">
       <div
-        className="flex items-center h-9 px-3 gap-2"
+        className="flex items-center h-9 px-3.5 gap-2.5"
         style={{
           background: isFocused ? 'var(--omnibox-bg-focus)' : 'var(--omnibox-bg)',
-          borderRadius: 'var(--radius-pill)',
+          borderRadius: 'var(--radius-md)',
           boxShadow: isFocused
-            ? '0 0 0 3px var(--omnibox-ring), var(--shadow-sm)'
-            : 'inset 0 0 0 1px var(--chrome-border)',
+            ? '0 0 0 3px var(--omnibox-ring), 0 1px 2px rgba(20,15,10,0.04)'
+            : '0 1px 2px rgba(20,15,10,0.04), inset 0 0 0 0.5px var(--chrome-border)',
           transition: 'box-shadow var(--transition-fast), background var(--transition-fast)',
           WebkitAppRegion: 'no-drag',
         }}

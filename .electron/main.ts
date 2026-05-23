@@ -45,7 +45,7 @@ function createWindow(): void {
       decrypt: (s) => safeStorage.decryptString(Buffer.from(s, 'base64')),
     }
   );
-  const autofillManager = new AutofillManager();
+  const autofillManager = new AutofillManager(path.join(app.getPath('userData'), 'addresses.json'));
 
   tabManager = new TabManager(win, historyManager);
 

@@ -1,15 +1,11 @@
-import { app } from 'electron';
 import fs from 'fs';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { SavedAddress } from '../../src/types/browser';
 
 export class AutofillManager {
-  private addressesPath: string;
   private addresses: SavedAddress[];
 
-  constructor() {
-    this.addressesPath = path.join(app.getPath('userData'), 'addresses.json');
+  constructor(private addressesPath: string) {
     this.addresses = this.load();
   }
 

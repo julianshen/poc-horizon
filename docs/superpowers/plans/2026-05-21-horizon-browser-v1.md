@@ -2965,7 +2965,7 @@ git commit -m "feat: auto-update with electron-updater"
 - Modify: `package.json` — add build scripts
 - Modify: `electron-builder.json5`
 
-- [ ] **Step 1: Verify build works**
+- [x] **Step 1: Verify build works**
 
 Run: `npm run build`
 Expected: `dist/` and `dist-electron/` created with compiled assets.
@@ -2973,7 +2973,7 @@ Expected: `dist/` and `dist-electron/` created with compiled assets.
 Run: `npm run dist`
 Expected: `release/` directory created with platform-specific packages.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add package.json electron-builder.json5
@@ -3117,4 +3117,4 @@ git commit -m "test: unit and e2e test scaffold"
 - [ ] Pop-ups are blocked
 - [x] Error pages show on load failure
 - [ ] Auto-update checks on startup
-- [ ] Build produces distributable (`npm run dist`)
+- [x] Build produces distributable (`npm run dist`)

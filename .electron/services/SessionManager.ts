@@ -1,17 +1,16 @@
 import { session } from 'electron';
+import { defaultRequestResponse, shouldAutoAllow } from './permissionPolicy';
 
 export class SessionManager {
   private ses = session.defaultSession;
 
   initialize(): void {
-    this.ses.setPermissionRequestHandler((_webContents, permission, callback) => {
-      // Default deny; renderer will show prompt
-      callback(false);
+    this.ses.setPermissionRequestHandler((_wc, permission, callback) => {
+      callback(defaultRequestResponse(permission));
     });
 
-    this.ses.setPermissionCheckHandler((_webContents, permission) => {
-      // Default allow for fullscreen only
-      return permission === 'fullscreen';
+    this.ses.setPermissionCheckHandler((_wc, permission) => {
+      return shouldAutoAllow(permission);
     });
 
     this.ses.setCertificateVerifyProc((_request, callback) => {

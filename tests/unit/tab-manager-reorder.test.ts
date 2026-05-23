@@ -35,7 +35,7 @@ function fakeHistory() {
 
 describe('TabManager.reorder pinned-boundary clamp', () => {
   it('clamps a pinned tab into the pinned region', () => {
-    const tm = new TabManager(fakeWindow(), fakeHistory());
+    const tm = new TabManager(fakeWindow(), { kind: 'default', historyManager: fakeHistory() });
     const a = tm.createTab('https://a');
     const b = tm.createTab('https://b');
     const c = tm.createTab('https://c');
@@ -49,7 +49,7 @@ describe('TabManager.reorder pinned-boundary clamp', () => {
   });
 
   it('clamps an unpinned tab to stay below the pinned region', () => {
-    const tm = new TabManager(fakeWindow(), fakeHistory());
+    const tm = new TabManager(fakeWindow(), { kind: 'default', historyManager: fakeHistory() });
     const a = tm.createTab('https://a');
     const b = tm.createTab('https://b');
     const c = tm.createTab('https://c');
@@ -64,7 +64,7 @@ describe('TabManager.reorder pinned-boundary clamp', () => {
   });
 
   it('moves within the pinned region as expected', () => {
-    const tm = new TabManager(fakeWindow(), fakeHistory());
+    const tm = new TabManager(fakeWindow(), { kind: 'default', historyManager: fakeHistory() });
     const a = tm.createTab('https://a');
     const b = tm.createTab('https://b');
     tm.setPinned(a.id, true);

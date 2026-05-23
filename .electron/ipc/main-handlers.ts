@@ -7,6 +7,7 @@ import { HistoryManager } from '../services/HistoryManager';
 import { DownloadManager } from '../services/DownloadManager';
 import { PasswordManager } from '../services/PasswordManager';
 import { AutofillManager } from '../services/AutofillManager';
+import type { IpcChannels } from '../../src/types/ipc';
 
 export interface WindowContext {
   tabManager: TabManager;
@@ -14,118 +15,133 @@ export interface WindowContext {
 }
 
 /**
- * Register all IPC handlers.
- *
- * `fallbackTabManager` + `fallbackWindow` are used when `resolveContext` is
- * absent (existing tests) or returns undefined. In production main.ts
- * passes a resolver that maps the event's sender to the right per-window
- * TabManager so multi-window setups (e.g. regular + incognito) route
- * correctly.
+ * Bag of process-global services shared by every IPC handler. The
+ * window-bound pair (tabManager + window) is *not* here — that comes
+ * from the per-event resolver so multi-window setups route correctly.
  */
-export function registerIpcHandlers(
-  fallbackTabManager: TabManager,
-  fallbackWindow: BrowserWindow,
-  settingsManager: SettingsManager,
-  bookmarkManager: BookmarkManager,
-  historyManager: HistoryManager,
-  downloadManager: DownloadManager,
-  passwordManager: PasswordManager,
-  autofillManager: AutofillManager,
-  resolveContext?: (event: IpcMainInvokeEvent) => WindowContext | undefined
+export interface IpcDeps {
+  settingsManager: SettingsManager;
+  bookmarkManager: BookmarkManager;
+  historyManager: HistoryManager;
+  downloadManager: DownloadManager;
+  passwordManager: PasswordManager;
+  autofillManager: AutofillManager;
+}
+
+/** Resolves the per-event WindowContext from the sender's webContents. */
+export type ContextResolver = (event: IpcMainInvokeEvent) => WindowContext;
+
+/**
+ * Type-safe `ipcMain.handle` wrapper: the payload arg is derived from
+ * `IpcChannels[K]`, so any future drift between the channel map and the
+ * actual handler signature fails at compile time instead of at runtime.
+ */
+function handle<K extends keyof IpcChannels>(
+  channel: K,
+  fn: (event: IpcMainInvokeEvent, payload: IpcChannels[K]) => unknown
 ): void {
-  const ctx = (event: IpcMainInvokeEvent): WindowContext =>
-    resolveContext?.(event) ?? { tabManager: fallbackTabManager, window: fallbackWindow };
+  ipcMain.handle(channel, (event, payload) => fn(event, payload as IpcChannels[K]));
+}
 
-  ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (event, { url }: { url?: string }) => ctx(event).tabManager.createTab(url));
-  ipcMain.handle(IPC_CHANNELS.TAB_CLOSE, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.closeTab(tabId));
-  ipcMain.handle(IPC_CHANNELS.TAB_ACTIVATE, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.activateTab(tabId));
-  ipcMain.handle(IPC_CHANNELS.TAB_PIN, (event, { tabId, pinned }: { tabId: string; pinned: boolean }) => ctx(event).tabManager.setPinned(tabId, pinned));
-  ipcMain.handle(IPC_CHANNELS.TAB_MUTE, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.setMuted(tabId, true));
-  ipcMain.handle(IPC_CHANNELS.TAB_UNMUTE, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.setMuted(tabId, false));
-  ipcMain.handle(IPC_CHANNELS.TAB_DUPLICATE, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.duplicate(tabId));
-  ipcMain.handle(IPC_CHANNELS.TAB_REORDER, (event, { tabId, index }: { tabId: string; index: number }) => ctx(event).tabManager.reorder(tabId, index));
+/**
+ * Register all IPC handlers. Call this exactly once at app start.
+ *
+ * The `resolveContext` function maps each event's sender to the right
+ * window's TabManager + BrowserWindow. Existing tests call this with a
+ * resolver that always returns the same mock; main.ts uses a sender →
+ * webContents.id lookup so a multi-window (e.g. regular + incognito)
+ * setup routes correctly.
+ */
+export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolver): void {
+  const ctx = (event: IpcMainInvokeEvent): WindowContext => resolveContext(event);
+  const { settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager, autofillManager } = deps;
 
-  ipcMain.handle(IPC_CHANNELS.NAVIGATION_GO, (event, { tabId, url }: { tabId: string; url: string }) => ctx(event).tabManager.navigate(tabId, url));
-  ipcMain.handle(IPC_CHANNELS.NAVIGATION_BACK, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.goBack(tabId));
-  ipcMain.handle(IPC_CHANNELS.NAVIGATION_FORWARD, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.goForward(tabId));
-  ipcMain.handle(IPC_CHANNELS.NAVIGATION_RELOAD, (event, { tabId, hard }: { tabId: string; hard?: boolean }) => ctx(event).tabManager.reload(tabId, hard));
-  ipcMain.handle(IPC_CHANNELS.NAVIGATION_STOP, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.stop(tabId));
+  handle('tab:create', (event, { url }) => ctx(event).tabManager.createTab(url));
+  handle('tab:close', (event, { tabId }) => ctx(event).tabManager.closeTab(tabId));
+  handle('tab:activate', (event, { tabId }) => ctx(event).tabManager.activateTab(tabId));
+  handle('tab:pin', (event, { tabId, pinned }) => ctx(event).tabManager.setPinned(tabId, pinned));
+  handle('tab:mute', (event, { tabId }) => ctx(event).tabManager.setMuted(tabId, true));
+  handle('tab:unmute', (event, { tabId }) => ctx(event).tabManager.setMuted(tabId, false));
+  handle('tab:duplicate', (event, { tabId }) => ctx(event).tabManager.duplicate(tabId));
+  handle('tab:reorder', (event, { tabId, index }) => ctx(event).tabManager.reorder(tabId, index));
 
-  ipcMain.handle(IPC_CHANNELS.WINDOW_MINIMIZE, (event) => ctx(event).window.minimize());
-  ipcMain.handle(IPC_CHANNELS.WINDOW_MAXIMIZE, (event) => {
+  handle('navigation:go', (event, { tabId, url }) => ctx(event).tabManager.navigate(tabId, url));
+  handle('navigation:back', (event, { tabId }) => ctx(event).tabManager.goBack(tabId));
+  handle('navigation:forward', (event, { tabId }) => ctx(event).tabManager.goForward(tabId));
+  handle('navigation:reload', (event, { tabId, hard }) => ctx(event).tabManager.reload(tabId, hard));
+  handle('navigation:stop', (event, { tabId }) => ctx(event).tabManager.stop(tabId));
+
+  handle('window:minimize', (event) => ctx(event).window.minimize());
+  handle('window:maximize', (event) => {
     const w = ctx(event).window;
     if (w.isMaximized()) w.unmaximize();
     else w.maximize();
   });
-  ipcMain.handle(IPC_CHANNELS.WINDOW_CLOSE, (event) => ctx(event).window.close());
+  handle('window:close', (event) => ctx(event).window.close());
 
-  ipcMain.handle(IPC_CHANNELS.APP_QUIT, () => process.exit(0));
-  ipcMain.handle(IPC_CHANNELS.APP_GET_VERSION, () => '1.0.0');
+  handle('app:quit', () => process.exit(0));
+  handle('app:getVersion', () => '1.0.0');
 
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_event, { key }: { key: string }) =>
+  handle('settings:get', (_event, { key }) =>
     settingsManager.get(key as Parameters<typeof settingsManager.get>[0])
   );
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_ALL, () => settingsManager.getAll());
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_SET, (event, { key, value }: { key: string; value: unknown }) => {
+  handle('settings:getAll', () => settingsManager.getAll());
+  handle('settings:set', (event, { key, value }) => {
     settingsManager.set(key as Parameters<typeof settingsManager.set>[0], value as never);
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
   });
-  ipcMain.handle(IPC_CHANNELS.SETTINGS_RESET, (_event, { key }: { key?: string }) =>
-    settingsManager.reset(key as Parameters<typeof settingsManager.reset>[0])
+  handle('settings:reset', (_event, payload) =>
+    settingsManager.reset((payload as { key?: string }).key as Parameters<typeof settingsManager.reset>[0])
   );
 
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_GET_TREE, () => bookmarkManager.getTree());
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_ADD, (_event, { url, title, parentId }: { url: string; title: string; parentId?: string }) =>
-    bookmarkManager.add(url, title, parentId)
-  );
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_REMOVE, (_event, { bookmarkId }: { bookmarkId: string }) => bookmarkManager.remove(bookmarkId));
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_MOVE, (_event, { bookmarkId, parentId, index }: { bookmarkId: string; parentId: string; index: number }) =>
-    bookmarkManager.move(bookmarkId, parentId, index)
-  );
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_UPDATE, (_event, { bookmarkId, changes }: { bookmarkId: string; changes: Partial<import('../../src/types/browser').Bookmark> }) =>
-    bookmarkManager.update(bookmarkId, changes)
-  );
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_IMPORT, (_event, { data }: { data: string }) => bookmarkManager.import(data));
-  ipcMain.handle(IPC_CHANNELS.BOOKMARK_EXPORT, () => bookmarkManager.export());
+  handle('bookmark:getTree', () => bookmarkManager.getTree());
+  handle('bookmark:add', (_event, { url, title, parentId }) => bookmarkManager.add(url, title, parentId));
+  handle('bookmark:remove', (_event, { bookmarkId }) => bookmarkManager.remove(bookmarkId));
+  handle('bookmark:move', (_event, { bookmarkId, parentId, index }) => bookmarkManager.move(bookmarkId, parentId, index));
+  handle('bookmark:update', (_event, { bookmarkId, changes }) => bookmarkManager.update(bookmarkId, changes));
+  handle('bookmark:import', (_event, { data }) => bookmarkManager.import(data));
+  handle('bookmark:export', () => bookmarkManager.export());
 
-  ipcMain.handle(IPC_CHANNELS.HISTORY_SEARCH, (_event, { query, limit }: { query: string; limit?: number }) => historyManager.search(query, limit));
-  ipcMain.handle(IPC_CHANNELS.HISTORY_GET_RECENT, (_event, { limit }: { limit?: number }) => historyManager.getRecent(limit));
-  ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, (_event, { range }: { range?: string }) => historyManager.clear(range));
+  handle('history:search', (_event, { query, limit }) => historyManager.search(query, limit));
+  handle('history:getRecent', (_event, { limit }) => historyManager.getRecent(limit));
+  handle('history:clear', (_event, { range }) => historyManager.clear(range));
 
-  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_PAUSE, (_event, { downloadId }: { downloadId: string }) => downloadManager.pause(downloadId));
-  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_RESUME, (_event, { downloadId }: { downloadId: string }) => downloadManager.resume(downloadId));
-  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CANCEL, (_event, { downloadId }: { downloadId: string }) => downloadManager.cancel(downloadId));
-  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_CLEAR_COMPLETED, () => downloadManager.clearCompleted());
+  handle('download:pause', (_event, { downloadId }) => downloadManager.pause(downloadId));
+  handle('download:resume', (_event, { downloadId }) => downloadManager.resume(downloadId));
+  handle('download:cancel', (_event, { downloadId }) => downloadManager.cancel(downloadId));
+  handle('download:clearCompleted', () => downloadManager.clearCompleted());
 
-  ipcMain.handle(IPC_CHANNELS.FIND_START, (event, { tabId, text, caseSensitive }: { tabId: string; text: string; caseSensitive?: boolean }) => {
+  handle('find:start', (event, { tabId, text, caseSensitive }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);
     if (!view) return;
     return view.webContents.findInPage(text, { caseSensitive });
   });
-  ipcMain.handle(IPC_CHANNELS.FIND_NEXT, (event, { tabId, forward }: { tabId: string; forward?: boolean }) => {
+  handle('find:next', (event, { tabId, forward }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);
     if (!view) return;
     view.webContents.findInPage('', { forward });
   });
-  ipcMain.handle(IPC_CHANNELS.FIND_STOP, (event, { tabId }: { tabId: string }) => {
+  handle('find:stop', (event, { tabId }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);
     if (!view) return;
     view.webContents.stopFindInPage('clearSelection');
   });
 
-  ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_ALL, () => passwordManager.getAll());
-  ipcMain.handle(IPC_CHANNELS.PASSWORD_SAVE, (_event, { entry }: { entry: import('../../src/types/browser').PasswordEntry }) => passwordManager.saveEntry(entry));
-  ipcMain.handle(IPC_CHANNELS.PASSWORD_REMOVE, (_event, { origin, username }: { origin: string; username: string }) => passwordManager.remove(origin, username));
-  ipcMain.handle(IPC_CHANNELS.PASSWORD_GET_FOR_ORIGIN, (_event, { origin }: { origin: string }) => passwordManager.getForOrigin(origin));
+  handle('password:getAll', () => passwordManager.getAll());
+  handle('password:save', (_event, { entry }) => passwordManager.saveEntry(entry));
+  handle('password:remove', (_event, { origin, username }) => passwordManager.remove(origin, username));
+  handle('password:getForOrigin', (_event, { origin }) => passwordManager.getForOrigin(origin));
 
-  ipcMain.handle(IPC_CHANNELS.AUTOFILL_GET_ADDRESSES, () => autofillManager.getAddresses());
-  ipcMain.handle(IPC_CHANNELS.AUTOFILL_SAVE_ADDRESS, (_event, { address }: { address: import('../../src/types/browser').SavedAddress }) => autofillManager.saveAddress(address));
-  ipcMain.handle(IPC_CHANNELS.AUTOFILL_REMOVE_ADDRESS, (_event, { addressId }: { addressId: string }) => autofillManager.removeAddress(addressId));
+  handle('autofill:getAddresses', () => autofillManager.getAddresses());
+  handle('autofill:saveAddress', (_event, { address }) => autofillManager.saveAddress(address));
+  handle('autofill:removeAddress', (_event, { addressId }) => autofillManager.removeAddress(addressId));
 
-  ipcMain.handle(IPC_CHANNELS.ZOOM_SET, (event, { tabId, level }: { tabId: string; level: number }) => ctx(event).tabManager.setZoom(tabId, level));
-  ipcMain.handle(IPC_CHANNELS.ZOOM_RESET, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.setZoom(tabId, 1.0));
-  ipcMain.handle(IPC_CHANNELS.DEVTOOLS_TOGGLE, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.toggleDevTools(tabId));
-  ipcMain.handle(IPC_CHANNELS.DEVTOOLS_OPEN, (event, { tabId, mode }: { tabId: string; mode: 'right' | 'bottom' | 'undocked' }) => ctx(event).tabManager.openDevTools(tabId, mode));
-  ipcMain.handle(IPC_CHANNELS.PRINT_START, (event, { tabId }: { tabId: string }) => ctx(event).tabManager.print(tabId));
-  ipcMain.handle(IPC_CHANNELS.PRINT_TO_PDF, (event, { tabId, outputPath }: { tabId: string; outputPath: string }) => ctx(event).tabManager.printToPDF(tabId, outputPath));
+  handle('zoom:set', (event, { tabId, level }) => ctx(event).tabManager.setZoom(tabId, level));
+  handle('zoom:reset', (event, { tabId }) => ctx(event).tabManager.setZoom(tabId, 1.0));
+  handle('devtools:toggle', (event, { tabId }) => ctx(event).tabManager.toggleDevTools(tabId));
+  handle('devtools:open', (event, { tabId, mode }) =>
+    ctx(event).tabManager.openDevTools(tabId, (mode ?? 'right') as 'right' | 'bottom' | 'undocked')
+  );
+  handle('print:start', (event, { tabId }) => ctx(event).tabManager.print(tabId));
+  handle('print:toPDF', (event, { tabId, outputPath }) => ctx(event).tabManager.printToPDF(tabId, outputPath));
 }

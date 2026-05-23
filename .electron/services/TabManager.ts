@@ -4,23 +4,41 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Tab } from '../../src/types/browser';
 import type { HistoryManager } from './HistoryManager';
 
+export type TabManagerMode =
+  | { kind: 'default'; historyManager: HistoryManager }
+  | { kind: 'incognito' };
+
+const INCOGNITO_PARTITION = 'incognito';
+
 export class TabManager {
   private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
   private activeTabId: string | null = null;
   private window: BrowserWindow;
-  private historyManager: HistoryManager;
-  private readonly partition?: string;
+  private readonly mode: TabManagerMode;
   private changeListeners = new Set<() => void>();
 
-  constructor(window: BrowserWindow, historyManager: HistoryManager, partition?: string) {
+  constructor(window: BrowserWindow, mode: TabManagerMode) {
     this.window = window;
-    this.historyManager = historyManager;
-    this.partition = partition;
+    this.mode = mode;
   }
 
-  /** True if this manager's tabs use a non-default (incognito) partition. */
+  /** True when this manager's tabs live in the non-persistent partition. */
   isIncognito(): boolean {
-    return this.partition === 'incognito';
+    return this.mode.kind === 'incognito';
+  }
+
+  /**
+   * Record a navigation in history. A no-op in incognito mode — the
+   * HistoryManager isn't even held, so leakage is unrepresentable.
+   */
+  private recordHistory(url: string, title: string): void {
+    if (this.mode.kind === 'default') {
+      this.mode.historyManager.addEntry(url, title);
+    }
+  }
+
+  private partition(): string | undefined {
+    return this.mode.kind === 'incognito' ? INCOGNITO_PARTITION : undefined;
   }
 
   /** Subscribe to any change in the tab set (create/close/activate/update/reorder/pin/mute). */
@@ -55,7 +73,7 @@ export class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        partition: this.partition,
+        partition: this.partition(),
       },
     });
 
@@ -109,7 +127,7 @@ export class TabManager {
       const canGoBack = wc.navigationHistory.canGoBack();
       const canGoForward = wc.navigationHistory.canGoForward();
       this.updateTab(tabId, { url, canGoBack, canGoForward });
-      if (!this.isIncognito()) this.historyManager.addEntry(url, entry?.tab.title ?? '');
+      this.recordHistory(url, entry?.tab.title ?? '');
       this.safeSend('navigation:state', {
         tabId,
         canGoBack,
@@ -122,9 +140,7 @@ export class TabManager {
     wc.on('page-title-updated', (_event, title) => {
       this.updateTab(tabId, { title });
       const entry = this.tabs.get(tabId);
-      if (entry?.tab.url && !this.isIncognito()) {
-        this.historyManager.addEntry(entry.tab.url, title);
-      }
+      if (entry?.tab.url) this.recordHistory(entry.tab.url, title);
       this.safeSend('page:title', { tabId, title });
     });
 

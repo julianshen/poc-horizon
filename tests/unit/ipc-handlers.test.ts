@@ -122,14 +122,15 @@ beforeEach(() => {
   handlers.clear();
   s = makeFakeServices();
   registerIpcHandlers(
-    s.tabManager as never,
-    s.window as never,
-    s.settingsManager as never,
-    s.bookmarkManager as never,
-    s.historyManager as never,
-    s.downloadManager as never,
-    s.passwordManager as never,
-    s.autofillManager as never
+    {
+      settingsManager: s.settingsManager as never,
+      bookmarkManager: s.bookmarkManager as never,
+      historyManager: s.historyManager as never,
+      downloadManager: s.downloadManager as never,
+      passwordManager: s.passwordManager as never,
+      autofillManager: s.autofillManager as never,
+    },
+    () => ({ tabManager: s.tabManager as never, window: s.window as never })
   );
 });
 

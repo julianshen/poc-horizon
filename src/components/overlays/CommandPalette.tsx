@@ -1,22 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
-
-interface Item {
-  kind: 'ai' | 'tab' | 'page' | 'cmd';
-  label: string;
-  hint: string;
-  action: () => void;
-}
+import { useCommandItems } from '../../hooks/useCommandItems';
+import { CommandPaletteIcon } from './CommandPaletteIcon';
 
 export const CommandPalette: React.FC = () => {
-  const { showCmd, toggleOverlay, tabs, activeTabId, toggleAI } = useBrowserStore();
+  const { showCmd, toggleOverlay } = useBrowserStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
 
-  const close = useCallback(() => {
-    toggleOverlay('showCmd');
-  }, [toggleOverlay]);
+  const close = useCallback(() => toggleOverlay('showCmd'), [toggleOverlay]);
+  const items = useCommandItems(q, close);
 
   useEffect(() => {
     if (!showCmd) return;
@@ -24,97 +18,6 @@ export const CommandPalette: React.FC = () => {
     setSel(0);
     inputRef.current?.focus();
   }, [showCmd]);
-
-  const items = useMemo<Item[]>(() => {
-    const base: Item[] = [
-      {
-        kind: 'ai',
-        label: q ? `Ask Horizon: "${q}"` : 'Ask Horizon…',
-        hint: 'AI',
-        action: () => {
-          if (!useBrowserStore.getState().showAI) toggleAI();
-          close();
-        },
-      },
-      {
-        kind: 'cmd',
-        label: 'New Tab',
-        hint: '⌘T',
-        action: () => {
-          window.horizonAPI.invoke('tab:create', {});
-          close();
-        },
-      },
-      {
-        kind: 'cmd',
-        label: 'Open Bookmarks',
-        hint: 'Panel',
-        action: () => {
-          toggleOverlay('showBookmarks');
-          close();
-        },
-      },
-      {
-        kind: 'cmd',
-        label: 'Open History',
-        hint: 'Panel',
-        action: () => {
-          toggleOverlay('showHistory');
-          close();
-        },
-      },
-      {
-        kind: 'cmd',
-        label: 'Open Downloads',
-        hint: '⌘J',
-        action: () => {
-          toggleOverlay('showDownloads');
-          close();
-        },
-      },
-      {
-        kind: 'cmd',
-        label: 'Open Settings',
-        hint: '⌘,',
-        action: () => {
-          toggleOverlay('showSettings');
-          close();
-        },
-      },
-      {
-        kind: 'cmd',
-        label: 'Find in page',
-        hint: '⌘F',
-        action: () => {
-          toggleOverlay('showFindBar');
-          close();
-        },
-      },
-      ...tabs.map(
-        (t): Item => ({
-          kind: 'tab',
-          label: `Switch to · ${t.title || t.url}`,
-          hint: 'Tab',
-          action: () => {
-            window.horizonAPI.invoke('tab:activate', { tabId: t.id });
-            close();
-          },
-        })
-      ),
-      {
-        kind: 'cmd',
-        label: 'Reload current tab',
-        hint: '⌘R',
-        action: () => {
-          if (activeTabId) window.horizonAPI.invoke('navigation:reload', { tabId: activeTabId });
-          close();
-        },
-      },
-    ];
-    if (!q) return base;
-    const needle = q.toLowerCase();
-    return base.filter((it) => it.kind === 'ai' || it.label.toLowerCase().includes(needle));
-  }, [q, tabs, activeTabId, toggleAI, toggleOverlay, close]);
 
   const onKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -127,10 +30,6 @@ export const CommandPalette: React.FC = () => {
         setSel((s) => Math.max(0, s - 1));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        // The "Ask Horizon" row is sticky so items is always non-empty;
-        // clamp sel to a valid index so a stale value (from a filter that
-        // shrank the list) still picks something instead of silently doing
-        // nothing.
         if (items.length === 0) return;
         const idx = Math.min(sel, items.length - 1);
         items[idx].action();
@@ -138,6 +37,13 @@ export const CommandPalette: React.FC = () => {
     },
     [close, items, sel]
   );
+
+  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setQ(e.target.value);
+    setSel(0);
+  }, []);
+
+  const stop = useCallback((e: React.MouseEvent) => e.stopPropagation(), []);
 
   if (!showCmd) return null;
 
@@ -148,7 +54,7 @@ export const CommandPalette: React.FC = () => {
       onClick={close}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={stop}
         className="w-full max-w-[680px] mx-6 flex flex-col overflow-hidden relative"
         style={{
           background: 'var(--surface-1)',
@@ -171,10 +77,7 @@ export const CommandPalette: React.FC = () => {
           <input
             ref={inputRef}
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setSel(0);
-            }}
+            onChange={onChange}
             onKeyDown={onKey}
             placeholder="Ask Horizon, or type a command…"
             className="flex-1 bg-transparent outline-none text-base font-medium italic"
@@ -203,15 +106,13 @@ export const CommandPalette: React.FC = () => {
                 className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-sm"
                 style={{
                   background:
-                    i === sel
-                      ? 'linear-gradient(135deg, var(--accent-soft), var(--ai-tint))'
-                      : 'transparent',
+                    i === sel ? 'linear-gradient(135deg, var(--accent-soft), var(--ai-tint))' : 'transparent',
                   color: 'var(--chrome-fg)',
                   transition: 'background var(--transition-fast)',
                 }}
               >
                 <span style={{ color: it.kind === 'ai' ? 'var(--accent-primary)' : 'var(--chrome-fg-muted)' }} className="flex">
-                  {iconFor(it.kind)}
+                  <CommandPaletteIcon kind={it.kind} />
                 </span>
                 <span className="flex-1 truncate">{it.label}</span>
                 <span className="text-[11px]" style={{ color: i === sel ? 'var(--accent-primary)' : 'var(--chrome-fg-subtle)' }}>
@@ -233,26 +134,3 @@ export const CommandPalette: React.FC = () => {
     </div>
   );
 };
-
-function iconFor(kind: Item['kind']): React.ReactNode {
-  if (kind === 'ai') {
-    return (
-      <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <path d="M12 3l1.8 4.4L18.2 9.2 13.8 11 12 15.4 10.2 11 5.8 9.2 10.2 7.4z" />
-      </svg>
-    );
-  }
-  if (kind === 'tab') {
-    return (
-      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-      </svg>
-    );
-  }
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}

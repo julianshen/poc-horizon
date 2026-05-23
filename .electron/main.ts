@@ -108,7 +108,7 @@ function initSingletons(): void {
 }
 
 function registerHandlers(): void {
-  const resolve = (event: IpcMainInvokeEvent): WindowContext | undefined => {
+  const resolve = (event: IpcMainInvokeEvent): WindowContext => {
     // Direct hit — the sender is a chrome renderer we tracked at window
     // creation.
     const direct = contexts.get(event.sender.id);
@@ -120,21 +120,17 @@ function registerHandlers(): void {
       const ctx = contexts.get(win.webContents.id);
       if (ctx) return ctx;
     }
-    return undefined;
+    // Last-resort fallback: route to the most-recent primary window. This
+    // should not happen in practice but is preferable to throwing on a
+    // valid-looking IPC.
+    if (primaryTabManager && primaryWindow && !primaryWindow.isDestroyed()) {
+      return { tabManager: primaryTabManager, window: primaryWindow };
+    }
+    throw new Error('IPC: could not resolve a WindowContext for the sender');
   };
 
   registerIpcHandlers(
-    // The fallback values are only used when `resolve` returns undefined.
-    // We use getters so the captured closure stays current as windows
-    // open/close — passing the values directly would freeze them.
-    new Proxy({} as TabManager, { get: (_, prop) => (primaryTabManager as unknown as Record<PropertyKey, unknown>)[prop] }),
-    new Proxy({} as BrowserWindow, { get: (_, prop) => (primaryWindow as unknown as Record<PropertyKey, unknown>)?.[prop] }),
-    settingsManager,
-    bookmarkManager,
-    historyManager,
-    downloadManager,
-    passwordManager,
-    autofillManager,
+    { settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager, autofillManager },
     resolve
   );
 
@@ -170,8 +166,9 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
 
   const localTabManager = new TabManager(
     win,
-    historyManager,
-    incognito ? WindowManager.incognitoPartition() : undefined
+    incognito
+      ? { kind: 'incognito' }
+      : { kind: 'default', historyManager }
   );
   contexts.set(wcId, { tabManager: localTabManager, window: win });
 

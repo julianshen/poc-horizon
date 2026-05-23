@@ -24,6 +24,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       include: [
         'src/utils/**/*.ts',
+        'src/stores/**/*.ts',
         'shared/**/*.ts',
         '.electron/services/SettingsManager.ts',
         '.electron/services/BookmarkManager.ts',

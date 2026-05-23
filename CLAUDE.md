@@ -30,12 +30,12 @@ Non-obvious style rules worth surfacing (full list in AGENTS.md §3, §12.4):
 npm run dev              # electron-vite dev (main + preload + renderer)
 npm run build            # electron-vite build → dist/ + dist-electron/
 npm run dist[:mac|:win|:linux]   # electron-builder package
-npm test                 # vitest (unit)
-npm test -- --coverage   # enforce coverage thresholds from AGENTS.md §2
+npm test                 # vitest (unit, watch mode)
+npm run test:coverage    # v8 coverage report; enforces ≥90% (AGENTS.md §2.1)
 npx vitest run path/to/file.test.ts   # single file
 npx vitest -t "test name"             # single test by name pattern
 npm run test:e2e         # playwright
-npm run lint             # eslint .ts,.tsx
+npm run lint             # eslint flat config (eslint.config.mjs)
 npx tsc --noEmit -p tsconfig.json   # type-check renderer (root + main/preload have config debt — see below)
 ```
 
@@ -70,7 +70,7 @@ Path aliases: `@` → `src/`, `@shared` → `shared/`. Both must be added to `el
 - `electron-builder.json5` — packaging config for `npm run dist`.
 - `tsconfig.main.json` / `tsconfig.preload.json` — per-process TS configs; ensure new files under `.electron/` are included.
 - `eslint.config.mjs` — flat config (ESLint 9). Renamed from `.js` to silence module-type warning. `no-empty-object-type` is disabled because `src/types/ipc.ts` uses `{}` deliberately as empty-payload markers in the IPC channel map.
-- `vitest.config.ts` — points vitest at `tests/**/*.test.ts(x)` and re-declares the `@`/`@shared` aliases (vitest does not inherit from `vite.config.ts` because the renderer-only config doesn't define `test`).
+- `vite.config.ts` — renderer Vite config + vitest's `test:` block (coverage thresholds, include globs). There is no separate `vitest.config.ts`. Coverage `include` is currently scoped to `src/utils/**` + `shared/**` — areas under test. When you add tests for a new directory, **extend the `include` list** so the 90% threshold applies there.
 
 ## Known config debt
 

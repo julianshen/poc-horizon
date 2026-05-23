@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { SEARCH_ENGINES } from '@shared/constants';
 import { normalizeUrl } from '@/utils/url';
+
+const searchUrl = (engine: keyof typeof SEARCH_ENGINES, query: string): string =>
+  SEARCH_ENGINES[engine].url.replace('{query}', encodeURIComponent(query));
 
 describe('normalizeUrl', () => {
   it('adds https:// to bare domain', () => {
@@ -7,9 +11,7 @@ describe('normalizeUrl', () => {
   });
 
   it('routes plain text to the default search engine', () => {
-    expect(normalizeUrl('hello world')).toBe(
-      'https://duckduckgo.com/?q=hello%20world'
-    );
+    expect(normalizeUrl('hello world')).toBe(searchUrl('duckduckgo', 'hello world'));
   });
 
   it('preserves an existing http scheme', () => {
@@ -31,20 +33,13 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('   example.com   ')).toBe('https://example.com');
   });
 
-  it('returns empty string for empty or whitespace-only input', () => {
-    expect(normalizeUrl('')).toBe('');
-    expect(normalizeUrl('   ')).toBe('');
+  it('returns null for empty or whitespace-only input', () => {
+    expect(normalizeUrl('')).toBeNull();
+    expect(normalizeUrl('   ')).toBeNull();
   });
 
   it('uses the requested search engine when provided', () => {
-    expect(normalizeUrl('cats', 'google')).toBe(
-      'https://www.google.com/search?q=cats'
-    );
-  });
-
-  it('falls back to duckduckgo for an unknown search engine', () => {
-    expect(normalizeUrl('cats', 'bogus-engine')).toBe(
-      'https://duckduckgo.com/?q=cats'
-    );
+    expect(normalizeUrl('cats', 'google')).toBe(searchUrl('google', 'cats'));
+    expect(normalizeUrl('cats', 'bing')).toBe(searchUrl('bing', 'cats'));
   });
 });

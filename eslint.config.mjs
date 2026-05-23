@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -11,6 +12,7 @@ export default tseslint.config(
       'coverage',
       '*.config.ts',
       '*.config.js',
+      '*.config.mjs',
     ],
   },
   js.configs.recommended,
@@ -18,24 +20,8 @@ export default tseslint.config(
   {
     languageOptions: {
       globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        process: 'readonly',
-        __dirname: 'readonly',
-        Buffer: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        URL: 'readonly',
-        URLSearchParams: 'readonly',
-        fetch: 'readonly',
-        HTMLElement: 'readonly',
-        HTMLInputElement: 'readonly',
-        Event: 'readonly',
-        KeyboardEvent: 'readonly',
-        MouseEvent: 'readonly',
+        ...globals.browser,
+        ...globals.node,
       },
     },
     rules: {

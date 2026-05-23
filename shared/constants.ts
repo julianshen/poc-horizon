@@ -5,7 +5,7 @@ export const DEFAULT_SETTINGS = {
   schemaVersion: 1,
   startupBehavior: 'new-tab' as const,
   startupPages: ['https://duckduckgo.com'],
-  defaultSearchEngine: 'duckduckgo',
+  defaultSearchEngine: 'duckduckgo' as const,
   downloadPath: '', // resolved at runtime
   askWhereToSave: false,
   downloadNotifications: true,
@@ -53,7 +53,7 @@ export const DEFAULT_SETTINGS = {
   certificateOverrides: {},
 };
 
-export const SEARCH_ENGINES: Record<string, { name: string; url: string; suggestUrl?: string }> = {
+export const SEARCH_ENGINES = {
   duckduckgo: {
     name: 'DuckDuckGo',
     url: 'https://duckduckgo.com/?q={query}',
@@ -68,4 +68,6 @@ export const SEARCH_ENGINES: Record<string, { name: string; url: string; suggest
     name: 'Bing',
     url: 'https://www.bing.com/search?q={query}',
   },
-};
+} as const satisfies Record<string, { name: string; url: string; suggestUrl?: string }>;
+
+export type SearchEngineKey = keyof typeof SEARCH_ENGINES;

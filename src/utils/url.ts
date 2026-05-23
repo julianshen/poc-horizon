@@ -1,14 +1,16 @@
-import { SEARCH_ENGINES } from '@shared/constants';
+import { DEFAULT_SETTINGS, SEARCH_ENGINES, type SearchEngineKey } from '@shared/constants';
 
-export function normalizeUrl(input: string, searchEngine = 'duckduckgo'): string {
+export function normalizeUrl(
+  input: string,
+  searchEngine: SearchEngineKey = DEFAULT_SETTINGS.defaultSearchEngine
+): string | null {
   const trimmed = input.trim();
-  if (!trimmed) return '';
+  if (!trimmed) return null;
 
   if (trimmed.includes('://')) return trimmed;
 
   if (!trimmed.includes('.')) {
-    const engine = SEARCH_ENGINES[searchEngine] ?? SEARCH_ENGINES.duckduckgo;
-    return engine.url.replace('{query}', encodeURIComponent(trimmed));
+    return SEARCH_ENGINES[searchEngine].url.replace('{query}', encodeURIComponent(trimmed));
   }
 
   return `https://${trimmed}`;

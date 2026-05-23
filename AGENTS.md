@@ -74,10 +74,12 @@ describe('url utils', () => {
 
 | Metric | Minimum | Target |
 |--------|---------|--------|
-| Lines | 80% | 90% |
-| Functions | 85% | 95% |
-| Branches | 75% | 85% |
-| Statements | 80% | 90% |
+| Lines | 90% | 95% |
+| Functions | 90% | 95% |
+| Branches | 90% | 95% |
+| Statements | 90% | 95% |
+
+> **Effective 2026-05-23:** the minimum across all four metrics is **90%**. Previously 80%/85%/75%/80%. Critical paths (§2.2) remain 95%+.
 
 ### 2.2 Critical Path Coverage
 

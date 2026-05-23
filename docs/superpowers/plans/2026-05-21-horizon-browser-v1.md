@@ -2991,7 +2991,7 @@ git commit -m "chore: packaging configuration verified"
 - Create: `tests/unit/search-engine.test.ts`
 - Create: `tests/unit/format.test.ts`
 
-- [ ] **Write url.test.ts**
+- [x] **Write url.test.ts**
 
 ```typescript
 import { describe, it, expect } from 'vitest';
@@ -3020,7 +3020,7 @@ describe('normalizeUrl', () => {
 });
 ```
 
-- [ ] **Write search-engine.test.ts**
+- [x] **Write search-engine.test.ts**
 
 ```typescript
 import { describe, it, expect } from 'vitest';
@@ -3037,7 +3037,7 @@ describe('SEARCH_ENGINES', () => {
 });
 ```
 
-- [ ] **Run unit tests**
+- [x] **Run unit tests**
 
 Run: `npx vitest run`
 Expected: All tests pass.

@@ -7,6 +7,7 @@ import { SettingsManager } from './services/SettingsManager';
 import { BookmarkManager } from './services/BookmarkManager';
 import { HistoryManager } from './services/HistoryManager';
 import { DownloadManager } from './services/DownloadManager';
+import { DownloadStore } from './services/DownloadStore';
 import { PasswordManager } from './services/PasswordManager';
 import { AutofillManager } from './services/AutofillManager';
 import { autoUpdater } from 'electron-updater';
@@ -37,7 +38,8 @@ function createWindow(): void {
   const settingsManager = new SettingsManager(path.join(app.getPath('userData'), 'settings.json'));
   const bookmarkManager = new BookmarkManager(path.join(app.getPath('userData'), 'bookmarks.json'));
   const historyManager = new HistoryManager(path.join(app.getPath('userData'), 'history.json'));
-  const downloadManager = new DownloadManager();
+  const downloadStore = new DownloadStore(path.join(app.getPath('userData'), 'downloads.json'));
+  const downloadManager = new DownloadManager(downloadStore);
   const passwordManager = new PasswordManager(
     path.join(app.getPath('userData'), 'passwords.json'),
     {

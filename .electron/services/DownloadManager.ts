@@ -1,38 +1,23 @@
-import { app, DownloadItem, Event, WebContents } from 'electron';
-import fs from 'fs';
+import { app, DownloadItem as ElectronDownloadItem, Event, WebContents } from 'electron';
 import path from 'path';
-import type { DownloadItem as DownloadItemType } from '../../src/types/browser';
+import { v4 as uuidv4 } from 'uuid';
+import type { DownloadItem } from '../../src/types/browser';
+import { DownloadStore, type DownloadListener } from './DownloadStore';
 
 export class DownloadManager {
-  private downloadsPath: string;
-  private downloads: Map<string, DownloadItemType> = new Map();
-  private listeners: Set<(items: DownloadItemType[]) => void> = new Set();
+  private store: DownloadStore;
+  private handles: Map<string, ElectronDownloadItem> = new Map();
 
-  constructor() {
-    this.downloadsPath = path.join(app.getPath('userData'), 'downloads.json');
-    this.load();
+  constructor(store: DownloadStore) {
+    this.store = store;
   }
 
-  private load(): void {
-    try {
-      const data = fs.readFileSync(this.downloadsPath, 'utf-8');
-      const items: DownloadItemType[] = JSON.parse(data);
-      items.forEach((item) => this.downloads.set(item.id, item));
-    } catch {
-      // No existing downloads
-    }
-  }
-
-  private save(): void {
-    fs.writeFileSync(this.downloadsPath, JSON.stringify(Array.from(this.downloads.values()), null, 2));
-  }
-
-  handleDownload(event: Event, item: DownloadItem, _webContents: WebContents): void {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  handleDownload(_event: Event, item: ElectronDownloadItem, _wc: WebContents): void {
+    const id = uuidv4();
     const downloadPath = path.join(app.getPath('downloads'), item.getFilename());
     item.setSavePath(downloadPath);
 
-    const downloadItem: DownloadItemType = {
+    const record: DownloadItem = {
       id,
       filename: item.getFilename(),
       url: item.getURL(),
@@ -44,84 +29,56 @@ export class DownloadManager {
       mimeType: item.getMimeType(),
     };
 
-    // Track active downloads for pause/resume/cancel
-    (downloadItem as any)._electronItem = item;
+    this.handles.set(id, item);
+    this.store.upsert(record);
 
-    this.downloads.set(id, downloadItem);
-    this.notifyListeners();
-
-    item.on('updated', (_event, state) => {
-      downloadItem.receivedBytes = item.getReceivedBytes();
-      downloadItem.totalBytes = item.getTotalBytes();
-      downloadItem.state = state === 'progressing' ? 'progressing' : 'interrupted';
-      this.downloads.set(id, downloadItem);
-      this.notifyListeners();
+    item.on('updated', (_e, state) => {
+      const current = this.store.getAll().find((d) => d.id === id);
+      if (!current) return;
+      this.store.upsert({
+        ...current,
+        receivedBytes: item.getReceivedBytes(),
+        totalBytes: item.getTotalBytes(),
+        state: state === 'progressing' ? 'progressing' : 'interrupted',
+      });
     });
 
-    item.once('done', (_event, state) => {
-      downloadItem.state = state === 'completed' ? 'completed' : 'cancelled';
-      downloadItem.endTime = Date.now();
-      this.downloads.set(id, downloadItem);
-      this.save();
-      this.notifyListeners();
+    item.once('done', (_e, state) => {
+      this.handles.delete(id);
+      this.store.finalize(id, state === 'completed' ? 'completed' : 'cancelled', Date.now());
     });
-  }
-
-  getDownloads(): DownloadItemType[] {
-    return Array.from(this.downloads.values());
   }
 
   pause(downloadId: string): void {
-    const item = this.downloads.get(downloadId);
-    const electronItem = (item as any)?._electronItem as DownloadItem;
-    if (electronItem) {
-      electronItem.pause();
-      item!.state = 'interrupted';
-      this.downloads.set(downloadId, item!);
-      this.notifyListeners();
-    }
+    const handle = this.handles.get(downloadId);
+    if (!handle) return;
+    handle.pause();
+    this.store.setState(downloadId, 'interrupted');
   }
 
   resume(downloadId: string): void {
-    const item = this.downloads.get(downloadId);
-    const electronItem = (item as any)?._electronItem as DownloadItem;
-    if (electronItem) {
-      electronItem.resume();
-      item!.state = 'progressing';
-      this.downloads.set(downloadId, item!);
-      this.notifyListeners();
-    }
+    const handle = this.handles.get(downloadId);
+    if (!handle) return;
+    handle.resume();
+    this.store.setState(downloadId, 'progressing');
   }
 
   cancel(downloadId: string): void {
-    const item = this.downloads.get(downloadId);
-    const electronItem = (item as any)?._electronItem as DownloadItem;
-    if (electronItem) {
-      electronItem.cancel();
-      item!.state = 'cancelled';
-      this.downloads.set(downloadId, item!);
-      this.save();
-      this.notifyListeners();
-    }
+    const handle = this.handles.get(downloadId);
+    if (!handle) return;
+    handle.cancel();
+    this.store.finalize(downloadId, 'cancelled', Date.now());
+  }
+
+  getDownloads(): DownloadItem[] {
+    return this.store.getAll();
   }
 
   clearCompleted(): void {
-    for (const [id, item] of this.downloads) {
-      if (item.state === 'completed' || item.state === 'cancelled') {
-        this.downloads.delete(id);
-      }
-    }
-    this.save();
-    this.notifyListeners();
+    this.store.clearCompleted();
   }
 
-  onUpdate(callback: (items: DownloadItemType[]) => void): () => void {
-    this.listeners.add(callback);
-    return () => this.listeners.delete(callback);
-  }
-
-  private notifyListeners(): void {
-    const items = this.getDownloads();
-    this.listeners.forEach((cb) => cb(items));
+  onUpdate(callback: DownloadListener): () => void {
+    return this.store.onUpdate(callback);
   }
 }

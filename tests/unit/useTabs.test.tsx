@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useTabs } from '@/hooks/useTabs';
 import { useBrowserStore } from '@/stores/browserStore';
-import { installFakeHorizonAPI, type FakeHorizonAPI } from '../helpers/fakeHorizonAPI';
+import { setupRendererTest } from '../helpers/fakeHorizonAPI';
 import type { Tab } from '@/types/browser';
 
 const sampleTab = (id: string): Tab => ({
@@ -24,23 +24,12 @@ const sampleTab = (id: string): Tab => ({
   lastAccessedAt: 0,
 });
 
-let api: FakeHorizonAPI;
-let dispose: () => void;
-const initialState = useBrowserStore.getState();
-
-beforeEach(() => {
-  ({ api, dispose } = installFakeHorizonAPI());
-  useBrowserStore.setState({ ...initialState, tabs: [], activeTabId: null }, true);
-});
-
-afterEach(() => {
-  dispose();
-});
-
 describe('useTabs', () => {
+  const { api } = setupRendererTest();
+
   it('appends a new tab and activates it on tab:created', () => {
     renderHook(() => useTabs());
-    api.emit('tab:created', sampleTab('a'));
+    api().emit('tab:created', sampleTab('a'));
     const s = useBrowserStore.getState();
     expect(s.tabs.map((t) => t.id)).toEqual(['a']);
     expect(s.activeTabId).toBe('a');
@@ -49,28 +38,28 @@ describe('useTabs', () => {
   it('removes a tab on tab:closed', () => {
     useBrowserStore.getState().setTabs([sampleTab('a'), sampleTab('b')]);
     renderHook(() => useTabs());
-    api.emit('tab:closed', { tabId: 'a' });
+    api().emit('tab:closed', { tabId: 'a' });
     expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['b']);
   });
 
   it('switches active tab on tab:activated', () => {
     useBrowserStore.getState().setTabs([sampleTab('a'), sampleTab('b')]);
     renderHook(() => useTabs());
-    api.emit('tab:activated', { tabId: 'b' });
+    api().emit('tab:activated', { tabId: 'b' });
     expect(useBrowserStore.getState().activeTabId).toBe('b');
   });
 
   it('patches a tab on tab:updated using the embedded id', () => {
     useBrowserStore.getState().setTabs([sampleTab('a')]);
     renderHook(() => useTabs());
-    api.emit('tab:updated', { id: 'a', title: 'Renamed' });
+    api().emit('tab:updated', { id: 'a', title: 'Renamed' });
     expect(useBrowserStore.getState().tabs[0].title).toBe('Renamed');
   });
 
   it('strips tabId from navigation:state before patching', () => {
     useBrowserStore.getState().setTabs([sampleTab('a')]);
     renderHook(() => useTabs());
-    api.emit('navigation:state', {
+    api().emit('navigation:state', {
       tabId: 'a',
       canGoBack: true,
       canGoForward: false,
@@ -81,19 +70,18 @@ describe('useTabs', () => {
     expect(tab.canGoBack).toBe(true);
     expect(tab.isLoading).toBe(true);
     expect(tab.url).toBe('https://updated.example');
-    // The 'tabId' key must not leak into the tab object.
     expect((tab as unknown as { tabId?: string }).tabId).toBeUndefined();
   });
 
   it('marks a tab loading + resets progress on load:started, completes on load:finished', () => {
     useBrowserStore.getState().setTabs([sampleTab('a')]);
     renderHook(() => useTabs());
-    api.emit('load:started', { tabId: 'a', url: 'https://a.example/new' });
+    api().emit('load:started', { tabId: 'a', url: 'https://a.example/new' });
     let tab = useBrowserStore.getState().tabs[0];
     expect(tab.isLoading).toBe(true);
     expect(tab.loadProgress).toBe(0);
     expect(tab.url).toBe('https://a.example/new');
-    api.emit('load:finished', { tabId: 'a', url: 'https://a.example/new' });
+    api().emit('load:finished', { tabId: 'a', url: 'https://a.example/new' });
     tab = useBrowserStore.getState().tabs[0];
     expect(tab.isLoading).toBe(false);
     expect(tab.loadProgress).toBe(100);
@@ -102,8 +90,8 @@ describe('useTabs', () => {
   it('updates title on page:title and favicon on page:favicon', () => {
     useBrowserStore.getState().setTabs([sampleTab('a')]);
     renderHook(() => useTabs());
-    api.emit('page:title', { tabId: 'a', title: 'Doc Title' });
-    api.emit('page:favicon', { tabId: 'a', faviconUrl: 'https://a.example/favicon.ico' });
+    api().emit('page:title', { tabId: 'a', title: 'Doc Title' });
+    api().emit('page:favicon', { tabId: 'a', faviconUrl: 'https://a.example/favicon.ico' });
     const tab = useBrowserStore.getState().tabs[0];
     expect(tab.title).toBe('Doc Title');
     expect(tab.favicon).toBe('https://a.example/favicon.ico');
@@ -122,8 +110,8 @@ describe('useTabs', () => {
       'page:favicon',
     ];
     const { unmount } = renderHook(() => useTabs());
-    for (const c of channels) expect(api.listenerCount(c), `mount ${c}`).toBe(1);
+    for (const c of channels) expect(api().listenerCount(c), `mount ${c}`).toBe(1);
     unmount();
-    for (const c of channels) expect(api.listenerCount(c), `unmount ${c}`).toBe(0);
+    for (const c of channels) expect(api().listenerCount(c), `unmount ${c}`).toBe(0);
   });
 });

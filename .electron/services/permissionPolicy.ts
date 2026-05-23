@@ -21,9 +21,16 @@ export type PermissionName =
   | 'window-management';
 
 // Result for a setPermissionRequestHandler call (renderer prompt).
+// Electron's callback receives a string broader than our union (extensions,
+// future Chromium additions). Accepting `string` keeps the boundary safe
+// while the union documents the set we actually reason about.
+//
 // We default-deny everything; the renderer surfaces a UI prompt and the
 // user explicitly approves via a separate flow.
-export function defaultRequestResponse(_permission: string): boolean {
+//
+// TODO(per-origin): Electron also passes the webContents; once per-origin
+// policy lands, thread `wc.getURL()`'s origin through to consult settings.
+export function defaultRequestResponse(_permission: PermissionName | string): boolean {
   return false;
 }
 
@@ -31,8 +38,8 @@ export function defaultRequestResponse(_permission: string): boolean {
 // already permitted without prompting?"). We auto-allow only the
 // permissions whose UX would be broken by a prompt, and where the
 // renderer already controls when the call happens.
-const AUTO_ALLOW: ReadonlySet<string> = new Set<PermissionName>(['fullscreen']);
+const AUTO_ALLOW = new Set<PermissionName>(['fullscreen']);
 
-export function shouldAutoAllow(permission: string): boolean {
-  return AUTO_ALLOW.has(permission);
+export function shouldAutoAllow(permission: PermissionName | string): boolean {
+  return AUTO_ALLOW.has(permission as PermissionName);
 }

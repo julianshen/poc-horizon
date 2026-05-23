@@ -1,12 +1,5 @@
-// A minimal renderer-side stand-in for window.horizonAPI used by tests.
-//
-// The real preload exposes:
-//   invoke(channel, payload): Promise<unknown>
-//   on(channel, cb): () => void
-//
-// The fake records invoke calls and lets tests fire `on` callbacks by
-// hand. Mounts itself on globalThis.window when installed, restores on
-// dispose.
+import { vi, beforeEach, afterEach } from 'vitest';
+import { useBrowserStore } from '@/stores/browserStore';
 
 export interface FakeHorizonAPI {
   invoke: ReturnType<typeof vi.fn>;
@@ -16,9 +9,7 @@ export interface FakeHorizonAPI {
   listenerCount: (channel: string) => number;
 }
 
-import { vi } from 'vitest';
-
-export function installFakeHorizonAPI(): { api: FakeHorizonAPI; dispose: () => void } {
+function buildFakeApi(): FakeHorizonAPI {
   const listeners = new Map<string, Set<(payload: unknown) => void>>();
   const invokes: Array<{ channel: string; payload: unknown }> = [];
 
@@ -39,26 +30,40 @@ export function installFakeHorizonAPI(): { api: FakeHorizonAPI; dispose: () => v
     };
   };
 
-  const emit = (channel: string, payload: unknown) => {
-    listeners.get(channel)?.forEach((cb) => cb(payload));
-  };
-
-  const listenerCount = (channel: string) => listeners.get(channel)?.size ?? 0;
-
-  const api: FakeHorizonAPI = { invoke, on, emit, invokes, listenerCount };
-
-  const original = (globalThis as { window?: { horizonAPI?: unknown } }).window?.horizonAPI;
-  // Mount on window (jsdom provides it). In node env without jsdom this throws.
-  (window as unknown as { horizonAPI: FakeHorizonAPI }).horizonAPI = api;
-
   return {
-    api,
-    dispose: () => {
-      if (original === undefined) {
-        delete (window as unknown as { horizonAPI?: unknown }).horizonAPI;
-      } else {
-        (window as unknown as { horizonAPI: unknown }).horizonAPI = original;
-      }
-    },
+    invoke,
+    on,
+    emit: (channel, payload) => listeners.get(channel)?.forEach((cb) => cb(payload)),
+    invokes,
+    listenerCount: (channel) => listeners.get(channel)?.size ?? 0,
   };
+}
+
+/**
+ * Renderer-test fixture: install a fresh fake horizonAPI on `window`
+ * and reset the Zustand store before each test; teardown afterEach.
+ * Returns an `api` accessor function that yields the *current* fake
+ * (i.e. the one installed for the in-flight test).
+ *
+ * Must be called at suite top-level (not inside `it`).
+ */
+export function setupRendererTest(): { api: () => FakeHorizonAPI } {
+  let current: FakeHorizonAPI;
+  const initialState = useBrowserStore.getState();
+
+  beforeEach(() => {
+    current = buildFakeApi();
+    vi.stubGlobal('horizonAPI', current);
+    // window.horizonAPI is what production code reads — mirror to it
+    // for completeness (vi.stubGlobal sets globalThis).
+    (window as unknown as { horizonAPI: FakeHorizonAPI }).horizonAPI = current;
+    useBrowserStore.setState({ ...initialState, tabs: [], activeTabId: null }, true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (window as unknown as { horizonAPI?: unknown }).horizonAPI;
+  });
+
+  return { api: () => current };
 }

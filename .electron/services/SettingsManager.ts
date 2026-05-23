@@ -1,15 +1,11 @@
-import { app } from 'electron';
 import fs from 'fs';
-import path from 'path';
 import { DEFAULT_SETTINGS } from '../../shared/constants';
 import type { Settings } from '../../src/types/browser';
 
 export class SettingsManager {
-  private settingsPath: string;
   private settings: Settings;
 
-  constructor() {
-    this.settingsPath = path.join(app.getPath('userData'), 'settings.json');
+  constructor(private settingsPath: string) {
     this.settings = this.load();
   }
 

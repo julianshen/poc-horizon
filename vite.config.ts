@@ -21,7 +21,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      include: ['src/utils/**/*.ts', 'shared/**/*.ts'],
+      include: [
+        'src/utils/**/*.ts',
+        'shared/**/*.ts',
+        '.electron/services/SettingsManager.ts',
+      ],
       exclude: ['**/*.d.ts', '**/index.ts'],
       thresholds: {
         lines: 90,

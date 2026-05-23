@@ -34,7 +34,7 @@ function createWindow(): void {
   const sessionManager = new SessionManager();
   sessionManager.initialize();
 
-  const settingsManager = new SettingsManager();
+  const settingsManager = new SettingsManager(path.join(app.getPath('userData'), 'settings.json'));
   const bookmarkManager = new BookmarkManager();
   const historyManager = new HistoryManager();
   const downloadManager = new DownloadManager();

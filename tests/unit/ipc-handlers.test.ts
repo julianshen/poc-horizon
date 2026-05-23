@@ -40,6 +40,10 @@ function makeFakeServices() {
     print: vi.fn(),
     printToPDF: vi.fn().mockResolvedValue('/tmp/out.pdf'),
     getBrowserView: vi.fn().mockReturnValue(view),
+    setPinned: vi.fn(),
+    setMuted: vi.fn(),
+    duplicate: vi.fn().mockReturnValue({ id: 't2' }),
+    reorder: vi.fn(),
   };
 
   const wcSend = vi.fn();
@@ -150,6 +154,28 @@ describe('IPC handlers', () => {
     it('tab:activate dispatches activateTab(tabId)', () => {
       invoke(IPC_CHANNELS.TAB_ACTIVATE, { tabId: 't1' });
       expect(s.tabManager.activateTab).toHaveBeenCalledWith('t1');
+    });
+
+    it('tab:pin dispatches setPinned(tabId, pinned)', () => {
+      invoke(IPC_CHANNELS.TAB_PIN, { tabId: 't1', pinned: true });
+      expect(s.tabManager.setPinned).toHaveBeenCalledWith('t1', true);
+    });
+
+    it('tab:mute / tab:unmute dispatch setMuted with the correct flag', () => {
+      invoke(IPC_CHANNELS.TAB_MUTE, { tabId: 't1' });
+      expect(s.tabManager.setMuted).toHaveBeenCalledWith('t1', true);
+      invoke(IPC_CHANNELS.TAB_UNMUTE, { tabId: 't1' });
+      expect(s.tabManager.setMuted).toHaveBeenCalledWith('t1', false);
+    });
+
+    it('tab:duplicate dispatches duplicate(tabId)', () => {
+      invoke(IPC_CHANNELS.TAB_DUPLICATE, { tabId: 't1' });
+      expect(s.tabManager.duplicate).toHaveBeenCalledWith('t1');
+    });
+
+    it('tab:reorder dispatches reorder(tabId, index)', () => {
+      invoke(IPC_CHANNELS.TAB_REORDER, { tabId: 't1', index: 2 });
+      expect(s.tabManager.reorder).toHaveBeenCalledWith('t1', 2);
     });
   });
 

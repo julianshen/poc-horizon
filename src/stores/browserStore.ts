@@ -21,6 +21,7 @@ interface BrowserState {
   setActiveTab: (tabId: string) => void;
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
   removeTab: (tabId: string) => void;
+  reorderTab: (tabId: string, targetIndex: number) => void;
   setNavigationState: (state: { canGoBack: boolean; canGoForward: boolean; isLoading: boolean; url: string }) => void;
   setLoadProgress: (progress: number) => void;
   toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd') => void;
@@ -53,6 +54,17 @@ export const useBrowserStore = create<BrowserState>((set) => ({
     set((state) => ({
       tabs: state.tabs.filter((t) => t.id !== tabId),
     })),
+  reorderTab: (tabId, targetIndex) =>
+    set((state) => {
+      const from = state.tabs.findIndex((t) => t.id === tabId);
+      if (from === -1) return state;
+      const clamped = Math.max(0, Math.min(state.tabs.length - 1, targetIndex));
+      if (from === clamped) return state;
+      const next = state.tabs.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(clamped, 0, moved);
+      return { tabs: next };
+    }),
   setNavigationState: (state) => set(state),
   setLoadProgress: (loadProgress) => set({ loadProgress }),
   toggleOverlay: (overlay) => set((state) => ({ [overlay]: !state[overlay] })),

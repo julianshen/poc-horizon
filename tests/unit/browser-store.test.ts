@@ -93,6 +93,39 @@ describe('browserStore', () => {
     expect(useBrowserStore.getState().loadProgress).toBe(42);
   });
 
+  describe('reorderTab()', () => {
+    beforeEach(() => {
+      useBrowserStore.getState().setTabs([sampleTab('a'), sampleTab('b'), sampleTab('c'), sampleTab('d')]);
+    });
+
+    it('moves a tab to an earlier index', () => {
+      useBrowserStore.getState().reorderTab('d', 1);
+      expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['a', 'd', 'b', 'c']);
+    });
+
+    it('moves a tab to a later index', () => {
+      useBrowserStore.getState().reorderTab('a', 2);
+      expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['b', 'c', 'a', 'd']);
+    });
+
+    it('is a no-op when the source is missing', () => {
+      useBrowserStore.getState().reorderTab('missing', 0);
+      expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('is a no-op when the index equals the current position', () => {
+      useBrowserStore.getState().reorderTab('b', 1);
+      expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('clamps the target index into [0, len-1]', () => {
+      useBrowserStore.getState().reorderTab('a', 99);
+      expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['b', 'c', 'd', 'a']);
+      useBrowserStore.getState().reorderTab('a', -5);
+      expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+    });
+  });
+
   it.each([
     'showSettings',
     'showBookmarks',

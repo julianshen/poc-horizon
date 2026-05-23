@@ -15,6 +15,8 @@ import { IPC_CHANNELS } from './ipc/channels';
 import { registerIpcHandlers } from './ipc/main-handlers';
 import { denyAllWindowOpens } from './services/windowOpenPolicy';
 import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
+import { TabSessionStore } from './services/TabSessionStore';
+import type { Tab } from '../src/types/browser';
 
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -47,8 +49,39 @@ function createWindow(): void {
     }
   );
   const autofillManager = new AutofillManager(path.join(app.getPath('userData'), 'addresses.json'));
+  const tabSessionStore = new TabSessionStore(path.join(app.getPath('userData'), 'session.json'));
 
   tabManager = new TabManager(win, historyManager);
+
+  // Persist tabs whenever TabManager broadcasts a tab:* event to the
+  // renderer. We hook by wrapping webContents.send so the persistence
+  // is invisible to TabManager itself.
+  const persist = (): void => {
+    tabSessionStore.scheduleSave(
+      tabManager.getAllTabs().map((t: Tab) => ({
+        url: t.url,
+        title: t.title,
+        isPinned: t.isPinned,
+        isActive: t.isActive,
+      }))
+    );
+  };
+  const origSend = win.webContents.send.bind(win.webContents);
+  win.webContents.send = ((channel: string, ...args: unknown[]): void => {
+    origSend(channel, ...args);
+    if (channel.startsWith('tab:')) persist();
+  }) as typeof win.webContents.send;
+
+  app.on('before-quit', () => {
+    tabSessionStore.flush(
+      tabManager.getAllTabs().map((t: Tab) => ({
+        url: t.url,
+        title: t.title,
+        isPinned: t.isPinned,
+        isActive: t.isActive,
+      }))
+    );
+  });
 
   win.webContents.session.on('will-download', (event, item, webContents) => {
     downloadManager.handleDownload(event, item, webContents);
@@ -87,6 +120,21 @@ function createWindow(): void {
   // first paint). Without this wait, the tab:created broadcast fires
   // into the void and the TabBar never sees the initial tab.
   win.webContents.once('did-finish-load', () => {
+    const startup = settingsManager.get('startupBehavior') as 'new-tab' | 'restore' | 'specific-pages' | undefined;
+    const restoreDisabled = process.env.HORIZON_DISABLE_RESTORE === '1';
+    if (startup === 'restore' && !restoreDisabled) {
+      const saved = tabSessionStore.load();
+      if (saved.length > 0) {
+        let activated: string | null = null;
+        for (const t of saved) {
+          const created = tabManager.createTab(t.url);
+          if (t.isPinned) tabManager.setPinned(created.id, true);
+          if (t.isActive) activated = created.id;
+        }
+        if (activated) tabManager.activateTab(activated);
+        return;
+      }
+    }
     tabManager.createTab('horizon://newtab');
   });
 }

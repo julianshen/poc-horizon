@@ -11,6 +11,7 @@ let firstWindow: Page;
 test.beforeAll(async () => {
   app = await electron.launch({
     args: [path.join(__dirname, '../../dist-electron/main.js')],
+    env: { ...process.env, HORIZON_DISABLE_RESTORE: '1' },
     timeout: 20_000,
   });
   firstWindow = await app.firstWindow();

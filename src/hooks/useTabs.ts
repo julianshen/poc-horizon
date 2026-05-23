@@ -3,7 +3,7 @@ import { useBrowserStore } from '../stores/browserStore';
 import type { Tab } from '../types/browser';
 
 export function useTabs(): void {
-  const { setTabs, setActiveTab, updateTab, removeTab } = useBrowserStore();
+  const { setTabs, setActiveTab, updateTab, removeTab, reorderTab } = useBrowserStore();
 
   useEffect(() => {
     const unsubCreated = window.horizonAPI.on('tab:created', (tab: Tab) => {
@@ -48,6 +48,13 @@ export function useTabs(): void {
       updateTab(tabId, { favicon: faviconUrl });
     });
 
+    const unsubReordered = window.horizonAPI.on(
+      'tab:reordered',
+      ({ tabId, index }: { tabId: string; index: number }) => {
+        reorderTab(tabId, index);
+      }
+    );
+
     return () => {
       unsubCreated();
       unsubClosed();
@@ -58,6 +65,7 @@ export function useTabs(): void {
       unsubLoadFinished();
       unsubTitle();
       unsubFavicon();
+      unsubReordered();
     };
-  }, [setTabs, setActiveTab, updateTab, removeTab]);
+  }, [setTabs, setActiveTab, updateTab, removeTab, reorderTab]);
 }

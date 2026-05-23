@@ -15,9 +15,11 @@ export const TabBar: React.FC = () => {
       style={{ background: 'transparent', WebkitAppRegion: 'drag' }}
     >
       <div className="flex items-center gap-px flex-1" style={{ WebkitAppRegion: 'no-drag' }}>
-        {tabs.map((tab) => (
-          <Tab key={tab.id} tab={tab} isActive={tab.id === activeTabId} />
-        ))}
+        {[...tabs]
+          .sort((a, b) => Number(b.isPinned) - Number(a.isPinned))
+          .map((tab, i) => (
+            <Tab key={tab.id} tab={tab} isActive={tab.id === activeTabId} index={i} />
+          ))}
         <button
           data-testid="new-tab-button"
           aria-label="New tab"

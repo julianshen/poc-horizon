@@ -3,7 +3,7 @@ export const APP_VERSION = '1.0.0';
 
 export const DEFAULT_SETTINGS = {
   schemaVersion: 1,
-  startupBehavior: 'new-tab' as const,
+  startupBehavior: 'restore' as const,
   startupPages: ['https://duckduckgo.com'],
   defaultSearchEngine: 'duckduckgo' as const,
   downloadPath: '', // resolved at runtime

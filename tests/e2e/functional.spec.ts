@@ -7,6 +7,7 @@ let win: Page;
 test.beforeAll(async () => {
   app = await electron.launch({
     args: [path.join(__dirname, '../../dist-electron/main.js')],
+    env: { ...process.env, HORIZON_DISABLE_RESTORE: '1' },
     timeout: 20_000,
   });
   win = await app.firstWindow();
@@ -119,6 +120,26 @@ test('Cmd+J opens the downloads view (empty state OK)', async () => {
   // Either the shelf is visible or it stays hidden (empty). Just verify
   // the store flag toggled by re-triggering and confirming no crash.
   await win.keyboard.press('ControlOrMeta+j');
+});
+
+test('pinning a tab moves it to the front of the bar', async () => {
+  // Start clean — close all but one tab, then add two more.
+  while ((await win.getByTestId('tab').count()) > 1) {
+    const last = win.getByTestId('tab').last();
+    await last.hover();
+    await last.getByTestId('tab-close').click();
+  }
+  await win.getByTestId('new-tab-button').click();
+  await win.getByTestId('new-tab-button').click();
+  await expect(win.getByTestId('tab')).toHaveCount(3);
+
+  // Pin the third tab via the context menu, then verify it's at index 0.
+  const third = win.getByTestId('tab').nth(2);
+  const thirdId = await third.getAttribute('data-tab-id');
+  await third.click({ button: 'right' });
+  await win.getByRole('menuitem', { name: /Pin tab/ }).click();
+
+  await expect.poll(async () => (await win.getByTestId('tab').first().getAttribute('data-tab-id'))).toBe(thirdId);
 });
 
 test('typing in omnibox dispatches navigation:go on Enter', async () => {

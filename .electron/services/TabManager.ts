@@ -286,6 +286,29 @@ export class TabManager {
     }
   }
 
+  /**
+   * Reorder the tab map so the tab with `tabId` lands at `targetIndex`.
+   * The Map preserves insertion order, so we rebuild it in the new order.
+   */
+  reorder(tabId: string, targetIndex: number): void {
+    const ids = Array.from(this.tabs.keys());
+    const from = ids.indexOf(tabId);
+    if (from === -1) return;
+    const clamped = Math.max(0, Math.min(ids.length - 1, targetIndex));
+    if (from === clamped) return;
+
+    ids.splice(from, 1);
+    ids.splice(clamped, 0, tabId);
+
+    const next = new Map<string, { tab: Tab; view: BrowserView }>();
+    for (const id of ids) {
+      const entry = this.tabs.get(id);
+      if (entry) next.set(id, entry);
+    }
+    this.tabs = next;
+    this.window.webContents.send('tab:reordered', { tabId, index: clamped });
+  }
+
   private updateTab(tabId: string, updates: Partial<Tab>): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;

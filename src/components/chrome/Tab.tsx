@@ -5,10 +5,12 @@ import { TabContextMenu } from './TabContextMenu';
 interface TabProps {
   tab: TabType;
   isActive: boolean;
+  index: number;
 }
 
-export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
+export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const activate = useCallback(() => {
     window.horizonAPI.invoke('tab:activate', { tabId: tab.id });
@@ -39,14 +41,48 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
 
   const width = tab.isPinned ? 'w-9 min-w-[36px] max-w-[36px]' : 'min-w-[80px] max-w-[180px]';
 
+  const onDragStart = useCallback(
+    (e: React.DragEvent) => {
+      e.dataTransfer.setData('text/x-horizon-tab', tab.id);
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    [tab.id]
+  );
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('text/x-horizon-tab')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDragOver(true);
+    }
+  }, []);
+
+  const onDragLeave = useCallback(() => setDragOver(false), []);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const draggedId = e.dataTransfer.getData('text/x-horizon-tab');
+      if (!draggedId || draggedId === tab.id) return;
+      window.horizonAPI.invoke('tab:reorder', { tabId: draggedId, index });
+    },
+    [tab.id, index]
+  );
+
   return (
     <>
       <div
         data-testid="tab"
         data-tab-id={tab.id}
+        draggable
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
         onClick={activate}
         onContextMenu={openMenu}
-        className={`group h-[26px] px-2.5 flex items-center gap-2 cursor-pointer text-xs select-none ${width}`}
+        className={`group h-[26px] px-2.5 flex items-center gap-2 cursor-pointer text-xs select-none relative ${width}`}
         style={{
           background: isActive ? 'var(--tab-bg-active)' : 'var(--tab-bg-inactive)',
           color: isActive ? 'var(--chrome-fg)' : 'var(--chrome-fg-subtle)',
@@ -70,6 +106,13 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
           }
         }}
       >
+        {dragOver && (
+          <span
+            className="absolute -left-0.5 top-1 bottom-1 w-0.5 rounded-full"
+            style={{ background: 'var(--accent-primary)' }}
+            aria-hidden
+          />
+        )}
         {tab.isLoading ? (
           <span className="spinner shrink-0" />
         ) : tab.favicon ? (

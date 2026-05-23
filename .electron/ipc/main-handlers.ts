@@ -37,6 +37,10 @@ export function registerIpcHandlers(tabManager: TabManager, window: BrowserWindo
     return tabManager.duplicate(tabId);
   });
 
+  ipcMain.handle(IPC_CHANNELS.TAB_REORDER, (_event, { tabId, index }: { tabId: string; index: number }) => {
+    tabManager.reorder(tabId, index);
+  });
+
   ipcMain.handle(IPC_CHANNELS.NAVIGATION_GO, (_event, { tabId, url }: { tabId: string; url: string }) => {
     tabManager.navigate(tabId, url);
   });

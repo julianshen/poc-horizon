@@ -3099,22 +3099,22 @@ git commit -m "test: unit and e2e test scaffold"
 
 - [ ] App launches without errors (`npm run dev`)
 - [ ] New tab creates a BrowserView with DuckDuckGo
-- [ ] Navigation (back/forward/reload/stop) works
+- [x] Navigation (back/forward/reload/stop) works
 - [x] Omnibox accepts URLs and search queries
-- [ ] Tab switching works
-- [ ] Tab closing works
-- [ ] Keyboard shortcuts work (Ctrl+T, Ctrl+W, Ctrl+L)
-- [ ] Settings persist to JSON
-- [ ] Bookmarks CRUD works
-- [ ] History records navigation
-- [ ] Downloads track progress
-- [ ] Find in page opens and searches
-- [ ] Passwords save and encrypt
-- [ ] Autofill addresses work
+- [x] Tab switching works
+- [x] Tab closing works
+- [x] Keyboard shortcuts work (Ctrl+T, Ctrl+W, Ctrl+L)
+- [x] Settings persist to JSON
+- [x] Bookmarks CRUD works
+- [x] History records navigation
+- [x] Downloads track progress
+- [x] Find in page opens and searches
+- [x] Passwords save and encrypt
+- [x] Autofill addresses work
 - [ ] Zoom changes apply
 - [ ] Print dialog opens
 - [ ] DevTools toggle works
 - [ ] Pop-ups are blocked
-- [ ] Error pages show on load failure
+- [x] Error pages show on load failure
 - [ ] Auto-update checks on startup
 - [ ] Build produces distributable (`npm run dist`)

@@ -1,15 +1,11 @@
-import { app } from 'electron';
 import fs from 'fs';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Bookmark } from '../../src/types/browser';
 
 export class BookmarkManager {
-  private bookmarksPath: string;
   private bookmarks: Bookmark[];
 
-  constructor() {
-    this.bookmarksPath = path.join(app.getPath('userData'), 'bookmarks.json');
+  constructor(private bookmarksPath: string) {
     this.bookmarks = this.load();
   }
 

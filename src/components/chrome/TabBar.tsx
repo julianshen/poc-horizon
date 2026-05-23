@@ -15,6 +15,8 @@ export const TabBar: React.FC = () => {
         <Tab key={tab.id} tab={tab} isActive={tab.id === activeTabId} />
       ))}
       <button
+        data-testid="new-tab-button"
+        aria-label="New tab"
         onClick={createTab}
         className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-gray-200 text-lg"
       >

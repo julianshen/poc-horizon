@@ -49,6 +49,7 @@ export class TabManager {
     view.webContents.loadURL(url);
 
     this.setupWebContentsEvents(id, view);
+    this.window.webContents.send('tab:created', tab);
     this.activateTab(id);
 
     return tab;
@@ -140,6 +141,8 @@ export class TabManager {
       width: bounds.width,
       height: bounds.height - chromeHeight,
     });
+
+    this.window.webContents.send('tab:activated', { tabId });
   }
 
   closeTab(tabId: string): void {
@@ -149,6 +152,7 @@ export class TabManager {
     this.window.removeBrowserView(entry.view);
     (entry.view.webContents as any).destroy?.();
     this.tabs.delete(tabId);
+    this.window.webContents.send('tab:closed', { tabId });
 
     if (this.activeTabId === tabId) {
       const remaining = Array.from(this.tabs.values());

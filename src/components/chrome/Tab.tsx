@@ -18,6 +18,8 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
 
   return (
     <div
+      data-testid="tab"
+      data-tab-id={tab.id}
       onClick={activate}
       className={`h-8 px-3 rounded-t-lg flex items-center gap-2 min-w-[120px] max-w-[200px] cursor-pointer text-xs select-none ${
         isActive ? 'bg-white' : 'hover:bg-gray-200'
@@ -31,6 +33,8 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive }) => {
       <span className="flex-1 truncate">{tab.title || 'New Tab'}</span>
       {tab.isLoading && <span className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />}
       <button
+        data-testid="tab-close"
+        aria-label={`Close ${tab.title || 'tab'}`}
         onClick={close}
         className="w-4 h-4 rounded-full hover:bg-gray-300 flex items-center justify-center text-xs"
       >

@@ -22,26 +22,24 @@ test.afterAll(async () => {
 });
 
 test('app launches and shows the browser chrome', async () => {
-  // The TitleBar / TabBar / Toolbar should render. Smoke check: the
-  // Omnibox input is present.
   const input = firstWindow.getByRole('textbox');
   await expect(input).toBeVisible();
 });
 
-// Test selectors need refinement against the real DOM (TabBar children
-// don't match .cursor-pointer reliably across all states). Follow-up
-// will rewrite using stable test ids on each Tab; until then the
-// `app launches` smoke is the contract.
-test.skip('new-tab button creates a tab — TODO: stable selectors', async () => {
-  const plus = firstWindow.getByText('+', { exact: true }).first();
-  await plus.click();
-  await expect(firstWindow.getByText('New Tab').first()).toBeVisible({ timeout: 5_000 });
+test('initial tab appears in TabBar after app launches', async () => {
+  // main.ts calls tabManager.createTab('https://duckduckgo.com') on startup.
+  // The IPC broadcast lands on useTabs which adds it to the store; TabBar renders it.
+  await expect(firstWindow.getByTestId('tab').first()).toBeVisible({ timeout: 10_000 });
 });
 
-test.skip('Cmd/Ctrl+T keyboard shortcut creates a tab — TODO: stable selectors', async () => {
-  const beforeCount = await firstWindow.locator('[data-testid="tab"]').count();
+test('new-tab-button click creates an additional tab', async () => {
+  const before = await firstWindow.getByTestId('tab').count();
+  await firstWindow.getByTestId('new-tab-button').click();
+  await expect.poll(() => firstWindow.getByTestId('tab').count()).toBeGreaterThan(before);
+});
+
+test('Cmd/Ctrl+T keyboard shortcut creates an additional tab', async () => {
+  const before = await firstWindow.getByTestId('tab').count();
   await firstWindow.keyboard.press('ControlOrMeta+t');
-  await firstWindow.waitForTimeout(500);
-  const afterCount = await firstWindow.locator('[data-testid="tab"]').count();
-  expect(afterCount).toBeGreaterThan(beforeCount);
+  await expect.poll(() => firstWindow.getByTestId('tab').count()).toBeGreaterThan(before);
 });

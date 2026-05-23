@@ -39,9 +39,9 @@ describe('TabBar', () => {
     expect(screen.getByText('Beta')).toBeTruthy();
   });
 
-  it('"+" button dispatches tab:create', () => {
+  it('new-tab-button dispatches tab:create', () => {
     render(<TabBar />);
-    fireEvent.click(screen.getByText('+'));
+    fireEvent.click(screen.getByTestId('new-tab-button'));
     expect(api().invokes).toEqual([{ channel: 'tab:create', payload: {} }]);
   });
 
@@ -52,19 +52,19 @@ describe('TabBar', () => {
       activeTabId: 'a',
     });
     render(<TabBar />);
-    fireEvent.click(screen.getByText('Tab b'));
+    const tabB = screen.getAllByTestId('tab').find((el) => el.dataset.tabId === 'b')!;
+    fireEvent.click(tabB);
     expect(api().invokes).toEqual([{ channel: 'tab:activate', payload: { tabId: 'b' } }]);
   });
 
-  it('clicking the × button dispatches tab:close and not tab:activate', () => {
+  it('clicking the tab-close button dispatches tab:close and not tab:activate', () => {
     useBrowserStore.setState({
       ...initialState,
       tabs: [sampleTab('a'), sampleTab('b')],
       activeTabId: 'a',
     });
     render(<TabBar />);
-    // Find the × button inside Tab b
-    const closeButtons = screen.getAllByText('×');
+    const closeButtons = screen.getAllByTestId('tab-close');
     fireEvent.click(closeButtons[1]);
     expect(api().invokes).toEqual([{ channel: 'tab:close', payload: { tabId: 'b' } }]);
   });

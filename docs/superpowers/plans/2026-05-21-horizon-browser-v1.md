@@ -3098,7 +3098,7 @@ git commit -m "test: unit and e2e test scaffold"
 ## Final Verification Checklist
 
 - [x] App launches without errors (`npm run dev`)
-- [ ] New tab creates a BrowserView with DuckDuckGo
+- [x] New tab creates a BrowserView with DuckDuckGo
 - [x] Navigation (back/forward/reload/stop) works
 - [x] Omnibox accepts URLs and search queries
 - [x] Tab switching works

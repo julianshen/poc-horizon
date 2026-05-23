@@ -82,8 +82,13 @@ function createWindow(): void {
     };
   });
 
-  // Create initial tab
-  tabManager.createTab('https://duckduckgo.com');
+  // Defer initial tab until the renderer's IPC listeners are registered
+  // (useTabs subscribes inside a React useEffect, which runs after the
+  // first paint). Without this wait, the tab:created broadcast fires
+  // into the void and the TabBar never sees the initial tab.
+  win.webContents.once('did-finish-load', () => {
+    tabManager.createTab('https://duckduckgo.com');
+  });
 }
 
 app.whenReady().then(createWindow);

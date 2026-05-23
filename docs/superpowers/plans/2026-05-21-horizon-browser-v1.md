@@ -3050,7 +3050,7 @@ Expected: All tests pass.
 - Create: `tests/e2e/smoke.spec.ts`
 - Create: `playwright.config.ts`
 
-- [ ] **Write playwright.config.ts**
+- [x] **Write playwright.config.ts**
 
 ```typescript
 import { defineConfig, devices } from '@playwright/test';
@@ -3074,7 +3074,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Write smoke.spec.ts**
+- [x] **Write smoke.spec.ts**
 
 ```typescript
 import { test, expect } from '@playwright/test';
@@ -3086,7 +3086,7 @@ test('app launches and loads initial tab', async ({ page }) => {
 });
 ```
 
-- [ ] **Commit tests**
+- [x] **Commit tests**
 
 ```bash
 git add tests/ playwright.config.ts
@@ -3097,7 +3097,7 @@ git commit -m "test: unit and e2e test scaffold"
 
 ## Final Verification Checklist
 
-- [ ] App launches without errors (`npm run dev`)
+- [x] App launches without errors (`npm run dev`)
 - [ ] New tab creates a BrowserView with DuckDuckGo
 - [x] Navigation (back/forward/reload/stop) works
 - [x] Omnibox accepts URLs and search queries

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, safeStorage, IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, safeStorage, session, IpcMainInvokeEvent } from 'electron';
 import path from 'path';
 import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
@@ -17,6 +17,7 @@ import { denyAllWindowOpens } from './services/windowOpenPolicy';
 import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 import { TabSessionStore } from './services/TabSessionStore';
 import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
+import { applySpellcheckToSession } from './services/spellcheck';
 import type { Tab } from '../src/types/browser';
 
 
@@ -240,7 +241,16 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   });
 }
 
-app.whenReady().then(() => createWindow());
+app.whenReady().then(() => {
+  // Apply spell-check settings to every session that exists or will be
+  // created. The default session is for regular windows; the incognito
+  // partition is created in WindowManager when an incognito window opens.
+  initSingletons();
+  const langs = settingsManager.get('spellcheckLanguages') as string[];
+  applySpellcheckToSession(session.defaultSession, langs);
+  applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

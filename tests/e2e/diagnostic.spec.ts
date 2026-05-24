@@ -200,6 +200,22 @@ test('collect diagnostics', async () => {
   log(`Web context-menu listeners on tab webContents: ${listenerCount} (expect >= 1)`);
   expect(listenerCount, 'TabManager should register a context-menu listener').toBeGreaterThanOrEqual(1);
 
+  // ── Spell check wiring: session.spellCheckerLanguages should be set
+  // from settings after app start, and BrowserView webPreferences should
+  // have spellcheck enabled.
+  const spellInfo = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0]!;
+    const v = w.getBrowserViews()[0]!;
+    return {
+      sessionLanguages: v.webContents.session.getSpellCheckerLanguages(),
+      // BrowserView doesn't expose webPreferences directly — but enabled
+      // spell check means session.getSpellCheckerLanguages() returns a
+      // non-empty list. (Disabled would also return [].)
+    };
+  });
+  log(`Session spell-checker languages: ${JSON.stringify(spellInfo.sessionLanguages)} (expect non-empty)`);
+  expect(spellInfo.sessionLanguages.length, 'session.getSpellCheckerLanguages should be set from settings').toBeGreaterThan(0);
+
   // App menu (☰) — accessible by aria-label "Menu". Verifies that the
   // BrowserView is hidden (0×0) while the menu is open so menu rows that
   // overlap the view region aren't painted behind the page.

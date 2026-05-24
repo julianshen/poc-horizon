@@ -79,6 +79,7 @@ export class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        spellcheck: true,
         partition: this.partition(),
       },
     });

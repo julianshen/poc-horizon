@@ -1,5 +1,6 @@
-import { ipcMain, BrowserWindow, IpcMainInvokeEvent } from 'electron';
+import { ipcMain, BrowserWindow, IpcMainInvokeEvent, session } from 'electron';
 import { IPC_CHANNELS } from './channels';
+import { applySpellcheckToSession } from '../services/spellcheck';
 import { TabManager } from '../services/TabManager';
 import { SettingsManager } from '../services/SettingsManager';
 import { BookmarkManager } from '../services/BookmarkManager';
@@ -100,6 +101,12 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
   handle('settings:getAll', () => settingsManager.getAll());
   handle('settings:set', (event, { key, value }) => {
     settingsManager.set(key as Parameters<typeof settingsManager.set>[0], value as never);
+    // Re-apply spellchecker languages when the user changes them.
+    if (key === 'spellcheckLanguages' && Array.isArray(value)) {
+      const langs = value as string[];
+      applySpellcheckToSession(session.defaultSession, langs);
+      applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+    }
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
   });
   handle('settings:reset', (_event, payload) =>

@@ -18,6 +18,23 @@ export function buildWebContextMenu(
   const template: MenuItemConstructorOptions[] = [];
   const sep = (): void => { template.push({ type: 'separator' }); };
 
+  // Spelling suggestions (only present when the click is on a misspelled
+  // word inside an editable field; dictionarySuggestions is populated by
+  // Chromium's spellchecker before the event fires).
+  if (params.misspelledWord && params.dictionarySuggestions.length > 0) {
+    for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+      template.push({
+        label: suggestion,
+        click: () => wc.replaceMisspelling(suggestion),
+      });
+    }
+    template.push({
+      label: `Add "${params.misspelledWord}" to dictionary`,
+      click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord),
+    });
+    sep();
+  }
+
   // Link context.
   if (params.linkURL) {
     template.push(

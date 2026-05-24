@@ -35,8 +35,6 @@ describe('browserStore', () => {
     const s = useBrowserStore.getState();
     expect(s.tabs).toEqual([]);
     expect(s.activeTabId).toBeNull();
-    expect(s.isLoading).toBe(false);
-    expect(s.url).toBe('');
   });
 
   it('setTabs() replaces the tab list', () => {
@@ -72,25 +70,6 @@ describe('browserStore', () => {
     s.setTabs([sampleTab('a'), sampleTab('b')]);
     s.removeTab('a');
     expect(useBrowserStore.getState().tabs.map((t) => t.id)).toEqual(['b']);
-  });
-
-  it('setNavigationState() updates all four nav fields at once', () => {
-    useBrowserStore.getState().setNavigationState({
-      canGoBack: true,
-      canGoForward: true,
-      isLoading: true,
-      url: 'https://example.com',
-    });
-    const s = useBrowserStore.getState();
-    expect(s.canGoBack).toBe(true);
-    expect(s.canGoForward).toBe(true);
-    expect(s.isLoading).toBe(true);
-    expect(s.url).toBe('https://example.com');
-  });
-
-  it('setLoadProgress() updates only progress', () => {
-    useBrowserStore.getState().setLoadProgress(42);
-    expect(useBrowserStore.getState().loadProgress).toBe(42);
   });
 
   describe('reorderTab()', () => {

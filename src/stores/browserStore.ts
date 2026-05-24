@@ -4,11 +4,6 @@ import type { Tab } from '../types/browser';
 interface BrowserState {
   tabs: Tab[];
   activeTabId: string | null;
-  isLoading: boolean;
-  loadProgress: number;
-  canGoBack: boolean;
-  canGoForward: boolean;
-  url: string;
   showSettings: boolean;
   showBookmarks: boolean;
   showHistory: boolean;
@@ -30,19 +25,12 @@ interface BrowserState {
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
   removeTab: (tabId: string) => void;
   reorderTab: (tabId: string, targetIndex: number) => void;
-  setNavigationState: (state: { canGoBack: boolean; canGoForward: boolean; isLoading: boolean; url: string }) => void;
-  setLoadProgress: (progress: number) => void;
   toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd') => void;
 }
 
 export const useBrowserStore = create<BrowserState>((set) => ({
   tabs: [],
   activeTabId: null,
-  isLoading: false,
-  loadProgress: 0,
-  canGoBack: false,
-  canGoForward: false,
-  url: '',
   showSettings: false,
   showBookmarks: false,
   showHistory: false,
@@ -77,7 +65,5 @@ export const useBrowserStore = create<BrowserState>((set) => ({
       next.splice(clamped, 0, moved);
       return { tabs: next };
     }),
-  setNavigationState: (state) => set(state),
-  setLoadProgress: (loadProgress) => set({ loadProgress }),
   toggleOverlay: (overlay) => set((state) => ({ [overlay]: !state[overlay] })),
 }));

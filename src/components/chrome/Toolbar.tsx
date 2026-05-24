@@ -38,7 +38,10 @@ export const Toolbar: React.FC = () => {
         </button>
       </div>
       <Omnibox />
-      <div className="flex gap-0.5 items-center" style={{ WebkitAppRegion: 'no-drag' }}>
+      {/* ml-auto pushes the right-side icon group to the window edge —
+          the Omnibox's max-w-3xl cap leaves slack on wide windows; this
+          consumes that slack so the menu button anchors at the right. */}
+      <div className="flex gap-0.5 items-center ml-auto" style={{ WebkitAppRegion: 'no-drag' }}>
         <button onClick={openCmd} className="icon-btn" aria-label="Command palette" title="⌘K">
           <svg viewBox="0 0 24 24" aria-hidden>
             <rect x="3" y="3" width="7" height="7" rx="1.5" />

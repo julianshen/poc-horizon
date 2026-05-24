@@ -45,7 +45,7 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
     [tab.id, tab.isMuted]
   );
 
-  const width = tab.isPinned ? 'w-9 min-w-[36px] max-w-[36px]' : 'min-w-[80px] max-w-[180px]';
+  const width = tab.isPinned ? 'w-9 min-w-[36px] max-w-[36px]' : 'min-w-[60px] max-w-[180px]';
 
   const onDragStart = useCallback(
     (e: React.DragEvent) => {

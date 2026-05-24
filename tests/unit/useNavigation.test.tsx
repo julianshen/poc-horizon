@@ -4,18 +4,24 @@ import { renderHook } from '@testing-library/react';
 import { useNavigation } from '@/hooks/useNavigation';
 import { useBrowserStore } from '@/stores/browserStore';
 import { setupRendererTest } from '../helpers/fakeHorizonAPI';
+import type { Tab } from '@/types/browser';
+
+const tab = (overrides: Partial<Tab> = {}): Tab => ({
+  id: 'a', schemaVersion: 1, url: 'https://a', title: 'A', isLoading: false, loadProgress: 0,
+  canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true,
+  isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0,
+  ...overrides,
+});
 
 describe('useNavigation', () => {
   const { api } = setupRendererTest();
   const initialState = useBrowserStore.getState();
 
-  it('returns canGoBack/canGoForward/isLoading from the store', () => {
+  it('derives canGoBack/canGoForward/isLoading from the active tab', () => {
     useBrowserStore.setState({
       ...initialState,
       activeTabId: 'a',
-      canGoBack: true,
-      canGoForward: false,
-      isLoading: true,
+      tabs: [tab({ canGoBack: true, canGoForward: false, isLoading: true })],
     });
     const { result } = renderHook(() => useNavigation());
     expect(result.current.canGoBack).toBe(true);
@@ -24,7 +30,7 @@ describe('useNavigation', () => {
   });
 
   it('goBack/goForward dispatch IPC with the active tab id', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 'a' });
+    useBrowserStore.setState({ ...initialState, activeTabId: 'a', tabs: [tab()] });
     const { result } = renderHook(() => useNavigation());
     result.current.goBack();
     result.current.goForward();
@@ -42,14 +48,14 @@ describe('useNavigation', () => {
   });
 
   it('reload dispatches navigation:reload when not currently loading', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 'a', isLoading: false });
+    useBrowserStore.setState({ ...initialState, activeTabId: 'a', tabs: [tab({ isLoading: false })] });
     const { result } = renderHook(() => useNavigation());
     result.current.reload();
     expect(api().invokes).toEqual([{ channel: 'navigation:reload', payload: { tabId: 'a' } }]);
   });
 
   it('reload dispatches navigation:stop when currently loading (Chrome parity)', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 'a', isLoading: true });
+    useBrowserStore.setState({ ...initialState, activeTabId: 'a', tabs: [tab({ isLoading: true })] });
     const { result } = renderHook(() => useNavigation());
     result.current.reload();
     expect(api().invokes).toEqual([{ channel: 'navigation:stop', payload: { tabId: 'a' } }]);

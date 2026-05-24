@@ -105,6 +105,20 @@ test('collect diagnostics', async () => {
   await win.getByRole('button', { name: 'Toggle AI panel' }).click();
   await win.waitForTimeout(200);
 
+  // Verify Back/Forward buttons become enabled after a navigation.
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0]!;
+    const v = w.getBrowserViews()[0]!;
+    await v.webContents.loadURL('data:text/html,<title>A</title><h1>A</h1>');
+    await new Promise((r) => setTimeout(r, 200));
+    await v.webContents.loadURL('data:text/html,<title>B</title><h1>B</h1>');
+    await new Promise((r) => setTimeout(r, 200));
+  });
+  await win.waitForTimeout(400);
+  const backDisabled = await win.getByRole('button', { name: 'Back' }).isDisabled();
+  log(`=== BACK BUTTON DISABLED AFTER 2 NAVIGATIONS: ${backDisabled} (expect false) ===`);
+  expect(backDisabled, 'Back button should be enabled after navigating away from initial page').toBe(false);
+
   // App menu (☰) — accessible by aria-label "Menu". Verifies that the
   // BrowserView is hidden (0×0) while the menu is open so menu rows that
   // overlap the view region aren't painted behind the page.

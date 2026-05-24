@@ -16,6 +16,14 @@ interface BrowserState {
   showFindBar: boolean;
   showAI: boolean;
   showCmd: boolean;
+  // Component-local menus lifted to the store so BrowserContentArea can
+  // hide the BrowserView when they're open — Electron's BrowserView paints
+  // above all DOM, so an open menu that crosses into the view region would
+  // otherwise be hidden behind the page contents.
+  showAppMenu: boolean;
+  showTabContextMenu: boolean;
+  setAppMenuOpen: (open: boolean) => void;
+  setTabContextMenuOpen: (open: boolean) => void;
   toggleAI: () => void;
   setTabs: (tabs: Tab[]) => void;
   setActiveTab: (tabId: string) => void;
@@ -42,6 +50,10 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   showFindBar: false,
   showAI: false,
   showCmd: false,
+  showAppMenu: false,
+  showTabContextMenu: false,
+  setAppMenuOpen: (open) => set({ showAppMenu: open }),
+  setTabContextMenuOpen: (open) => set({ showTabContextMenu: open }),
   toggleAI: () => set((state) => ({ showAI: !state.showAI })),
 
   setTabs: (tabs) => set({ tabs }),

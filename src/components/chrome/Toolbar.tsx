@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { Omnibox } from './Omnibox';
 import { AppMenu } from './AppMenu';
 import { useNavigation } from '../../hooks/useNavigation';
@@ -6,10 +6,9 @@ import { useBrowserStore } from '../../stores/browserStore';
 
 export const Toolbar: React.FC = () => {
   const { goBack, goForward, reload, canGoBack, canGoForward, isLoading } = useNavigation();
-  const { showAI, toggleAI, toggleOverlay } = useBrowserStore();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const toggleMenu = useCallback(() => setMenuOpen((v) => !v), []);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const { showAI, toggleAI, toggleOverlay, showAppMenu, setAppMenuOpen } = useBrowserStore();
+  const toggleMenu = useCallback(() => setAppMenuOpen(!showAppMenu), [setAppMenuOpen, showAppMenu]);
+  const closeMenu = useCallback(() => setAppMenuOpen(false), [setAppMenuOpen]);
   const openCmd = useCallback(() => toggleOverlay('showCmd'), [toggleOverlay]);
 
   return (
@@ -57,7 +56,7 @@ export const Toolbar: React.FC = () => {
           className="icon-btn"
           aria-label="Menu"
           aria-haspopup="menu"
-          aria-expanded={menuOpen}
+          aria-expanded={showAppMenu}
           onClick={toggleMenu}
         >
           <svg viewBox="0 0 24 24" aria-hidden>
@@ -67,7 +66,7 @@ export const Toolbar: React.FC = () => {
           </svg>
         </button>
       </div>
-      <AppMenu open={menuOpen} onClose={closeMenu} />
+      <AppMenu open={showAppMenu} onClose={closeMenu} />
     </div>
   );
 };

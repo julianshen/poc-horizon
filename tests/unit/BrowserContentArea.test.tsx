@@ -83,6 +83,34 @@ describe('BrowserContentArea (renderer-reported content bounds)', () => {
     expect(after).toBe(before + 1);
   });
 
+  it('reports 0×0 when an obscuring overlay is open (menu, palette, panel)', () => {
+    vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 12, y: 146, top: 146, left: 12, right: 892, bottom: 746,
+      width: 880, height: 600, toJSON: () => ({}),
+    });
+    render(<BrowserContentArea />);
+    flushRaf();
+    act(() => useBrowserStore.setState({ showCmd: true }));
+    flushRaf();
+    const last = api().invokes.filter((i) => i.channel === 'ui:contentBounds').slice(-1)[0];
+    expect(last.payload).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+
+  it('restores the measured rect when the overlay closes', () => {
+    vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 12, y: 146, top: 146, left: 12, right: 892, bottom: 746,
+      width: 880, height: 600, toJSON: () => ({}),
+    });
+    render(<BrowserContentArea />);
+    flushRaf();
+    act(() => useBrowserStore.setState({ showAppMenu: true }));
+    flushRaf();
+    act(() => useBrowserStore.setState({ showAppMenu: false }));
+    flushRaf();
+    const last = api().invokes.filter((i) => i.channel === 'ui:contentBounds').slice(-1)[0];
+    expect(last.payload).toMatchObject({ x: 12, y: 146, width: 880, height: 600 });
+  });
+
   it('re-reports on window resize', () => {
     vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 12, y: 146, top: 146, left: 12, right: 892, bottom: 746,

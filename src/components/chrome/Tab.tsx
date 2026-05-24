@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import type { Tab as TabType } from '../../types/browser';
 import { TabContextMenu } from './TabContextMenu';
+import { useBrowserStore } from '../../stores/browserStore';
 
 interface TabProps {
   tab: TabType;
@@ -11,6 +12,7 @@ interface TabProps {
 export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const setTabContextMenuOpen = useBrowserStore((s) => s.setTabContextMenuOpen);
 
   const activate = useCallback(() => {
     window.horizonAPI.invoke('tab:activate', { tabId: tab.id });
@@ -27,9 +29,13 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
   const openMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+    setTabContextMenuOpen(true);
+  }, [setTabContextMenuOpen]);
 
-  const closeMenu = useCallback(() => setMenu(null), []);
+  const closeMenu = useCallback(() => {
+    setMenu(null);
+    setTabContextMenuOpen(false);
+  }, [setTabContextMenuOpen]);
 
   const toggleMute = useCallback(
     (e: React.MouseEvent) => {

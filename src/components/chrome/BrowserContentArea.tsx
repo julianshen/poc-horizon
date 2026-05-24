@@ -15,6 +15,21 @@ export const BrowserContentArea: React.FC = () => {
   // Re-measure when the AI sidebar opens/closes — the div doesn't change
   // size but it shifts horizontally, which ResizeObserver doesn't catch.
   const showAI = useBrowserStore((s) => s.showAI);
+  // BrowserView paints above all DOM, so any open menu / overlay / panel
+  // that crosses the view region would be hidden behind the page contents.
+  // Aggregate every obscuring overlay and hide the view (0×0) while any is
+  // open. showAI is excluded — it's a sibling sidebar, not an overlay.
+  const obscured = useBrowserStore(
+    (s) =>
+      s.showCmd ||
+      s.showBookmarks ||
+      s.showHistory ||
+      s.showSettings ||
+      s.showDownloads ||
+      s.showFindBar ||
+      s.showAppMenu ||
+      s.showTabContextMenu
+  );
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -22,6 +37,10 @@ export const BrowserContentArea: React.FC = () => {
 
     let rafId = 0;
     const report = (): void => {
+      if (obscured) {
+        window.horizonAPI.invoke('ui:contentBounds', { x: 0, y: 0, width: 0, height: 0 });
+        return;
+      }
       const r = el.getBoundingClientRect();
       window.horizonAPI.invoke('ui:contentBounds', {
         x: r.left,
@@ -46,7 +65,7 @@ export const BrowserContentArea: React.FC = () => {
       ro.disconnect();
       window.removeEventListener('resize', schedule);
     };
-  }, [showAI]);
+  }, [showAI, obscured]);
 
   // absolute inset-0 fills the parent regardless of its flex direction —
   // the parent (`relative overflow-hidden` card in App.tsx) doesn't set a

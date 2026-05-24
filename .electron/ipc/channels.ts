@@ -50,6 +50,7 @@ export const IPC_CHANNELS = {
   WINDOW_CLOSE: 'window:close',
   WINDOW_SET_FULLSCREEN: 'window:setFullscreen',
   WINDOW_NEW_INCOGNITO: 'window:newIncognito',
+  UI_CONTENT_BOUNDS: 'ui:contentBounds',
   APP_QUIT: 'app:quit',
   APP_GET_VERSION: 'app:getVersion',
   APP_CHECK_FOR_UPDATES: 'app:checkForUpdates',

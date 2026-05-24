@@ -58,6 +58,7 @@ export interface IpcChannels {
   'print:toPDF': { tabId: string; outputPath: string; options?: { marginsType?: number; pageSize?: string; printBackground?: boolean } };
   'permission:respond': { id: string; decision: 'allow' | 'block' };
   'window:newIncognito': Record<string, never>;
+  'ui:contentBounds': { x: number; y: number; width: number; height: number };
   'contentSetting:set': { origin: string; setting: ContentSettingType; value: 'allow' | 'block' | 'ask' };
   'contextMenu:clicked': { itemId: string };
   'omnibox:getSuggestions': { query: string; maxResults?: number };

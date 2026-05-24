@@ -136,6 +136,8 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
   handle('autofill:saveAddress', (_event, { address }) => autofillManager.saveAddress(address));
   handle('autofill:removeAddress', (_event, { addressId }) => autofillManager.removeAddress(addressId));
 
+  handle('ui:contentBounds', (event, rect) => ctx(event).tabManager.setContentBounds(rect));
+
   handle('zoom:set', (event, { tabId, level }) => ctx(event).tabManager.setZoom(tabId, level));
   handle('zoom:reset', (event, { tabId }) => ctx(event).tabManager.setZoom(tabId, 1.0));
   handle('devtools:toggle', (event, { tabId }) => ctx(event).tabManager.toggleDevTools(tabId));

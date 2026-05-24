@@ -35,6 +35,7 @@ export default defineConfig({
         'src/components/chrome/BookmarksBar.tsx',
         'src/components/chrome/OmniboxSuggestions.tsx',
         'src/components/chrome/TabContextMenu.tsx',
+        'src/components/chrome/BrowserContentArea.tsx',
         'src/components/overlays/FindInPage.tsx',
         'src/components/overlays/PageErrorOverlay.tsx',
         'src/components/overlays/AIPanel.tsx',

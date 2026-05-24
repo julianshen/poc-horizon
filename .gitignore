@@ -9,3 +9,4 @@ release/
 coverage/
 .vscode/
 .idea/
+test-results/diagnostic-report.txt

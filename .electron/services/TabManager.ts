@@ -16,6 +16,10 @@ export class TabManager {
   private window: BrowserWindow;
   private readonly mode: TabManagerMode;
   private changeListeners = new Set<() => void>();
+  // Rect of the BrowserContentArea slot in the renderer DOM, reported by
+  // the renderer via 'ui:contentBounds'. null until the renderer mounts and
+  // measures itself for the first time.
+  private contentBounds: { x: number; y: number; width: number; height: number } | null = null;
 
   constructor(window: BrowserWindow, mode: TabManagerMode) {
     this.window = window;
@@ -181,19 +185,53 @@ export class TabManager {
     current.tab.lastAccessedAt = Date.now();
     this.activeTabId = tabId;
 
-    const bounds = this.window.getBounds();
-    // Dia layout: titlebar 36 + tabbar 30 + toolbar 48 + bookmarks 32 = 146
-    // Content sits in a floating card with 12px side/bottom inset.
-    const chromeHeight = 146;
-    const inset = 12;
-    current.view.setBounds({
-      x: inset,
-      y: chromeHeight,
-      width: Math.max(0, bounds.width - inset * 2),
-      height: Math.max(0, bounds.height - chromeHeight - inset),
-    });
+    this.applyBoundsToActive();
 
     this.safeSend('tab:activated', { tabId });
+  }
+
+  /**
+   * The renderer measures its BrowserContentArea slot and reports the rect
+   * here. Storing + reapplying eliminates the old magic chromeHeight/inset
+   * numbers and makes the BrowserView track AI sidebar toggles + window
+   * resizes automatically.
+   */
+  setContentBounds(rect: { x: number; y: number; width: number; height: number }): void {
+    this.contentBounds = {
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.max(0, Math.round(rect.width)),
+      height: Math.max(0, Math.round(rect.height)),
+    };
+    this.applyBoundsToActive();
+  }
+
+  private applyBoundsToActive(): void {
+    if (!this.activeTabId) return;
+    const current = this.tabs.get(this.activeTabId);
+    if (!current) return;
+    const rect = this.contentBounds ?? this.fallbackBounds();
+    current.view.setBounds(rect);
+  }
+
+  /**
+   * Sensible default rect used only until the renderer reports its slot
+   * for the first time. Matches the chrome strip heights from the design
+   * spec (titlebar 36 + tabbar 30 + toolbar 48 + bookmarks 32 = 146) plus
+   * the floating-card 12px inset. The AI sidebar defaults to closed, so
+   * full window-width minus the inset is correct at startup. The renderer
+   * overwrites this within the first paint frame after mount.
+   */
+  private fallbackBounds(): { x: number; y: number; width: number; height: number } {
+    const w = this.window.getBounds();
+    const chromeHeight = 146;
+    const inset = 12;
+    return {
+      x: inset,
+      y: chromeHeight,
+      width: Math.max(0, w.width - inset * 2),
+      height: Math.max(0, w.height - chromeHeight - inset),
+    };
   }
 
   closeTab(tabId: string): void {

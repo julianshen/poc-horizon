@@ -101,7 +101,12 @@ export class TabManager {
 
     this.tabs.set(id, { tab, view });
     this.window.addBrowserView(view);
-    view.setAutoResize({ width: true, height: true });
+    // No setAutoResize — Electron's native autoResize stretches the view
+    // synchronously on window resize using the previous bounds as anchor,
+    // ignoring the AI sidebar / chrome layout. That re-introduces the
+    // exact overlap fixed by df05cfa for one frame after every resize.
+    // The renderer's ResizeObserver + window resize listener already
+    // forwards an accurate rect via ui:contentBounds.
     view.webContents.loadURL(url);
 
     this.setupWebContentsEvents(id, view);

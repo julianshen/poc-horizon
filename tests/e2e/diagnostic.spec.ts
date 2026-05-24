@@ -105,19 +105,55 @@ test('collect diagnostics', async () => {
   await win.getByRole('button', { name: 'Toggle AI panel' }).click();
   await win.waitForTimeout(200);
 
-  // Verify Back/Forward buttons become enabled after a navigation.
-  await app.evaluate(async ({ BrowserWindow }) => {
+  // Verify Back/Forward buttons actually navigate the BrowserView, not just
+  // become enabled. After loading A then B, clicking Back lands on A,
+  // clicking Forward returns to B.
+  const URL_A = 'data:text/html,<title>PAGE-A</title><h1>A</h1>';
+  const URL_B = 'data:text/html,<title>PAGE-B</title><h1>B</h1>';
+  await app.evaluate(async ({ BrowserWindow }, urls) => {
     const w = BrowserWindow.getAllWindows()[0]!;
     const v = w.getBrowserViews()[0]!;
-    await v.webContents.loadURL('data:text/html,<title>A</title><h1>A</h1>');
+    await v.webContents.loadURL(urls.a);
     await new Promise((r) => setTimeout(r, 200));
-    await v.webContents.loadURL('data:text/html,<title>B</title><h1>B</h1>');
-    await new Promise((r) => setTimeout(r, 200));
+    await v.webContents.loadURL(urls.b);
+    await new Promise((r) => setTimeout(r, 300));
+  }, { a: URL_A, b: URL_B });
+  await win.waitForTimeout(500);
+
+  const urlAfterB = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0]!;
+    return w.getBrowserViews()[0]!.webContents.getURL();
   });
-  await win.waitForTimeout(400);
+  log(`After loading A then B, current URL = ${urlAfterB}`);
+
   const backDisabled = await win.getByRole('button', { name: 'Back' }).isDisabled();
-  log(`=== BACK BUTTON DISABLED AFTER 2 NAVIGATIONS: ${backDisabled} (expect false) ===`);
-  expect(backDisabled, 'Back button should be enabled after navigating away from initial page').toBe(false);
+  const fwdDisabled = await win.getByRole('button', { name: 'Forward' }).isDisabled();
+  log(`Back disabled = ${backDisabled} (expect false), Forward disabled = ${fwdDisabled} (expect true)`);
+  expect(backDisabled, 'Back should be enabled after two loads').toBe(false);
+  expect(fwdDisabled, 'Forward should be disabled at history tip').toBe(true);
+
+  // Click Back and verify the BrowserView's current URL is now A.
+  await win.getByRole('button', { name: 'Back' }).click();
+  await win.waitForTimeout(400);
+  const urlAfterBack = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]!.getBrowserViews()[0]!.webContents.getURL()
+  );
+  log(`After Back click, URL = ${urlAfterBack}`);
+  expect(urlAfterBack, 'Back click should land on URL_A').toBe(URL_A);
+
+  // After Back, Forward should now be enabled.
+  const fwdEnabledAfterBack = !(await win.getByRole('button', { name: 'Forward' }).isDisabled());
+  log(`Forward enabled after Back = ${fwdEnabledAfterBack} (expect true)`);
+  expect(fwdEnabledAfterBack, 'Forward should be enabled after going Back').toBe(true);
+
+  // Click Forward and verify we return to B.
+  await win.getByRole('button', { name: 'Forward' }).click();
+  await win.waitForTimeout(400);
+  const urlAfterForward = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]!.getBrowserViews()[0]!.webContents.getURL()
+  );
+  log(`After Forward click, URL = ${urlAfterForward}`);
+  expect(urlAfterForward, 'Forward click should return to URL_B').toBe(URL_B);
 
   // App menu (☰) — accessible by aria-label "Menu". Verifies that the
   // BrowserView is hidden (0×0) while the menu is open so menu rows that

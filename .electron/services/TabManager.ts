@@ -1,7 +1,7 @@
 import { BrowserView, BrowserWindow } from 'electron';
 import { writeFile } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import type { Tab } from '../../src/types/browser';
+import type { Tab, TabGroup, TabGroupColor } from '../../src/types/browser';
 import type { HistoryManager } from './HistoryManager';
 import { buildWebContextMenu } from './webContextMenu';
 
@@ -13,6 +13,7 @@ const INCOGNITO_PARTITION = 'incognito';
 
 export class TabManager {
   private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
+  private groups = new Map<string, TabGroup>();
   private activeTabId: string | null = null;
   private window: BrowserWindow;
   private readonly mode: TabManagerMode;
@@ -349,6 +350,54 @@ export class TabManager {
 
   getActiveTabId(): string | null {
     return this.activeTabId;
+  }
+
+  // ─── Tab Groups ──────────────────────────────────────────────────────
+  getAllGroups(): TabGroup[] {
+    return Array.from(this.groups.values());
+  }
+
+  createGroup(name: string, color: TabGroupColor, tabIds: string[] = []): TabGroup {
+    const group: TabGroup = { id: uuidv4(), name, color };
+    this.groups.set(group.id, group);
+    for (const tabId of tabIds) this.assignTabToGroup(tabId, group.id);
+    this.safeSend('tabGroup:created', group);
+    this.emitChange();
+    return group;
+  }
+
+  updateGroup(groupId: string, changes: Partial<{ name: string; color: TabGroupColor }>): void {
+    const group = this.groups.get(groupId);
+    if (!group) return;
+    if (changes.name !== undefined) group.name = changes.name;
+    if (changes.color !== undefined) group.color = changes.color;
+    this.safeSend('tabGroup:updated', group);
+    this.emitChange();
+  }
+
+  deleteGroup(groupId: string): void {
+    if (!this.groups.has(groupId)) return;
+    // Remove the groupId from every tab that belonged to it, but leave
+    // the tabs themselves intact — same as Chrome's "Ungroup" behavior.
+    for (const { tab } of this.tabs.values()) {
+      if (tab.groupId === groupId) this.updateTab(tab.id, { groupId: undefined });
+    }
+    this.groups.delete(groupId);
+    this.safeSend('tabGroup:deleted', { groupId });
+    this.emitChange();
+  }
+
+  assignTabToGroup(tabId: string, groupId: string): void {
+    if (!this.groups.has(groupId)) return;
+    const entry = this.tabs.get(tabId);
+    if (!entry) return;
+    this.updateTab(tabId, { groupId });
+  }
+
+  removeTabFromGroup(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (!entry || entry.tab.groupId === undefined) return;
+    this.updateTab(tabId, { groupId: undefined });
   }
 
   setZoom(tabId: string, level: number): void {

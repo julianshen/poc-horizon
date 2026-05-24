@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { Tab } from '../types/browser';
+import type { Tab, TabGroup } from '../types/browser';
 
 interface BrowserState {
   tabs: Tab[];
+  groups: TabGroup[];
   activeTabId: string | null;
   showSettings: boolean;
   showBookmarks: boolean;
@@ -25,11 +26,14 @@ interface BrowserState {
   updateTab: (tabId: string, updates: Partial<Tab>) => void;
   removeTab: (tabId: string) => void;
   reorderTab: (tabId: string, targetIndex: number) => void;
+  upsertGroup: (group: TabGroup) => void;
+  removeGroup: (groupId: string) => void;
   toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd') => void;
 }
 
 export const useBrowserStore = create<BrowserState>((set) => ({
   tabs: [],
+  groups: [],
   activeTabId: null,
   showSettings: false,
   showBookmarks: false,
@@ -65,5 +69,14 @@ export const useBrowserStore = create<BrowserState>((set) => ({
       next.splice(clamped, 0, moved);
       return { tabs: next };
     }),
+  upsertGroup: (group) =>
+    set((state) => {
+      const idx = state.groups.findIndex((g) => g.id === group.id);
+      if (idx === -1) return { groups: [...state.groups, group] };
+      const next = state.groups.slice();
+      next[idx] = group;
+      return { groups: next };
+    }),
+  removeGroup: (groupId) => set((state) => ({ groups: state.groups.filter((g) => g.id !== groupId) })),
   toggleOverlay: (overlay) => set((state) => ({ [overlay]: !state[overlay] })),
 }));

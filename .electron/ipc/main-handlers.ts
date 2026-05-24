@@ -65,6 +65,18 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
   handle('tab:duplicate', (event, { tabId }) => ctx(event).tabManager.duplicate(tabId));
   handle('tab:reorder', (event, { tabId, index }) => ctx(event).tabManager.reorder(tabId, index));
 
+  handle('tabGroup:create', (event, { name, color, tabIds }) =>
+    ctx(event).tabManager.createGroup(name, color, tabIds ?? [])
+  );
+  handle('tabGroup:update', (event, { groupId, changes }) =>
+    ctx(event).tabManager.updateGroup(groupId, changes)
+  );
+  handle('tabGroup:delete', (event, { groupId }) => ctx(event).tabManager.deleteGroup(groupId));
+  handle('tabGroup:addTab', (event, { groupId, tabId }) =>
+    ctx(event).tabManager.assignTabToGroup(tabId, groupId)
+  );
+  handle('tabGroup:removeTab', (event, { tabId }) => ctx(event).tabManager.removeTabFromGroup(tabId));
+
   handle('navigation:go', (event, { tabId, url }) => ctx(event).tabManager.navigate(tabId, url));
   handle('navigation:back', (event, { tabId }) => ctx(event).tabManager.goBack(tabId));
   handle('navigation:forward', (event, { tabId }) => ctx(event).tabManager.goForward(tabId));

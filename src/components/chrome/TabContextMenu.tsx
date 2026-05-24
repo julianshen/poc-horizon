@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import type { Tab } from '../../types/browser';
+import type { Tab, TabGroupColor } from '../../types/browser';
+import { useBrowserStore } from '../../stores/browserStore';
 
 interface Props {
   tab: Tab;
@@ -8,7 +9,11 @@ interface Props {
   onClose: () => void;
 }
 
+const NEW_GROUP_COLORS: TabGroupColor[] = ['blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'grey'];
+let nextColorIdx = 0;
+
 export const TabContextMenu: React.FC<Props> = ({ tab, x, y, onClose }) => {
+  const groups = useBrowserStore((s) => s.groups);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +64,29 @@ export const TabContextMenu: React.FC<Props> = ({ tab, x, y, onClose }) => {
         label={tab.isMuted ? 'Unmute tab' : 'Mute tab'}
         onClick={() => invoke(tab.isMuted ? 'tab:unmute' : 'tab:mute', { tabId: tab.id })}
       />
+      <Divider />
+      {tab.groupId ? (
+        <Row label="Remove from group" onClick={() => invoke('tabGroup:removeTab', { tabId: tab.id })} />
+      ) : (
+        <Row
+          label="Add tab to new group"
+          onClick={() => {
+            const color = NEW_GROUP_COLORS[nextColorIdx++ % NEW_GROUP_COLORS.length];
+            invoke('tabGroup:create', { name: 'Group', color, tabIds: [tab.id] });
+          }}
+        />
+      )}
+      {groups.length > 0 && !tab.groupId && (
+        <>
+          {groups.map((g) => (
+            <Row
+              key={g.id}
+              label={`Add to "${g.name}"`}
+              onClick={() => invoke('tabGroup:addTab', { groupId: g.id, tabId: tab.id })}
+            />
+          ))}
+        </>
+      )}
       <Divider />
       <Row label="Close tab" onClick={() => invoke('tab:close', { tabId: tab.id })} />
     </div>

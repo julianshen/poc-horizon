@@ -17,7 +17,20 @@ export interface Tab {
   lastAccessedAt: number;
   errorState?: TabErrorState;
   historyStack?: { url: string; title: string }[];
+  /** ID of the TabGroup this tab belongs to, or undefined if ungrouped. */
+  groupId?: string;
 }
+
+/** Chrome-style colored, named container for a set of tabs. */
+export interface TabGroup {
+  id: string;
+  name: string;
+  /** One of the curated palette colors, see TAB_GROUP_COLORS. */
+  color: TabGroupColor;
+}
+
+export const TAB_GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan'] as const;
+export type TabGroupColor = (typeof TAB_GROUP_COLORS)[number];
 
 export interface TabErrorState {
   type: 'load-failed' | 'crashed' | 'unresponsive';

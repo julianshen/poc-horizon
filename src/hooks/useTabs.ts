@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { useBrowserStore } from '../stores/browserStore';
-import type { Tab } from '../types/browser';
+import type { Tab, TabGroup } from '../types/browser';
 
 export function useTabs(): void {
-  const { setTabs, setActiveTab, updateTab, removeTab, reorderTab } = useBrowserStore();
+  const { setTabs, setActiveTab, updateTab, removeTab, reorderTab, upsertGroup, removeGroup } = useBrowserStore();
 
   useEffect(() => {
     const unsubCreated = window.horizonAPI.on('tab:created', (tab: Tab) => {
@@ -55,6 +55,13 @@ export function useTabs(): void {
       }
     );
 
+    const unsubGroupCreated = window.horizonAPI.on('tabGroup:created', (g: TabGroup) => upsertGroup(g));
+    const unsubGroupUpdated = window.horizonAPI.on('tabGroup:updated', (g: TabGroup) => upsertGroup(g));
+    const unsubGroupDeleted = window.horizonAPI.on(
+      'tabGroup:deleted',
+      ({ groupId }: { groupId: string }) => removeGroup(groupId)
+    );
+
     return () => {
       unsubCreated();
       unsubClosed();
@@ -66,6 +73,9 @@ export function useTabs(): void {
       unsubTitle();
       unsubFavicon();
       unsubReordered();
+      unsubGroupCreated();
+      unsubGroupUpdated();
+      unsubGroupDeleted();
     };
-  }, [setTabs, setActiveTab, updateTab, removeTab, reorderTab]);
+  }, [setTabs, setActiveTab, updateTab, removeTab, reorderTab, upsertGroup, removeGroup]);
 }

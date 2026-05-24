@@ -1,10 +1,12 @@
 import React from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
 import { Tab } from './Tab';
+import { TabGroupLabel } from './TabGroupLabel';
 import { useIncognito } from '../../hooks/useIncognito';
+import type { Tab as TabType } from '../../types/browser';
 
 export const TabBar: React.FC = () => {
-  const { tabs, activeTabId } = useBrowserStore();
+  const { tabs, groups, activeTabId } = useBrowserStore();
   const incognito = useIncognito();
 
   const createTab = () => {
@@ -38,11 +40,11 @@ export const TabBar: React.FC = () => {
         </span>
       )}
       <div className="flex items-center gap-px flex-1" style={{ WebkitAppRegion: 'no-drag' }}>
-        {[...tabs]
-          .sort((a, b) => Number(b.isPinned) - Number(a.isPinned))
-          .map((tab, i) => (
-            <Tab key={tab.id} tab={tab} isActive={tab.id === activeTabId} index={i} />
-          ))}
+        {renderTabsWithGroups(
+          [...tabs].sort((a, b) => Number(b.isPinned) - Number(a.isPinned)),
+          groups,
+          activeTabId
+        )}
         <button
           data-testid="new-tab-button"
           aria-label="New tab"
@@ -72,3 +74,26 @@ export const TabBar: React.FC = () => {
     </div>
   );
 };
+
+/**
+ * Walk the tabs in order and insert a TabGroupLabel before each run of
+ * tabs that share a groupId. Pinned tabs sort first and can't be in a
+ * group (matches Chrome).
+ */
+function renderTabsWithGroups(
+  sortedTabs: TabType[],
+  groups: { id: string; name: string; color: string }[],
+  activeTabId: string | null
+): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  let prevGroupId: string | undefined;
+  sortedTabs.forEach((tab, i) => {
+    if (tab.groupId && tab.groupId !== prevGroupId) {
+      const g = groups.find((x) => x.id === tab.groupId);
+      if (g) nodes.push(<TabGroupLabel key={`g-${g.id}`} group={g as never} />);
+    }
+    nodes.push(<Tab key={tab.id} tab={tab} isActive={tab.id === activeTabId} index={i} />);
+    prevGroupId = tab.groupId;
+  });
+  return nodes;
+}

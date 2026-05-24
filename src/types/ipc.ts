@@ -5,6 +5,12 @@ export interface IpcChannels {
   'tab:activate': { tabId: string };
   'tab:reorder': { tabId: string; index: number };
   'tab:pin': { tabId: string; pinned: boolean };
+  // Tab Groups (Chrome parity v1).
+  'tabGroup:create': { name: string; color: import('./browser').TabGroupColor; tabIds?: string[] };
+  'tabGroup:update': { groupId: string; changes: Partial<{ name: string; color: import('./browser').TabGroupColor }> };
+  'tabGroup:delete': { groupId: string };
+  'tabGroup:addTab': { groupId: string; tabId: string };
+  'tabGroup:removeTab': { tabId: string };
   'tab:duplicate': { tabId: string };
   'tab:hibernate': { tabId: string };
   'tab:wake': { tabId: string };
@@ -71,6 +77,10 @@ export interface IpcChannels {
   // Main → Renderer
   'tab:created': import('./browser').Tab;
   'tab:closed': { tabId: string };
+  // Tab Group lifecycle events broadcast to the renderer.
+  'tabGroup:created': import('./browser').TabGroup;
+  'tabGroup:updated': import('./browser').TabGroup;
+  'tabGroup:deleted': { groupId: string };
   'tab:activated': { tabId: string };
   'tab:updated': Partial<import('./browser').Tab>;
   'tab:reordered': { tabId: string; index: number };

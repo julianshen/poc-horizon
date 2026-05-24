@@ -1,7 +1,20 @@
 import React, { useCallback, useState } from 'react';
-import type { Tab as TabType } from '../../types/browser';
+import type { Tab as TabType, TabGroupColor } from '../../types/browser';
 import { TabContextMenu } from './TabContextMenu';
 import { useBrowserStore } from '../../stores/browserStore';
+
+// Outline color for a tab that belongs to a group — matches the
+// TabGroupLabel palette so the visual link is obvious.
+const GROUP_TINT: Record<TabGroupColor, string> = {
+  grey:   'rgba(120,120,128,0.40)',
+  blue:   'rgba(94,168,255,0.55)',
+  red:    'rgba(212,77,77,0.50)',
+  yellow: 'rgba(232,180,64,0.55)',
+  green:  'rgba(80,170,90,0.55)',
+  pink:   'rgba(212,77,122,0.55)',
+  purple: 'rgba(140,80,200,0.55)',
+  cyan:   'rgba(60,170,190,0.55)',
+};
 
 interface TabProps {
   tab: TabType;
@@ -13,6 +26,8 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const setTabContextMenuOpen = useBrowserStore((s) => s.setTabContextMenuOpen);
+  const group = useBrowserStore((s) => s.groups.find((g) => g.id === tab.groupId));
+  const groupTint = group ? GROUP_TINT[group.color] : null;
 
   const activate = useCallback(() => {
     window.horizonAPI.invoke('tab:activate', { tabId: tab.id });
@@ -93,7 +108,9 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
           background: isActive ? 'var(--tab-bg-active)' : 'var(--tab-bg-inactive)',
           color: isActive ? 'var(--chrome-fg)' : 'var(--chrome-fg-subtle)',
           borderRadius: 'var(--radius-sm)',
-          boxShadow: isActive ? 'var(--tab-shadow-active)' : 'none',
+          boxShadow: groupTint
+            ? `0 0 0 1px ${groupTint}${isActive ? ', var(--tab-shadow-active)' : ''}`
+            : isActive ? 'var(--tab-shadow-active)' : 'none',
           transition: 'background var(--transition-fast), color var(--transition-fast)',
           WebkitAppRegion: 'no-drag',
           fontWeight: 500,

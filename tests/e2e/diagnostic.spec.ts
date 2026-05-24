@@ -188,6 +188,24 @@ test('collect diagnostics', async () => {
   expect(sawSpaNavState, 'pushState navigation should produce a navigation:state IPC').toBe(true);
   void navStateEvents;
 
+  // ── Web context menu: right-click inside the BrowserView should fire
+  // the 'context-menu' event in main; we verify by attaching a one-shot
+  // listener and checking it received the event.
+  const ctxFired = await app.evaluate(async ({ BrowserWindow }) => {
+    const wc = BrowserWindow.getAllWindows()[0]!.getBrowserViews()[0]!.webContents;
+    const fired = new Promise<boolean>((resolve) => {
+      wc.once('context-menu', () => resolve(true));
+      setTimeout(() => resolve(false), 800);
+    });
+    // sendInputEvent dispatches a trusted OS-level event that Chromium
+    // honours (synthesized contextmenu DOM events are ignored).
+    wc.sendInputEvent({ type: 'mouseDown', x: 50, y: 50, button: 'right', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: 50, y: 50, button: 'right', clickCount: 1 });
+    return fired;
+  });
+  log(`Web context-menu event fired on right-click: ${ctxFired} (expect true)`);
+  expect(ctxFired, 'Right-click in BrowserView should trigger context-menu').toBe(true);
+
   // App menu (☰) — accessible by aria-label "Menu". Verifies that the
   // BrowserView is hidden (0×0) while the menu is open so menu rows that
   // overlap the view region aren't painted behind the page.

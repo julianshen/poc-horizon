@@ -3,6 +3,7 @@ import { writeFile } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tab } from '../../src/types/browser';
 import type { HistoryManager } from './HistoryManager';
+import { buildWebContextMenu } from './webContextMenu';
 
 export type TabManagerMode =
   | { kind: 'default'; historyManager: HistoryManager }
@@ -162,6 +163,17 @@ export class TabManager {
     wc.setWindowOpenHandler(({ url }) => {
       this.createTab(url);
       return { action: 'deny' };
+    });
+
+    // Web-content context menu: build a Chrome-parity native menu from the
+    // ContextMenuParams Electron supplies (link / image / selection /
+    // editable detection is all in `params.editFlags` + URL fields).
+    wc.on('context-menu', (_event, params) => {
+      const menu = buildWebContextMenu(params, {
+        wc,
+        openInNewTab: (url) => this.createTab(url),
+      });
+      menu.popup({ window: this.window });
     });
 
     wc.on('page-title-updated', (_event, title) => {

@@ -108,6 +108,8 @@ export interface IpcChannels {
   'app:updateAvailable': { version: string };
   'app:updateDownloaded': { version: string };
   'autofill:showDropdown': { tabId: string; fieldId: string; suggestions: import('./browser').AutofillMatch[]; position: { x: number; y: number; width: number; height: number } };
+  /** Native application menu → renderer: ask the renderer to run a UI command. */
+  'menu:command': { command: string };
 }
 
 type PermissionType = import('./browser').PermissionType;

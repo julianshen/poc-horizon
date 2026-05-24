@@ -16,10 +16,12 @@ import { PermissionPrompt } from './components/overlays/PermissionPrompt';
 import { useBrowserStore } from './stores/browserStore';
 import { useTabs } from './hooks/useTabs';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useMenuCommands } from './hooks/useMenuCommands';
 
 const App: React.FC = () => {
   useTabs();
   useKeyboardShortcuts();
+  useMenuCommands();
 
   const { tabs, activeTabId, showAI } = useBrowserStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);

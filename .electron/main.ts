@@ -18,6 +18,7 @@ import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 import { TabSessionStore } from './services/TabSessionStore';
 import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
 import { applySpellcheckToSession } from './services/spellcheck';
+import { installAppMenu } from './services/appMenu';
 import type { Tab } from '../src/types/browser';
 
 
@@ -249,6 +250,18 @@ app.whenReady().then(() => {
   const langs = settingsManager.get('spellcheckLanguages') as string[];
   applySpellcheckToSession(session.defaultSession, langs);
   applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+  // Install the native application menu (macOS top-of-screen bar / Win
+  // & Linux in-window menubar). Without this, Electron's default menu
+  // is barely useful — no New Tab, no Reload, no Find, no DevTools.
+  installAppMenu({
+    resolveTabManager: () => {
+      const w = BrowserWindow.getFocusedWindow();
+      if (!w) return primaryTabManager;
+      return contexts.get(w.webContents.id)?.tabManager ?? primaryTabManager;
+    },
+    resolveWindow: () => BrowserWindow.getFocusedWindow() ?? primaryWindow,
+    openNewWindow: (opts) => createWindow(opts),
+  });
   createWindow();
 });
 

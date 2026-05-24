@@ -6,7 +6,11 @@ import { useBookmarks } from '../../hooks/useBookmarks';
 import { OmniboxSuggestions } from './OmniboxSuggestions';
 
 export const Omnibox: React.FC = () => {
-  const { url, activeTabId } = useBrowserStore();
+  // Read URL from the active tab — the root-level store url field is dead
+  // (never updated by the navigation:state IPC handler in useTabs). Same
+  // bug pattern as useNavigation that 4564dac fixed for canGoBack.
+  const activeTabId = useBrowserStore((s) => s.activeTabId);
+  const url = useBrowserStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.url ?? '');
   const [inputValue, setInputValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isFocused, setIsFocused] = useState(false);

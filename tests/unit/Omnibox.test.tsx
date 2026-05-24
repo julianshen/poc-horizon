@@ -4,32 +4,40 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Omnibox } from '@/components/chrome/Omnibox';
 import { useBrowserStore } from '@/stores/browserStore';
 import { setupRendererTest } from '../helpers/fakeHorizonAPI';
+import type { Tab } from '@/types/browser';
+
+const tab = (url: string, overrides: Partial<Tab> = {}): Tab => ({
+  id: 't1', schemaVersion: 1, url, title: '', isLoading: false, loadProgress: 0,
+  canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true,
+  isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0,
+  ...overrides,
+});
 
 describe('Omnibox', () => {
   const { api } = setupRendererTest();
   const initialState = useBrowserStore.getState();
 
   it('shows the active URL with the scheme stripped when not editing', () => {
-    useBrowserStore.setState({ ...initialState, url: 'https://example.com/path' });
+    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://example.com/path')] });
     render(<Omnibox />);
     const input = screen.getByRole('textbox') as HTMLInputElement;
     expect(input.value).toBe('example.com/path');
   });
 
   it('shows a lock for https and a warning for non-https', () => {
-    useBrowserStore.setState({ ...initialState, url: 'https://example.com' });
+    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://example.com')] });
     const { container, rerender } = render(<Omnibox />);
     const secureStroke = container.querySelector('svg')?.getAttribute('stroke');
     expect(secureStroke).toBe('var(--secure)');
 
-    useBrowserStore.setState({ ...initialState, url: 'http://insecure.example' });
+    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('http://insecure.example')] });
     rerender(<Omnibox />);
     const warnStroke = container.querySelector('svg')?.getAttribute('stroke');
     expect(warnStroke).toBe('var(--warning)');
   });
 
   it('switches to the editing buffer on focus and back on blur', () => {
-    useBrowserStore.setState({ ...initialState, url: 'https://example.com' });
+    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://example.com')] });
     render(<Omnibox />);
     const input = screen.getByRole('textbox') as HTMLInputElement;
 
@@ -87,27 +95,27 @@ describe('Omnibox', () => {
     expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([]);
   });
 
-  it('reflects external store URL changes while not editing', () => {
-    useBrowserStore.setState({ ...initialState, url: 'https://before.example' });
+  it('reflects external tab URL changes while not editing', () => {
+    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://before.example')] });
     render(<Omnibox />);
     const input = screen.getByRole('textbox') as HTMLInputElement;
     expect(input.value).toBe('before.example');
 
     act(() => {
-      useBrowserStore.setState({ url: 'https://after.example' });
+      useBrowserStore.setState({ tabs: [tab('https://after.example')] });
     });
     expect(input.value).toBe('after.example');
   });
 
   it('does not overwrite the editing buffer with external URL changes', () => {
-    useBrowserStore.setState({ ...initialState, url: 'https://before.example' });
+    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://before.example')] });
     render(<Omnibox />);
     const input = screen.getByRole('textbox') as HTMLInputElement;
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'user typing' } });
 
     act(() => {
-      useBrowserStore.setState({ url: 'https://surprise-nav.example' });
+      useBrowserStore.setState({ tabs: [tab('https://surprise-nav.example')] });
     });
     expect(input.value).toBe('user typing');
   });

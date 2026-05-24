@@ -105,19 +105,23 @@ test('collect diagnostics', async () => {
   await win.getByRole('button', { name: 'Toggle AI panel' }).click();
   await win.waitForTimeout(200);
 
-  // Verify Back/Forward buttons actually navigate the BrowserView, not just
-  // become enabled. After loading A then B, clicking Back lands on A,
-  // clicking Forward returns to B.
-  const URL_A = 'data:text/html,<title>PAGE-A</title><h1>A</h1>';
-  const URL_B = 'data:text/html,<title>PAGE-B</title><h1>B</h1>';
-  await app.evaluate(async ({ BrowserWindow }, urls) => {
-    const w = BrowserWindow.getAllWindows()[0]!;
-    const v = w.getBrowserViews()[0]!;
-    await v.webContents.loadURL(urls.a);
-    await new Promise((r) => setTimeout(r, 200));
-    await v.webContents.loadURL(urls.b);
-    await new Promise((r) => setTimeout(r, 300));
-  }, { a: URL_A, b: URL_B });
+  // Verify Back/Forward buttons via the REAL user path: type into the
+  // omnibox, press Enter (full chain — omnibox → navigation:go IPC →
+  // TabManager.navigate → loadURL → did-navigate → navigation:state IPC
+  // → useTabs updates store → useNavigation re-derives enabled state).
+  // Use about:blank-style real URLs — the omnibox treats data: as a search
+  // query and the test would route through DuckDuckGo. We use horizon://
+  // internal URLs which are registered protocols and bypass network.
+  const URL_A = 'horizon://newtab?diag=a';
+  const URL_B = 'horizon://newtab?diag=b';
+  const omnibox = win.getByPlaceholder(/Search or enter address/);
+  await omnibox.click();
+  await omnibox.fill(URL_A);
+  await omnibox.press('Enter');
+  await win.waitForTimeout(400);
+  await omnibox.click();
+  await omnibox.fill(URL_B);
+  await omnibox.press('Enter');
   await win.waitForTimeout(500);
 
   const urlAfterB = await app.evaluate(({ BrowserWindow }) => {
@@ -132,7 +136,7 @@ test('collect diagnostics', async () => {
   expect(backDisabled, 'Back should be enabled after two loads').toBe(false);
   expect(fwdDisabled, 'Forward should be disabled at history tip').toBe(true);
 
-  // Click Back and verify the BrowserView's current URL is now A.
+  // Click Back and verify the BrowserView's URL is now A.
   await win.getByRole('button', { name: 'Back' }).click();
   await win.waitForTimeout(400);
   const urlAfterBack = await app.evaluate(({ BrowserWindow }) =>

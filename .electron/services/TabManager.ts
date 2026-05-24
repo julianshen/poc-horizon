@@ -412,12 +412,22 @@ export class TabManager {
 
   toggleDevTools(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
-      entry.view.webContents.toggleDevTools();
+    if (!entry) return;
+    const wc = entry.view.webContents;
+    if (wc.isDevToolsOpened()) {
+      wc.closeDevTools();
+    } else {
+      // 'detach' opens DevTools as a separate window. On BrowserView a
+      // docked mode ('right'/'bottom') tries to dock inside the BV's
+      // own bounded area, which we explicitly size — the result is that
+      // DevTools renders inside the (possibly hidden / clipped) BV slot
+      // and the user perceives "nothing happened". A detached window
+      // is unambiguously visible.
+      wc.openDevTools({ mode: 'detach' });
     }
   }
 
-  openDevTools(tabId: string, mode: 'right' | 'bottom' | 'undocked'): void {
+  openDevTools(tabId: string, mode: 'right' | 'bottom' | 'undocked' | 'detach' = 'detach'): void {
     const entry = this.tabs.get(tabId);
     if (entry) {
       entry.view.webContents.openDevTools({ mode });

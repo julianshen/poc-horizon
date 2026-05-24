@@ -41,7 +41,27 @@ export function buildWebContextMenu(
       { label: 'Open Link in New Tab', click: () => openInNewTab(params.linkURL) },
       { label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) },
       { label: 'Open Link in Default Browser', click: () => { void shell.openExternal(params.linkURL); } },
+      { label: 'Share Link', click: () => shareUrl(wc, params.linkURL) },
     );
+    sep();
+  }
+
+  // Video context — Picture-in-Picture on the clicked video element.
+  // Chromium exposes HTMLVideoElement.requestPictureInPicture() natively
+  // in Electron; we just have to invoke it on the right element.
+  if (params.mediaType === 'video') {
+    template.push({
+      label: 'Picture in Picture',
+      click: () => {
+        // Find the video at the click coordinates and call requestPictureInPicture.
+        // elementFromPoint is fast and avoids needing a DOM-element token from main.
+        void wc.executeJavaScript(`(function(){
+          const el = document.elementFromPoint(${params.x}, ${params.y});
+          const v = el && (el.tagName === 'VIDEO' ? el : el.closest && el.closest('video'));
+          if (v && v.requestPictureInPicture) v.requestPictureInPicture().catch(() => {});
+        })();`);
+      },
+    });
     sep();
   }
 
@@ -79,11 +99,12 @@ export function buildWebContextMenu(
     sep();
   }
 
-  // Page navigation — always available.
+  // Page navigation + sharing — always available.
   template.push(
     { label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
     { label: 'Forward', enabled: wc.navigationHistory.canGoForward(), click: () => wc.navigationHistory.goForward() },
     { label: 'Reload', click: () => wc.reload() },
+    { label: 'Share Page', click: () => shareUrl(wc, wc.getURL()) },
     { type: 'separator' },
     { label: 'View Page Source', click: () => openInNewTab(`view-source:${wc.getURL()}`) },
     { label: 'Inspect Element', click: () => wc.inspectElement(params.x, params.y) },
@@ -97,4 +118,21 @@ export function buildWebContextMenu(
 
 function trim(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+/**
+ * Try the Web Share API on the renderer side first (so the OS share
+ * sheet shows up where available), then fall back to clipboard. Both
+ * paths are wrapped so a rejected share Promise doesn't reach the user.
+ */
+function shareUrl(wc: WebContents, url: string): void {
+  void wc.executeJavaScript(
+    `(async () => {
+       const url = ${JSON.stringify(url)};
+       try {
+         if (navigator.share) { await navigator.share({ url }); return; }
+       } catch (_) {}
+       try { await navigator.clipboard.writeText(url); } catch (_) {}
+     })();`
+  );
 }

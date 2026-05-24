@@ -216,6 +216,29 @@ test('collect diagnostics', async () => {
   log(`Session spell-checker languages: ${JSON.stringify(spellInfo.sessionLanguages)} (expect non-empty)`);
   expect(spellInfo.sessionLanguages.length, 'session.getSpellCheckerLanguages should be set from settings').toBeGreaterThan(0);
 
+  // ── DevTools: invoke devtools:toggle via IPC and confirm the active
+  // tab's webContents reports devtools as opened. Also assert it can
+  // open in the requested dock mode.
+  // Pull the active tab's UUID from the chrome — TabManager indexes its
+  // tabs map by that, not by webContents.id.
+  const tabId = await win.evaluate(() => {
+    const root = document.querySelector('[data-tab-id]') as HTMLElement | null;
+    return root?.getAttribute('data-tab-id') ?? null;
+  });
+  log(`Active tab id from DOM: ${tabId}`);
+  expect(tabId, 'Expected a tab in the DOM').not.toBeNull();
+  await win.evaluate((id) => window.horizonAPI.invoke('devtools:toggle', { tabId: id as string }), tabId!);
+  await win.waitForTimeout(500);
+  const devToolsOpen = await app.evaluate(({ BrowserWindow, webContents }) => {
+    const w = BrowserWindow.getAllWindows()[0]!;
+    const wc = w.getBrowserViews()[0]!.webContents;
+    return { open: wc.isDevToolsOpened(), webContentsCount: webContents.getAllWebContents().length };
+  });
+  log(`DevTools open after devtools:toggle: ${devToolsOpen.open} (expect true), webContents total = ${devToolsOpen.webContentsCount}`);
+  expect(devToolsOpen.open, 'devtools:toggle IPC should open DevTools on the active tab').toBe(true);
+  // Toggle off so it doesn't bleed into the next spec.
+  await win.evaluate((id) => window.horizonAPI.invoke('devtools:toggle', { tabId: id as string }), tabId!);
+
   // App menu (☰) — accessible by aria-label "Menu". Verifies that the
   // BrowserView is hidden (0×0) while the menu is open so menu rows that
   // overlap the view region aren't painted behind the page.

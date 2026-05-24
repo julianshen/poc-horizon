@@ -126,7 +126,7 @@ export class TabManager {
       this.safeSend('load:finished', { tabId, url: entry?.tab.url ?? '' });
     });
 
-    wc.on('did-navigate', (_event, url) => {
+    const broadcastNavState = (url: string): void => {
       const entry = this.tabs.get(tabId);
       const canGoBack = wc.navigationHistory.canGoBack();
       const canGoForward = wc.navigationHistory.canGoForward();
@@ -139,6 +139,24 @@ export class TabManager {
         isLoading: entry?.tab.isLoading ?? false,
         url,
       });
+    };
+
+    wc.on('did-navigate', (_event, url) => broadcastNavState(url));
+    // SPA navigations (history.pushState / replaceState) don't fire
+    // 'did-navigate' — they fire 'did-navigate-in-page' instead. Without
+    // this handler, modern client-routed apps (Gmail, GitHub PR pages,
+    // React/Vue SPAs) would update the BrowserView but the Tab state
+    // would stay stale, so Back/Forward buttons appear disabled even
+    // though Electron's navigationHistory tracks the entries correctly.
+    wc.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+      if (isMainFrame) broadcastNavState(url);
+    });
+
+    // target="_blank" / window.open: open in a new tab in this window
+    // instead of letting Electron try to spawn a stray BrowserWindow.
+    wc.setWindowOpenHandler(({ url }) => {
+      this.createTab(url);
+      return { action: 'deny' };
     });
 
     wc.on('page-title-updated', (_event, title) => {

@@ -159,6 +159,35 @@ test('collect diagnostics', async () => {
   log(`After Forward click, URL = ${urlAfterForward}`);
   expect(urlAfterForward, 'Forward click should return to URL_B').toBe(URL_B);
 
+  // ── SPA scenario: pushState navigation must trigger chrome state
+  // update. Many real apps (Gmail, GitHub) use history.pushState for
+  // client-side routing — Electron fires 'did-navigate-in-page', not
+  // 'did-navigate'. Without the handler, Back/Forward buttons stay
+  // disabled even though the page URL changed.
+  const navStateEvents: Array<{ url: string }> = [];
+  await win.evaluate(() => {
+    (window as unknown as { __navStateEvents: Array<{ url: string }> }).__navStateEvents = [];
+    window.horizonAPI.on('navigation:state', (s: unknown) => {
+      (window as unknown as { __navStateEvents: Array<{ url: string }> }).__navStateEvents.push(s as { url: string });
+    });
+  });
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const v = BrowserWindow.getAllWindows()[0]!.getBrowserViews()[0]!;
+    await v.webContents.loadURL('horizon://newtab');
+    await new Promise((r) => setTimeout(r, 300));
+    // Hash navigation also fires did-navigate-in-page (and is same-origin).
+    await v.webContents.executeJavaScript(`location.hash = '#spa-route-1'`);
+    await new Promise((r) => setTimeout(r, 200));
+  });
+  await win.waitForTimeout(400);
+  const sawSpaNavState = await win.evaluate(() =>
+    (window as unknown as { __navStateEvents: Array<{ url: string }> }).__navStateEvents
+      .some((e) => e.url.includes('spa-route-1'))
+  );
+  log(`navigation:state fired for pushState URL: ${sawSpaNavState} (expect true)`);
+  expect(sawSpaNavState, 'pushState navigation should produce a navigation:state IPC').toBe(true);
+  void navStateEvents;
+
   // App menu (☰) — accessible by aria-label "Menu". Verifies that the
   // BrowserView is hidden (0×0) while the menu is open so menu rows that
   // overlap the view region aren't painted behind the page.

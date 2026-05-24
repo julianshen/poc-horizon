@@ -9,6 +9,7 @@ vi.mock('electron', () => ({
       loadURL: vi.fn(),
       on: vi.fn(),
       setAudioMuted: vi.fn(),
+      setWindowOpenHandler: vi.fn(),
     };
     setBounds = vi.fn();
     setAutoResize = vi.fn();

@@ -16,7 +16,7 @@ export const BookmarksBar: React.FC = () => {
 
   return (
     <div
-      className="h-8 flex items-center px-0.5 gap-1 overflow-x-auto shrink-0"
+      className="h-8 flex items-center px-3.5 gap-1 overflow-x-auto shrink-0"
       style={{
         background: 'transparent',
       }}

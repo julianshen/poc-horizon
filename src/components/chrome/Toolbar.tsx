@@ -13,7 +13,7 @@ export const Toolbar: React.FC = () => {
 
   return (
     <div
-      className="flex items-center gap-1.5 px-3.5 pb-2.5 shrink-0 relative"
+      className="flex items-center gap-1.5 px-0.5 pb-2.5 shrink-0 relative"
       style={{ background: 'transparent', minHeight: 38, WebkitAppRegion: 'drag' }}
     >
       <div className="flex gap-0.5" style={{ WebkitAppRegion: 'no-drag' }}>

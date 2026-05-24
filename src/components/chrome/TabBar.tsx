@@ -13,7 +13,7 @@ export const TabBar: React.FC = () => {
 
   return (
     <div
-      className="h-[30px] flex items-center overflow-x-auto px-3 gap-px shrink-0"
+      className="h-[30px] flex items-center overflow-x-auto gap-px shrink-0"
       style={{ background: 'transparent', WebkitAppRegion: 'drag' }}
     >
       {incognito && (

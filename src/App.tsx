@@ -34,27 +34,32 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen relative" style={{ background: 'var(--chrome-bg)' }}>
       <TitleBar />
-      <TabBar />
-      <Toolbar />
-      <BookmarksBar />
+      {/* Chrome strips share the left column with the content card, so when the
+          AI panel opens, the toolbar / tabbar / bookmarks bar all narrow to
+          match the content area's width rather than floating over the panel. */}
       <div className="flex-1 flex min-h-0 px-3 pb-3 gap-3">
-        <div
-          className="flex-1 min-w-0 relative overflow-hidden"
-          style={{
-            background: 'var(--surface-1)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-card)',
-          }}
-        >
-          <BrowserContentArea />
-          {errorState && (
-            <PageErrorOverlay
-              errorType={errorState.type}
-              errorCode={errorState.errorCode}
-              errorDescription={errorState.errorDescription}
-              onReload={handleReload}
-            />
-          )}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <TabBar />
+          <Toolbar />
+          <BookmarksBar />
+          <div
+            className="flex-1 min-h-0 relative overflow-hidden"
+            style={{
+              background: 'var(--surface-1)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-card)',
+            }}
+          >
+            <BrowserContentArea />
+            {errorState && (
+              <PageErrorOverlay
+                errorType={errorState.type}
+                errorCode={errorState.errorCode}
+                errorDescription={errorState.errorDescription}
+                onReload={handleReload}
+              />
+            )}
+          </div>
         </div>
         {showAI && <AIPanel />}
       </div>

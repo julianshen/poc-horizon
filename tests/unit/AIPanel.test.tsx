@@ -144,6 +144,30 @@ describe('AIPanel', () => {
     expect(ta.value).toContain('recursion is when a function calls itself');
   });
 
+  it('Workflows popover opens, loads list, and runs a workflow on click', async () => {
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      tabs: [{ id: 't1', schemaVersion: 1, url: 'https://x', title: 'X', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 }],
+    });
+    // Stub workflow:list once to return a saved workflow — other channels
+    // fall through to the default fake that records invokes.
+    api().invoke.mockImplementationOnce(async (channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      return channel === 'workflow:list'
+        ? [{ id: 'w1', name: 'Daily Brief', prompt: 'Brief me.', attach: 'activeTab', createdAt: 0 }]
+        : undefined;
+    });
+    render(<AIPanel />);
+    fireEvent.click(screen.getByLabelText('Workflows'));
+    expect(screen.getByTestId('workflows-popover')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Daily Brief')).toBeTruthy());
+    fireEvent.click(screen.getByText('Daily Brief'));
+    expect(api().invokes).toContainEqual({
+      channel: 'ai:start',
+      payload: { prompt: 'Brief me.', mentionTabIds: ['t1'] },
+    });
+  });
+
   it('Summarize header button auto-mentions the active tab and sends a canned prompt', () => {
     useBrowserStore.setState({
       activeTabId: 't1',

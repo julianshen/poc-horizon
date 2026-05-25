@@ -145,6 +145,10 @@ export interface IpcChannels {
   'ai:uiAction':
     | { kind: 'button'; surfaceId: string; label: string; action?: string }
     | { kind: 'input'; surfaceId: string; path?: string; placeholder?: string; value: string };
+  // Saved workflows.
+  'workflow:list': Record<string, never>;
+  'workflow:create': { name: string; prompt: string; attach: 'activeTab' | 'allTabs' | 'none' };
+  'workflow:delete': { id: string };
 }
 
 type PermissionType = import('./browser').PermissionType;

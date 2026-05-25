@@ -3,6 +3,7 @@ import { useBrowserStore } from '../../stores/browserStore';
 import type { AgentEvent } from '../../types/ai';
 import { ChatMarkdown } from './ChatMarkdown';
 import { MentionPicker } from './MentionPicker';
+import { WorkflowsPopover } from './WorkflowsPopover';
 import { A2UISurface } from './A2UISurface';
 import { applyA2UIMessage, type A2UIMessage, type SurfaceState } from '../../types/a2ui';
 
@@ -89,6 +90,10 @@ export const AIPanel: React.FC = () => {
   // @-mention chips queued for the next send.
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [workflowsOpen, setWorkflowsOpen] = useState(false);
+  // Last user prompt + its attach kind — surfaced to WorkflowsPopover
+  // so the user can save the most recent message as a reusable workflow.
+  const [lastSavable, setLastSavable] = useState<{ prompt: string; attach: 'activeTab' | 'allTabs' | 'none' } | null>(null);
   // Auto-scroll: when messages mutate (text_delta, tool_use, etc.) we
   // scroll the chat container to the bottom unless the user has
   // manually scrolled up. Tracked via a "stick to bottom" flag.
@@ -209,11 +214,33 @@ export const AIPanel: React.FC = () => {
     if (!overridePrompt) setDraft('');
     setMentions([]);
     setRunning(true);
+    // Remember what to save if the user picks "Save as workflow" next.
+    setLastSavable({
+      prompt: trimmed,
+      attach: sentMentions.length === 0 ? 'none' : sentMentions.length === 1 ? 'activeTab' : 'allTabs',
+    });
     void window.horizonAPI.invoke('ai:start', {
       prompt: trimmed,
       mentionTabIds: sentMentions.length ? sentMentions.map((m) => m.tabId) : undefined,
     });
   }, [draft, running, mentions]);
+
+  /** Run a saved workflow — same mention-resolution as presets. */
+  const runWorkflow = useCallback((w: { prompt: string; attach: 'activeTab' | 'allTabs' | 'none' }) => {
+    if (running) return;
+    const allTabs = useBrowserStore.getState().tabs;
+    const activeId = useBrowserStore.getState().activeTabId;
+    let mentions: Mention[] = [];
+    if (w.attach === 'activeTab') {
+      const active = allTabs.find((t) => t.id === activeId);
+      if (active) mentions = [{ tabId: active.id, title: active.title || active.url }];
+    } else if (w.attach === 'allTabs') {
+      mentions = allTabs
+        .filter((t) => !t.isPinned)
+        .map((t) => ({ tabId: t.id, title: t.title || t.url }));
+    }
+    send(w.prompt, mentions);
+  }, [running, send]);
 
   /** Trigger a preset by label. Used by chips and the header Summarize button. */
   const runPreset = useCallback((label: string) => {
@@ -315,6 +342,31 @@ export const AIPanel: React.FC = () => {
             <line x1="8" y1="17" x2="14" y2="17" />
           </svg>
         </button>
+        <div className="relative" style={{ width: 26, height: 26 }}>
+          <button
+            onClick={() => setWorkflowsOpen((v) => !v)}
+            aria-label="Workflows"
+            aria-expanded={workflowsOpen}
+            title="Saved workflows"
+            className="icon-btn"
+            style={{ width: 26, height: 26 }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden>
+              {/* Three horizontal lines stacked — the universal "saved list" glyph. */}
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="15" y2="12" />
+              <line x1="3" y1="18" x2="18" y2="18" />
+            </svg>
+          </button>
+          {workflowsOpen && (
+            <WorkflowsPopover
+              lastPrompt={lastSavable?.prompt}
+              lastAttach={lastSavable?.attach}
+              onRun={runWorkflow}
+              onClose={() => setWorkflowsOpen(false)}
+            />
+          )}
+        </div>
         <button
           onClick={newChat}
           aria-label="New chat"

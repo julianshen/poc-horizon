@@ -25,6 +25,7 @@ import { PiSession } from './services/PiSession';
 import { LlmsTxtResolver } from './services/LlmsTxtResolver';
 import { parseLlmsTxt } from './services/llmsTxtParser';
 import { writePiSkill } from './services/piSkillWriter';
+import { WorkflowsManager } from './services/WorkflowsManager';
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
 import type { AgentEvent } from '../src/types/ai';
 import type { Tab } from '../src/types/browser';
@@ -61,6 +62,7 @@ let passwordManager: PasswordManager;
 let autofillManager: AutofillManager;
 let tabSessionStore: TabSessionStore;
 let permissionBroker: PermissionBroker;
+let workflowsManager: WorkflowsManager;
 
 // Single shared browser harness + Pi session for the AI panel POC.
 // Lazy-init on first ai:start because spawning Pi is expensive.
@@ -130,6 +132,7 @@ function initSingletons(): void {
     decrypt: (s) => safeStorage.decryptString(Buffer.from(s, 'base64')),
   });
   autofillManager = new AutofillManager(path.join(data, 'addresses.json'));
+  workflowsManager = new WorkflowsManager(path.join(data, 'workflows.json'));
   tabSessionStore = new TabSessionStore(path.join(data, 'session.json'));
 
   protocol.registerFileProtocol('horizon', (request, callback) => {
@@ -303,6 +306,12 @@ function registerHandlers(): void {
     piSessions.get(ctx.window.webContents.id)?.cancel();
     return { ok: true };
   });
+
+  ipcMain.handle(IPC_CHANNELS.WORKFLOW_LIST, () => workflowsManager.list());
+  ipcMain.handle(IPC_CHANNELS.WORKFLOW_CREATE, (_event, input: { name: string; prompt: string; attach: 'activeTab' | 'allTabs' | 'none' }) =>
+    workflowsManager.create(input)
+  );
+  ipcMain.handle(IPC_CHANNELS.WORKFLOW_DELETE, (_event, { id }: { id: string }) => workflowsManager.delete(id));
 
   ipcMain.handle(IPC_CHANNELS.AI_UI_ACTION, (event, payload: unknown) => {
     const ctx = resolve(event);

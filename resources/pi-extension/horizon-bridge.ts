@@ -147,9 +147,26 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "browser_screenshot",
 		label: "Screenshot",
-		description: "Take a PNG screenshot of the visible viewport. Returns base64 image data + dimensions.",
+		description: "Take a PNG screenshot of the visible viewport. Returns an image the LLM can see directly (vision-capable models only).",
 		parameters: Type.Object({}),
-		execute: async () => bridge("screenshot", {}),
+		execute: async () => {
+			try {
+				const result = (await callBridge("screenshot", {})) as { base64: string; width: number; height: number };
+				return {
+					// Vision-capable models receive the PNG bytes directly via the
+					// image content block. Non-vision models will see a placeholder
+					// (Pi/the upstream API decides) — we don't fall back to base64
+					// text because that wastes ~200KB of context per screenshot.
+					content: [{ type: "image" as const, data: result.base64, mimeType: "image/png" }],
+					details: { width: result.width, height: result.height },
+				};
+			} catch (err) {
+				return {
+					content: [{ type: "text" as const, text: `Screenshot failed: ${(err as Error).message}` }],
+					details: { error: (err as Error).message },
+				};
+			}
+		},
 	});
 
 	pi.registerTool({

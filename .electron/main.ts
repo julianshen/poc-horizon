@@ -63,10 +63,18 @@ let permissionBroker: PermissionBroker;
 // Single shared browser harness + Pi session for the AI panel POC.
 // Lazy-init on first ai:start because spawning Pi is expensive.
 let browserHarness: BrowserHarness | null = null;
-let piSession: PiSession | null = null;
+// Per-window Pi sessions — incognito and regular windows MUST have
+// distinct subprocesses so their conversations never co-mingle.
+// Keyed by BrowserWindow.webContents.id (the chrome's wcId).
+const piSessions = new Map<number, PiSession>();
 let bridgeServer: HorizonBridgeServer | null = null;
 let bridgePort = 0;
 const llmsTxtResolver = new LlmsTxtResolver();
+
+type AiSessionKind = 'default' | 'incognito';
+function aiSessionKindFor(tm: TabManager): AiSessionKind {
+  return tm.isIncognito() ? 'incognito' : 'default';
+}
 
 function initSingletons(): void {
   if (settingsManager) return;
@@ -167,6 +175,10 @@ function registerHandlers(): void {
       return { ok: false, error: `Could not attach debugger: ${(err as Error).message}` };
     }
 
+    const wcId = ctx.window.webContents.id;
+    const kind = aiSessionKindFor(ctx.tabManager);
+    let piSession = piSessions.get(wcId);
+
     if (!piSession) {
       // Bridge server (loopback TCP, random port) lets the Pi extension
       // call BrowserHarness primitives in-process while Pi itself runs
@@ -178,11 +190,9 @@ function registerHandlers(): void {
       const binary = (settingsManager.get('aiPiBinary' as never) as string) ?? 'pi';
       const baseArgs = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'rpc'];
       const extensionPath = path.join(__dirname, '../resources/pi-extension/horizon-bridge.ts');
-      // Resume a previous session if we saved its path last time. Pi
-      // accepts a full file path or short UUID prefix; we always pass
-      // the absolute path. If the saved file no longer exists, Pi
-      // starts a fresh session and we capture the new path below.
-      const savedSession = (settingsManager.get('aiSessionPath' as never) as string) || '';
+      // Resume a previous session of this kind if we have one saved.
+      const sessions = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
+      const savedSession = sessions[kind] ?? '';
       const sessionArgs = savedSession && existsSync(savedSession) ? ['--session', savedSession] : [];
       const args = [...baseArgs, ...sessionArgs, '-e', extensionPath];
       const maxIterations = (settingsManager.get('aiMaxIterations' as never) as number) ?? 24;
@@ -194,9 +204,11 @@ function registerHandlers(): void {
       // Capture the session file path so next launch can --session it.
       piSession.on('session', (sessionFile: string) => {
         try {
-          settingsManager.set('aiSessionPath' as never, sessionFile as never);
+          const current = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
+          settingsManager.set('aiSessions' as never, { ...current, [kind]: sessionFile } as never);
         } catch { /* settings write failures are non-fatal */ }
       });
+      piSessions.set(wcId, piSession);
     }
 
     // If enabled, prepend the active site's llms.txt as agent context.
@@ -217,7 +229,27 @@ function registerHandlers(): void {
     return { ok: true };
   });
 
-  ipcMain.handle(IPC_CHANNELS.AI_CANCEL, () => { piSession?.cancel(); return { ok: true }; });
+  ipcMain.handle(IPC_CHANNELS.AI_CANCEL, (event) => {
+    const ctx = resolve(event);
+    piSessions.get(ctx.window.webContents.id)?.cancel();
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AI_NEW_CHAT, (event) => {
+    const ctx = resolve(event);
+    const wcId = ctx.window.webContents.id;
+    const kind = aiSessionKindFor(ctx.tabManager);
+    // Kill the current Pi process so the next ai:start spawns fresh
+    // without --session, and forget the saved path for this kind.
+    piSessions.get(wcId)?.dispose();
+    piSessions.delete(wcId);
+    try {
+      const current = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
+      const next = { ...current }; delete next[kind];
+      settingsManager.set('aiSessions' as never, next as never);
+    } catch { /* */ }
+    return { ok: true };
+  });
   ipcMain.handle(IPC_CHANNELS.PERMISSION_RESPOND, (_event, { id, decision }: { id: string; decision: PermissionDecision }) => {
     if (!permissionBroker) return false;
     return permissionBroker.respond(id, decision);
@@ -275,6 +307,9 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   win.once('closed', () => {
     contexts.delete(wcId);
     persistableTabManagers.delete(localTabManager);
+    // Tear down this window's Pi subprocess so we don't leak it.
+    piSessions.get(wcId)?.dispose();
+    piSessions.delete(wcId);
     if (primaryWindow === win) primaryWindow = null;
   });
 
@@ -347,7 +382,8 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
-  piSession?.dispose();
+  for (const s of piSessions.values()) s.dispose();
+  piSessions.clear();
   bridgeServer?.close();
   browserHarness?.detach();
 });

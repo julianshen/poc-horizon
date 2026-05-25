@@ -81,6 +81,13 @@ export const AIPanel: React.FC = () => {
     setRunning(false);
   }, []);
 
+  const newChat = useCallback(() => {
+    void window.horizonAPI.invoke('ai:newChat', {});
+    setMessages(INITIAL);
+    setDraft('');
+    setRunning(false);
+  }, []);
+
   const onKey = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -117,6 +124,19 @@ export const AIPanel: React.FC = () => {
             · Sidebar
           </span>
         </div>
+        <button
+          onClick={newChat}
+          aria-label="New chat"
+          title="Start a new conversation"
+          className="icon-btn"
+          style={{ width: 26, height: 26 }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            {/* Pencil-on-paper "compose" glyph — same as the Mail "New Message" affordance. */}
+            <path d="M4 20h4l10-10-4-4L4 16v4z" />
+            <line x1="14" y1="6" x2="18" y2="10" />
+          </svg>
+        </button>
         <button onClick={toggleAI} aria-label="Close AI panel" className="icon-btn" style={{ width: 26, height: 26 }}>
           <svg viewBox="0 0 24 24" aria-hidden>
             <line x1="6" y1="6" x2="18" y2="18" />

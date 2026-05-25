@@ -58,8 +58,12 @@ export const DEFAULT_SETTINGS = {
   aiPiBinary: 'pi',
   /** Extra flags passed to `pi`. Session persists across app restarts via aiSessionPath. */
   aiPiArgs: ['--mode', 'rpc'],
-  /** Path of the most recent Pi session file, captured automatically; used to resume. */
-  aiSessionPath: '' as string,
+  /**
+   * Pi session file paths captured automatically; used to resume the
+   * conversation on the next app launch. Keyed by window kind so a
+   * regular window doesn't accidentally resume an incognito chat.
+   */
+  aiSessions: {} as { default?: string; incognito?: string },
   /** When true, fetch /llms.txt of the active site and prepend as agent context. */
   aiUseLlmsTxt: true,
   /** Hard cap on tool-call iterations per agent turn (safety). */

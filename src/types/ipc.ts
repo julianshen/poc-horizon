@@ -116,6 +116,8 @@ export interface IpcChannels {
   'ai:start': { prompt: string; tabId?: string };
   /** Cancel the in-flight turn, if any. */
   'ai:cancel': Record<string, never>;
+  /** Forget the current conversation: kill Pi, clear the saved session path. */
+  'ai:newChat': Record<string, never>;
   /** Main → Renderer: streaming events from the agent loop. */
   'ai:event': import('./ai').AgentEvent;
 }

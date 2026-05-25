@@ -65,6 +65,19 @@ describe('AIPanel', () => {
     expect(api().invokes).toContainEqual({ channel: 'ai:cancel', payload: {} });
   });
 
+  it('New chat button fires ai:newChat and resets the message list', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'first prompt' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    expect(screen.getByText('first prompt')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('New chat'));
+    expect(api().invokes).toContainEqual({ channel: 'ai:newChat', payload: {} });
+    // After New chat, the prior user message is gone and we're back at INITIAL.
+    expect(screen.queryByText('first prompt')).toBeNull();
+    expect(screen.getByText(/I can see the page you're reading/)).toBeTruthy();
+  });
+
   it('Shift+Enter does not submit (the draft stays in the textarea)', () => {
     render(<AIPanel />);
     const ta = screen.getByPlaceholderText(/Ask anything/) as HTMLTextAreaElement;

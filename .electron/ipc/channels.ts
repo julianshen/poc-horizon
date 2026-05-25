@@ -53,6 +53,7 @@ export const IPC_CHANNELS = {
   UI_CONTENT_BOUNDS: 'ui:contentBounds',
   AI_START: 'ai:start',
   AI_CANCEL: 'ai:cancel',
+  AI_NEW_CHAT: 'ai:newChat',
   AI_EVENT: 'ai:event',
   APP_QUIT: 'app:quit',
   APP_GET_VERSION: 'app:getVersion',

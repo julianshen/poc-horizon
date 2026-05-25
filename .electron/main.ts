@@ -75,6 +75,10 @@ type AiSessionKind = 'default' | 'incognito';
 function aiSessionKindFor(tm: TabManager): AiSessionKind {
   return tm.isIncognito() ? 'incognito' : 'default';
 }
+/** XML-escape for use inside an attribute value (mention <page> tags). */
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 function initSingletons(): void {
   if (settingsManager) return;
@@ -161,7 +165,8 @@ function registerHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.WINDOW_NEW_INCOGNITO, () => createWindow({ incognito: true }));
 
   // ─── AI agent (Pi POC) ──────────────────────────────────────────────
-  ipcMain.handle(IPC_CHANNELS.AI_START, async (event, { prompt }: { prompt: string }) => {
+  ipcMain.handle(IPC_CHANNELS.AI_START, async (event, payload: { prompt: string; mentionTabIds?: string[] }) => {
+    const { prompt, mentionTabIds = [] } = payload;
     const ctx = resolve(event);
     const active = ctx.tabManager.getActiveTabId();
     if (!active) return { ok: false, error: 'No active tab' };
@@ -221,10 +226,37 @@ function registerHandlers(): void {
         const origin = new URL(view.webContents.getURL()).origin;
         const skills = await llmsTxtResolver.fetch(origin);
         if (skills) {
-          augmentedPrompt = `<site-skills origin="${origin}">\n${skills}\n</site-skills>\n\n${prompt}`;
+          augmentedPrompt = `<site-skills origin="${origin}">\n${skills}\n</site-skills>\n\n${augmentedPrompt}`;
         }
       } catch { /* invalid URL (horizon:// etc.) — skip */ }
     }
+
+    // @-mentioned tabs: extract title + url + visible text, wrap as
+    // <page> blocks, prepend so the agent can reason across pages
+    // without needing to navigate to each.
+    if (mentionTabIds.length > 0) {
+      const cap = (settingsManager.get('aiMentionMaxChars' as never) as number) ?? 30_000;
+      const blocks: string[] = [];
+      for (const tabId of mentionTabIds) {
+        const v = ctx.tabManager.getBrowserView(tabId);
+        if (!v) continue;
+        const wc = v.webContents;
+        try {
+          const title = wc.getTitle();
+          const url = wc.getURL();
+          // innerText approximates "what a human sees" better than
+          // textContent (script/style filtered, line breaks preserved).
+          // Truncate per-page to keep the prompt budget bounded.
+          const text = (await wc.executeJavaScript('document.body && document.body.innerText || ""', true)) as string;
+          const truncated = text.length > cap ? text.slice(0, cap) + '\n…[truncated]' : text;
+          blocks.push(`<page url="${escapeAttr(url)}" title="${escapeAttr(title)}">\n${truncated}\n</page>`);
+        } catch { /* tab destroyed or extract failed — skip */ }
+      }
+      if (blocks.length > 0) {
+        augmentedPrompt = `${blocks.join('\n\n')}\n\n${augmentedPrompt}`;
+      }
+    }
+
     void piSession.startTurn(augmentedPrompt);
     return { ok: true };
   });

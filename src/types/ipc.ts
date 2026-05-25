@@ -112,8 +112,10 @@ export interface IpcChannels {
   'menu:command': { command: string };
 
   // ─── AI agent (Pi integration) ────────────────────────────────────
-  /** Start a new agent turn with the user's prompt against the active tab. */
-  'ai:start': { prompt: string; tabId?: string };
+  /** Start a new agent turn with the user's prompt against the active tab.
+   *  `mentionTabIds` is the IDs of additional tabs the user @-mentioned;
+   *  main extracts each tab's title/url/text and prepends as context. */
+  'ai:start': { prompt: string; tabId?: string; mentionTabIds?: string[] };
   /** Cancel the in-flight turn, if any. */
   'ai:cancel': Record<string, never>;
   /** Forget the current conversation: kill Pi, clear the saved session path. */

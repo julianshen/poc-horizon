@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
 import type { AgentEvent } from '../../types/ai';
 import { ChatMarkdown } from './ChatMarkdown';
+import { MentionPicker } from './MentionPicker';
+
+interface Mention { tabId: string; title: string }
 
 interface ToolCall { id: string; name: string; input: Record<string, unknown>; output?: unknown; isError?: boolean }
 interface Message {
@@ -10,6 +13,7 @@ interface Message {
   followup?: string[];
   loading?: boolean;
   tools?: ToolCall[];
+  mentions?: Mention[];
 }
 
 const INITIAL: Message[] = [
@@ -27,6 +31,9 @@ export const AIPanel: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
   const [running, setRunning] = useState(false);
+  // @-mention chips queued for the next send.
+  const [mentions, setMentions] = useState<Mention[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   // Auto-scroll: when messages mutate (text_delta, tool_use, etc.) we
   // scroll the chat container to the bottom unless the user has
   // manually scrolled up. Tracked via a "stick to bottom" flag.
@@ -89,11 +96,29 @@ export const AIPanel: React.FC = () => {
   const send = useCallback(() => {
     const trimmed = draft.trim();
     if (!trimmed || running) return;
-    setMessages((m) => [...m, { who: 'you', text: trimmed }, { who: 'ai', text: 'Thinking…', loading: true, tools: [] }]);
+    const sentMentions = mentions;
+    setMessages((m) => [
+      ...m,
+      { who: 'you', text: trimmed, mentions: sentMentions.length ? sentMentions : undefined },
+      { who: 'ai', text: 'Thinking…', loading: true, tools: [] },
+    ]);
     setDraft('');
+    setMentions([]);
     setRunning(true);
-    void window.horizonAPI.invoke('ai:start', { prompt: trimmed });
-  }, [draft, running]);
+    void window.horizonAPI.invoke('ai:start', {
+      prompt: trimmed,
+      mentionTabIds: sentMentions.length ? sentMentions.map((m) => m.tabId) : undefined,
+    });
+  }, [draft, running, mentions]);
+
+  const addMention = useCallback((tabId: string, title: string) => {
+    setMentions((cur) => cur.some((m) => m.tabId === tabId) ? cur : [...cur, { tabId, title }]);
+  }, []);
+  const removeMention = useCallback((tabId: string) => {
+    setMentions((cur) => cur.filter((m) => m.tabId !== tabId));
+  }, []);
+  const pickedSet = useRef<Set<string>>(new Set());
+  pickedSet.current = new Set(mentions.map((m) => m.tabId));
 
   const cancel = useCallback(() => {
     void window.horizonAPI.invoke('ai:cancel', {});
@@ -104,6 +129,8 @@ export const AIPanel: React.FC = () => {
     void window.horizonAPI.invoke('ai:newChat', {});
     setMessages(INITIAL);
     setDraft('');
+    setMentions([]);
+    setPickerOpen(false);
     setRunning(false);
   }, []);
 
@@ -185,7 +212,55 @@ export const AIPanel: React.FC = () => {
         </button>
       )}
 
+      {mentions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-1" data-testid="mention-chips">
+          {mentions.map((m) => (
+            <span
+              key={m.tabId}
+              className="text-[11px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent-primary)' }}
+            >
+              @ {m.title.length > 28 ? m.title.slice(0, 28) + '…' : m.title}
+              <button
+                type="button"
+                onClick={() => removeMention(m.tabId)}
+                aria-label={`Remove mention ${m.title}`}
+                className="ml-0.5"
+                style={{ opacity: 0.65, fontSize: 12, lineHeight: 1, cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="flex gap-2 items-end relative" style={{ padding: '4px 14px 14px' }}>
+        {pickerOpen && (
+          <MentionPicker
+            alreadyPicked={pickedSet.current}
+            onPick={addMention}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+        <button
+          onClick={() => setPickerOpen((v) => !v)}
+          aria-label="Mention a tab"
+          title="@ Mention a tab to compare across pages"
+          className="w-10 h-10 flex items-center justify-center shrink-0"
+          style={{
+            background: pickerOpen ? 'var(--accent-soft)' : 'var(--surface-1)',
+            color: pickerOpen ? 'var(--accent-primary)' : 'var(--chrome-fg-muted)',
+            boxShadow: '0 1px 2px rgba(20,15,10,0.04), 0 0 0 0.5px var(--chrome-border)',
+            borderRadius: 14,
+            cursor: 'pointer',
+          }}
+        >
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+          </svg>
+        </button>
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -233,6 +308,19 @@ const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({
   const hasText = m.text && m.text.length > 0;
   return (
     <div className={`flex flex-col gap-1.5 ${isYou ? 'items-end' : 'items-start'}`}>
+      {isYou && m.mentions && m.mentions.length > 0 && (
+        <div className="flex flex-wrap gap-1 max-w-[88%] justify-end">
+          {m.mentions.map((mention) => (
+            <span
+              key={mention.tabId}
+              className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent-primary)' }}
+            >
+              @ {mention.title.length > 24 ? mention.title.slice(0, 24) + '…' : mention.title}
+            </span>
+          ))}
+        </div>
+      )}
       {(hasText || (m.loading && !hasText)) && (
         <div
           className="text-sm leading-relaxed"

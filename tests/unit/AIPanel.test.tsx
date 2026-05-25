@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { setupRendererTest } from '../helpers/fakeHorizonAPI';
 import { AIPanel } from '@/components/overlays/AIPanel';
+import { useBrowserStore } from '@/stores/browserStore';
 
 describe('AIPanel', () => {
   const { api } = setupRendererTest();
@@ -76,6 +77,42 @@ describe('AIPanel', () => {
     // After New chat, the prior user message is gone and we're back at INITIAL.
     expect(screen.queryByText('first prompt')).toBeNull();
     expect(screen.getByText(/I can see the page you're reading/)).toBeTruthy();
+  });
+
+  it('@-mention picker → pick → send dispatches ai:start with mentionTabIds', async () => {
+    // Seed two tabs we can mention.
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      tabs: [
+        { id: 't1', schemaVersion: 1, url: 'https://a.example', title: 'Page A', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 },
+        { id: 't2', schemaVersion: 1, url: 'https://b.example', title: 'Page B', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: false, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 },
+      ],
+    });
+    render(<AIPanel />);
+    fireEvent.click(screen.getByLabelText('Mention a tab'));
+    expect(screen.getByTestId('mention-picker')).toBeTruthy();
+    fireEvent.click(screen.getByText('Page B'));
+    // Chip strip shows the picked tab.
+    expect(screen.getByTestId('mention-chips').textContent).toContain('Page B');
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'compare them' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    expect(api().invokes).toContainEqual({
+      channel: 'ai:start',
+      payload: { prompt: 'compare them', mentionTabIds: ['t2'] },
+    });
+  });
+
+  it('mention chip × button removes the mention before send', async () => {
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      tabs: [{ id: 't1', schemaVersion: 1, url: 'https://a.example', title: 'Wikipedia', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 }],
+    });
+    render(<AIPanel />);
+    fireEvent.click(screen.getByLabelText('Mention a tab'));
+    fireEvent.click(screen.getByText('Wikipedia'));
+    fireEvent.click(screen.getByLabelText('Remove mention Wikipedia'));
+    expect(screen.queryByTestId('mention-chips')).toBeNull();
   });
 
   it('Shift+Enter does not submit (the draft stays in the textarea)', () => {

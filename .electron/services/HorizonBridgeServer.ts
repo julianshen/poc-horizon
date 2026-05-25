@@ -1,5 +1,6 @@
 import { createServer, Server, Socket } from 'net';
 import type { BrowserHarness } from './BrowserHarness';
+import { readerExtract } from './readerExtract';
 
 interface ToolRequest {
   id: string;
@@ -104,6 +105,12 @@ export class HorizonBridgeServer {
       case 'getDom':     return await this.harness.getDom(Number(args.depth ?? 4));
       case 'getUrl':     return await this.harness.getUrl();
       case 'getTitle':   return await this.harness.getTitle();
+      case 'reader_extract': {
+        const url = await this.harness.getUrl();
+        const html = await this.harness.getHtml();
+        const article = readerExtract(html, url);
+        return article ?? { error: 'Could not extract article — page may not have reader-mode-compatible content.' };
+      }
       default: throw new Error(`Unknown tool: ${tool}`);
     }
   }

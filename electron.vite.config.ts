@@ -12,7 +12,12 @@ export default defineConfig({
       outDir: 'dist-electron',
       emptyOutDir: false,
       rollupOptions: {
-        external: ['electron', 'electron-updater', 'path', 'fs', 'os', 'crypto'],
+        external: [
+          'electron', 'electron-updater',
+          'path', 'fs', 'fs/promises', 'os', 'crypto', 'net', 'child_process', 'events', 'stream',
+          // Reader mode deps — JSDOM is a Node-only library, must not bundle.
+          '@mozilla/readability', 'jsdom',
+        ],
       },
     },
     resolve: {

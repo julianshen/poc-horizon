@@ -142,4 +142,14 @@ export class BrowserHarness {
   async getTitle(): Promise<string> {
     return this.require().getTitle();
   }
+
+  /**
+   * Get the full outerHTML of the page document. Used by readerExtract
+   * (Readability needs the original HTML, not just the visible text).
+   */
+  async getHtml(): Promise<string> {
+    const r = await this.evaluate('document.documentElement.outerHTML');
+    if (!r.ok) throw new Error(r.error);
+    return String(r.value ?? '');
+  }
 }

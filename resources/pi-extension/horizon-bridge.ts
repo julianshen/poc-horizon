@@ -201,6 +201,20 @@ export default function (pi: ExtensionAPI): void {
 		execute: async () => bridge("getTitle", {}),
 	});
 
+	pi.registerTool({
+		name: "reader_extract",
+		label: "Reader mode",
+		description:
+			"Extract the main article from the active tab using Mozilla's Readability " +
+			"(same algorithm as Firefox Reader View). Strips nav/ads/comments and returns " +
+			"the cleaned text. PREFER this over browser_getDom for reading-comprehension " +
+			"tasks — far cheaper in tokens and noise-free. Returns {title, byline, " +
+			"excerpt, contentHtml, textContent, length, readingMinutes, lang, siteName} " +
+			"or {error: ...} when the page isn't article-shaped (app shells, login walls).",
+		parameters: Type.Object({}),
+		execute: async () => bridge("reader_extract", {}),
+	});
+
 	// ─── A2UI: declarative UI inside the AI panel ────────────────────────
 	pi.registerTool({
 		name: "render_ui",

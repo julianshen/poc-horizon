@@ -131,6 +131,37 @@ describe('AIPanel', () => {
     act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
   });
 
+  it('pending llms.txt guides drain into a system card with site sections + links', async () => {
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      pendingLlmsGuides: [{
+        origin: 'https://fastapi.example',
+        title: 'FastAPI',
+        summary: 'A modern, fast web framework.',
+        sections: [{
+          name: 'Getting Started',
+          links: [
+            { title: 'Installation', url: 'https://fastapi.example/install', description: 'pip install fastapi' },
+          ],
+        }],
+        hasFull: true,
+        skillFile: '/tmp/skill.md',
+      }],
+    });
+    render(<AIPanel />);
+    await waitFor(() => expect(screen.getByTestId('llms-guide-card')).toBeTruthy());
+    expect(screen.getByText(/Site guide: FastAPI/)).toBeTruthy();
+    expect(screen.getByText(/A modern, fast web framework/)).toBeTruthy();
+    expect(screen.getByText('Installation')).toBeTruthy();
+    expect(screen.getByText(/Skill saved for the Pi agent/)).toBeTruthy();
+    // Clicking a section link dispatches navigation:go for the active tab.
+    fireEvent.click(screen.getByText('Installation'));
+    expect(api().invokes).toContainEqual({
+      channel: 'navigation:go',
+      payload: { tabId: 't1', url: 'https://fastapi.example/install' },
+    });
+  });
+
   it('render_ui accepts a flat {root, components} shape (LLM shortcut)', async () => {
     render(<AIPanel />);
     const ta = screen.getByPlaceholderText(/Ask anything/);

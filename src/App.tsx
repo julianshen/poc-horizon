@@ -17,11 +17,13 @@ import { useBrowserStore } from './stores/browserStore';
 import { useTabs } from './hooks/useTabs';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useMenuCommands } from './hooks/useMenuCommands';
+import { useLlmsTxtGuide } from './hooks/useLlmsTxtGuide';
 
 const App: React.FC = () => {
   useTabs();
   useKeyboardShortcuts();
   useMenuCommands();
+  useLlmsTxtGuide();
 
   const { tabs, activeTabId, showAI } = useBrowserStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);

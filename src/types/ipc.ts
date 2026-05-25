@@ -122,6 +122,20 @@ export interface IpcChannels {
   'ai:newChat': Record<string, never>;
   /** Main → Renderer: streaming events from the agent loop. */
   'ai:event': import('./ai').AgentEvent;
+  /** Main → Renderer: discovered an llms.txt for the active tab's
+   *  origin. Renderer should open the AI panel (if not already open)
+   *  and surface a one-shot navigation guide card. */
+  'ai:llmsTxtFound': {
+    origin: string;
+    title?: string;
+    summary?: string;
+    sections: Array<{
+      name: string;
+      links: Array<{ title: string; url: string; description?: string }>;
+    }>;
+    hasFull: boolean;
+    skillFile?: string;
+  };
 }
 
 type PermissionType = import('./browser').PermissionType;

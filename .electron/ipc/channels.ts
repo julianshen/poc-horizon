@@ -55,6 +55,7 @@ export const IPC_CHANNELS = {
   AI_CANCEL: 'ai:cancel',
   AI_NEW_CHAT: 'ai:newChat',
   AI_EVENT: 'ai:event',
+  AI_LLMS_TXT_FOUND: 'ai:llmsTxtFound',
   APP_QUIT: 'app:quit',
   APP_GET_VERSION: 'app:getVersion',
   APP_CHECK_FOR_UPDATES: 'app:checkForUpdates',

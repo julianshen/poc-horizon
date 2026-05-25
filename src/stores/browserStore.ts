@@ -12,6 +12,19 @@ interface BrowserState {
   showFindBar: boolean;
   showAI: boolean;
   showCmd: boolean;
+  /** Queue of llms.txt navigation guides pushed by main when a new
+   *  origin with an llms.txt is navigated to. AIPanel drains this on
+   *  next render so it can append system messages without re-fetching. */
+  pendingLlmsGuides: Array<{
+    origin: string;
+    title?: string;
+    summary?: string;
+    sections: Array<{ name: string; links: Array<{ title: string; url: string; description?: string }> }>;
+    hasFull: boolean;
+    skillFile?: string;
+  }>;
+  pushLlmsGuide: (g: BrowserState['pendingLlmsGuides'][number]) => void;
+  consumeLlmsGuides: () => BrowserState['pendingLlmsGuides'];
   // Component-local menus lifted to the store so BrowserContentArea can
   // hide the BrowserView when they're open — Electron's BrowserView paints
   // above all DOM, so an open menu that crosses into the view region would
@@ -47,6 +60,13 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   setAppMenuOpen: (open) => set({ showAppMenu: open }),
   setTabContextMenuOpen: (open) => set({ showTabContextMenu: open }),
   toggleAI: () => set((state) => ({ showAI: !state.showAI })),
+  pendingLlmsGuides: [],
+  pushLlmsGuide: (g) => set((state) => ({ pendingLlmsGuides: [...state.pendingLlmsGuides, g] })),
+  consumeLlmsGuides: () => {
+    let drained: BrowserState['pendingLlmsGuides'] = [];
+    set((state) => { drained = state.pendingLlmsGuides; return { pendingLlmsGuides: [] }; });
+    return drained;
+  },
 
   setTabs: (tabs) => set({ tabs }),
   setActiveTab: (activeTabId) => set({ activeTabId }),

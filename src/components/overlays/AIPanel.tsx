@@ -9,8 +9,20 @@ import { applyA2UIMessage, type A2UIMessage, type SurfaceState } from '../../typ
 interface Mention { tabId: string; title: string }
 
 interface ToolCall { id: string; name: string; input: Record<string, unknown>; output?: unknown; isError?: boolean }
+
+interface LlmsLink { title: string; url: string; description?: string }
+interface LlmsSection { name: string; links: LlmsLink[] }
+interface LlmsTxtGuide {
+  origin: string;
+  title?: string;
+  summary?: string;
+  sections: LlmsSection[];
+  hasFull: boolean;
+  skillFile?: string;
+}
+
 interface Message {
-  who: 'you' | 'ai';
+  who: 'you' | 'ai' | 'system';
   text: string;
   followup?: string[];
   loading?: boolean;
@@ -23,6 +35,9 @@ interface Message {
    * them into the existing state.
    */
   surfaces?: Map<string, SurfaceState>;
+  /** System-message payload — present when who === 'system' for the
+   *  llms.txt navigation guide card. */
+  guide?: LlmsTxtGuide;
 }
 
 const INITIAL: Message[] = [
@@ -35,8 +50,17 @@ const INITIAL: Message[] = [
 
 const AI_WIDTH = 360;
 
+// Outside the component so it persists across mount/unmount cycles
+// (e.g. when the user closes + reopens the AI panel). Tracks origins
+// for which we've already inserted the guide message THIS RENDER
+// SESSION — paired with main's per-process Set, this prevents a guide
+// re-render when the panel is reopened.
+const seenGuides = new Set<string>();
+
 export const AIPanel: React.FC = () => {
   const toggleAI = useBrowserStore((s) => s.toggleAI);
+  const pendingGuides = useBrowserStore((s) => s.pendingLlmsGuides);
+  const consumeGuides = useBrowserStore((s) => s.consumeLlmsGuides);
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
   const [running, setRunning] = useState(false);
@@ -61,6 +85,21 @@ export const AIPanel: React.FC = () => {
     // a small overshoot when the user is reading the latest reply.
     stickyRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
   }, []);
+
+  // Drain queued llms.txt guides into the messages list as system cards.
+  // Dedup per-origin within this AIPanel mount; main also dedups by
+  // origin per process so we're double-protected against repeats.
+  useEffect(() => {
+    if (pendingGuides.length === 0) return;
+    const fresh = pendingGuides.filter((g) => !seenGuides.has(g.origin));
+    if (fresh.length === 0) { consumeGuides(); return; }
+    for (const g of fresh) seenGuides.add(g.origin);
+    consumeGuides();
+    setMessages((m) => [
+      ...m,
+      ...fresh.map((g): Message => ({ who: 'system', text: '', guide: g })),
+    ]);
+  }, [pendingGuides, consumeGuides]);
 
   // Listen for streaming agent events. Each event mutates the last AI
   // message in place: text_delta appends, tool_use/result push into the
@@ -336,6 +375,9 @@ export const AIPanel: React.FC = () => {
 };
 
 const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({ m, isLastAndStreaming }) => {
+  if (m.who === 'system' && m.guide) {
+    return <LlmsTxtGuideCard guide={m.guide} />;
+  }
   const isYou = m.who === 'you';
   const hasText = m.text && m.text.length > 0;
   return (
@@ -406,6 +448,92 @@ const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({
               {f}
             </span>
           ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LlmsTxtGuideCard: React.FC<{ guide: LlmsTxtGuide }> = ({ guide }) => {
+  const goTo = (url: string): void => {
+    const tabId = useBrowserStore.getState().activeTabId;
+    if (tabId && url) void window.horizonAPI.invoke('navigation:go', { tabId, url });
+  };
+  return (
+    <div
+      data-testid="llms-guide-card"
+      style={{
+        background: 'var(--surface-1)',
+        border: '0.5px solid var(--accent-soft)',
+        borderRadius: 12,
+        padding: '12px 14px',
+        boxShadow: '0 1px 2px rgba(20,15,10,0.04), 0 0 0 0.5px var(--chrome-border)',
+        width: '92%',
+        maxWidth: '92%',
+      }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className="w-5 h-5 rounded-md flex items-center justify-center"
+          style={{ background: 'var(--accent-soft)', color: 'var(--accent-primary)' }}
+          aria-hidden
+        >
+          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </svg>
+        </span>
+        <div className="text-[12px] font-semibold flex-1" style={{ color: 'var(--chrome-fg)' }}>
+          Site guide{guide.title ? `: ${guide.title}` : ''}
+        </div>
+        <span className="text-[10px]" style={{ color: 'var(--chrome-fg-subtle)' }}>
+          {new URL(guide.origin).host} · llms{guide.hasFull ? '-full' : ''}.txt
+        </span>
+      </div>
+      {guide.summary && (
+        <div className="text-[12px] mb-2" style={{ color: 'var(--chrome-fg-muted)', fontStyle: 'italic' }}>
+          {guide.summary}
+        </div>
+      )}
+      {guide.sections.slice(0, 4).map((s, i) => (
+        <div key={i} style={{ marginTop: i === 0 ? 0 : 8 }}>
+          {s.name && (
+            <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--chrome-fg-subtle)', letterSpacing: '0.06em' }}>
+              {s.name}
+            </div>
+          )}
+          <ul className="text-[12px] flex flex-col gap-0.5" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {s.links.slice(0, 6).map((link, j) => (
+              <li key={j} className="truncate">
+                <button
+                  type="button"
+                  onClick={() => goTo(link.url)}
+                  className="text-left"
+                  style={{
+                    color: 'var(--accent-primary)',
+                    background: 'transparent',
+                    border: 0,
+                    padding: 0,
+                    font: 'inherit',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: 2,
+                  }}
+                  title={link.url}
+                >
+                  {link.title}
+                </button>
+                {link.description && (
+                  <span style={{ color: 'var(--chrome-fg-muted)' }}> — {link.description}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {guide.skillFile && (
+        <div className="text-[10px] mt-2" style={{ color: 'var(--chrome-fg-subtle)' }}>
+          Skill saved for the Pi agent · use in your next prompt
         </div>
       )}
     </div>

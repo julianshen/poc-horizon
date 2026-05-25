@@ -23,6 +23,8 @@ import { installAppMenu } from './services/appMenu';
 import { BrowserHarness } from './services/BrowserHarness';
 import { PiSession } from './services/PiSession';
 import { LlmsTxtResolver } from './services/LlmsTxtResolver';
+import { parseLlmsTxt } from './services/llmsTxtParser';
+import { writePiSkill } from './services/piSkillWriter';
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
 import type { AgentEvent } from '../src/types/ai';
 import type { Tab } from '../src/types/browser';
@@ -78,6 +80,41 @@ function aiSessionKindFor(tm: TabManager): AiSessionKind {
 /** XML-escape for use inside an attribute value (mention <page> tags). */
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Origins for which we've already surfaced the llms.txt guide this app session. */
+const llmsTxtShownOrigins = new Set<string>();
+
+async function handleNavigateForLlmsTxt(url: string, win: BrowserWindow): Promise<void> {
+  let origin: string;
+  try { origin = new URL(url).origin; } catch { return; }
+  // Skip our own protocol; nothing useful there.
+  if (origin.startsWith('horizon:') || origin.startsWith('file:') || origin.startsWith('data:')) return;
+  if (llmsTxtShownOrigins.has(origin)) return;
+  llmsTxtShownOrigins.add(origin); // claim eagerly so concurrent navigations don't double-fire
+
+  const { llmsTxt, llmsFullTxt } = await llmsTxtResolver.fetchBoth(origin);
+  if (!llmsTxt && !llmsFullTxt) {
+    // No guide here — leave the "shown" claim in place so we don't refetch on every page within the site.
+    return;
+  }
+  // Parse the index (prefer llms.txt; fall back to first lines of llms-full.txt).
+  const parsed = parseLlmsTxt(llmsTxt ?? llmsFullTxt ?? '');
+  let skillFile: string | undefined;
+  if (llmsTxt || llmsFullTxt) {
+    const path = await writePiSkill(origin, llmsTxt ?? '', llmsFullTxt ?? undefined);
+    if (path) skillFile = path;
+  }
+  if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.AI_LLMS_TXT_FOUND, {
+      origin,
+      title: parsed.title,
+      summary: parsed.summary,
+      sections: parsed.sections,
+      hasFull: Boolean(llmsFullTxt),
+      skillFile,
+    });
+  }
 }
 
 function initSingletons(): void {
@@ -318,6 +355,16 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
       : { kind: 'default', historyManager }
   );
   contexts.set(wcId, { tabManager: localTabManager, window: win });
+
+  // llms.txt navigation guide: when this window navigates to a new
+  // origin, async-probe /llms.txt and /llms-full.txt. If found, send
+  // a one-shot ai:llmsTxtFound IPC to the chrome renderer so it can
+  // auto-open the AI panel and surface a guide card. Per-origin dedup
+  // is in-memory only — restart of the app shows the card again.
+  // Skill files are written to ~/.pi/agent/skills/ as a side-effect.
+  localTabManager.onNavigate((url: string) => {
+    void handleNavigateForLlmsTxt(url, win);
+  });
 
   if (!incognito) {
     primaryTabManager = localTabManager;

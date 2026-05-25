@@ -18,6 +18,7 @@ export class TabManager {
   private window: BrowserWindow;
   private readonly mode: TabManagerMode;
   private changeListeners = new Set<() => void>();
+  private navigateListeners = new Set<(url: string, tabId: string) => void>();
   // Rect of the BrowserContentArea slot in the renderer DOM, reported by
   // the renderer via 'ui:contentBounds'. null until the renderer mounts and
   // measures itself for the first time.
@@ -51,6 +52,19 @@ export class TabManager {
   onChange(fn: () => void): () => void {
     this.changeListeners.add(fn);
     return () => this.changeListeners.delete(fn);
+  }
+
+  /** Subscribe to navigation events from any tab in this window. Fires for
+   *  did-navigate AND did-navigate-in-page (SPA pushState etc). */
+  onNavigate(fn: (url: string, tabId: string) => void): () => void {
+    this.navigateListeners.add(fn);
+    return () => this.navigateListeners.delete(fn);
+  }
+
+  private emitNavigate(url: string, tabId: string): void {
+    for (const fn of this.navigateListeners) {
+      try { fn(url, tabId); } catch { /* non-fatal */ }
+    }
   }
 
   private emitChange(): void {
@@ -147,6 +161,7 @@ export class TabManager {
         isLoading: entry?.tab.isLoading ?? false,
         url,
       });
+      this.emitNavigate(url, tabId);
     };
 
     wc.on('did-navigate', (_event, url) => broadcastNavState(url));

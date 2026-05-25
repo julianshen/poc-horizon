@@ -16,9 +16,11 @@ import { net } from 'electron';
  */
 export class LlmsTxtResolver {
   private cache = new Map<string, string | null>();   // origin → contents | null (404)
+  private both = new Map<string, { llmsTxt: string | null; llmsFullTxt: string | null }>();
   private inflight = new Map<string, Promise<string | null>>();
+  private inflightBoth = new Map<string, Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }>>();
 
-  /** Get llms.txt for an origin (https://example.com). Returns null if unavailable. */
+  /** Get the best available llms*.txt for an origin (full preferred). Null if neither. */
   async fetch(origin: string): Promise<string | null> {
     if (this.cache.has(origin)) return this.cache.get(origin) ?? null;
     const existing = this.inflight.get(origin);
@@ -31,6 +33,25 @@ export class LlmsTxtResolver {
       return result;
     } finally {
       this.inflight.delete(origin);
+    }
+  }
+
+  /** Get both files for an origin. Either or both may be null. Cached per-origin. */
+  async fetchBoth(origin: string): Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }> {
+    if (this.both.has(origin)) return this.both.get(origin)!;
+    const existing = this.inflightBoth.get(origin);
+    if (existing) return existing;
+    const p = (async () => ({
+      llmsTxt: await this.tryGet(`${origin}/llms.txt`),
+      llmsFullTxt: await this.tryGet(`${origin}/llms-full.txt`),
+    }))();
+    this.inflightBoth.set(origin, p);
+    try {
+      const result = await p;
+      this.both.set(origin, result);
+      return result;
+    } finally {
+      this.inflightBoth.delete(origin);
     }
   }
 

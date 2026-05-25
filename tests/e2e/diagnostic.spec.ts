@@ -200,6 +200,36 @@ test('collect diagnostics', async () => {
   log(`Web context-menu listeners on tab webContents: ${listenerCount} (expect >= 1)`);
   expect(listenerCount, 'TabManager should register a context-menu listener').toBeGreaterThanOrEqual(1);
 
+  // ── Pi agent end-to-end: ai:start IPC → PiSession spawns pi --mode rpc
+  // → text_delta events stream back via ai:event. Skipped if `pi` isn't
+  // on PATH (CI without Pi installed).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { spawnSync } = await import('child_process');
+  const piAvailable = spawnSync('pi', ['--version']).status === 0;
+  if (!piAvailable) {
+    log('SKIP Pi agent test — pi binary not on PATH');
+  } else {
+    await win.evaluate(() => {
+      (window as unknown as { __aiEvents: unknown[] }).__aiEvents = [];
+      window.horizonAPI.on('ai:event', (e: unknown) => {
+        (window as unknown as { __aiEvents: unknown[] }).__aiEvents.push(e);
+      });
+    });
+    await win.evaluate(() =>
+      window.horizonAPI.invoke('ai:start', { prompt: 'Say "ok" exactly and nothing else.' })
+    );
+    // Pi turn-around with a hosted LLM is ~1-5s.
+    await win.waitForFunction(
+      () => (window as unknown as { __aiEvents: { type: string }[] }).__aiEvents.some((e) => e.type === 'turn_end'),
+      { timeout: 30_000 }
+    );
+    const events = await win.evaluate(() => (window as unknown as { __aiEvents: { type: string }[] }).__aiEvents);
+    const types = events.map((e) => e.type);
+    log(`Pi agent emitted event types: ${JSON.stringify(types)}`);
+    expect(types, 'Pi should stream at least one text_delta').toContain('text_delta');
+    expect(types, 'Pi should emit turn_end at the end').toContain('turn_end');
+  }
+
   // ── Spell check wiring: session.spellCheckerLanguages should be set
   // from settings after app start, and BrowserView webPreferences should
   // have spellcheck enabled.

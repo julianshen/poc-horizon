@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
 import type { AgentEvent } from '../../types/ai';
+import { ChatMarkdown } from './ChatMarkdown';
 
 interface ToolCall { id: string; name: string; input: Record<string, unknown>; output?: unknown; isError?: boolean }
 interface Message {
@@ -26,6 +27,24 @@ export const AIPanel: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
   const [running, setRunning] = useState(false);
+  // Auto-scroll: when messages mutate (text_delta, tool_use, etc.) we
+  // scroll the chat container to the bottom unless the user has
+  // manually scrolled up. Tracked via a "stick to bottom" flag.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef(true);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !stickyRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    // Within 32px of the bottom counts as "still at bottom" — accommodates
+    // a small overshoot when the user is reading the latest reply.
+    stickyRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+  }, []);
 
   // Listen for streaming agent events. Each event mutates the last AI
   // message in place: text_delta appends, tool_use/result push into the
@@ -146,11 +165,13 @@ export const AIPanel: React.FC = () => {
       </header>
 
       <div
+        ref={scrollRef}
+        onScroll={onScroll}
         className="flex-1 overflow-y-auto flex flex-col gap-4"
         style={{ padding: '8px 18px 12px' }}
       >
         {messages.map((m, i) => (
-          <MessageBubble key={i} m={m} />
+          <MessageBubble key={i} m={m} isLastAndStreaming={running && i === messages.length - 1} />
         ))}
       </div>
 
@@ -207,38 +228,42 @@ export const AIPanel: React.FC = () => {
   );
 };
 
-const MessageBubble: React.FC<{ m: Message }> = ({ m }) => {
+const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({ m, isLastAndStreaming }) => {
   const isYou = m.who === 'you';
+  const hasText = m.text && m.text.length > 0;
   return (
     <div className={`flex flex-col gap-1.5 ${isYou ? 'items-end' : 'items-start'}`}>
-      <div
-        className="text-sm leading-relaxed"
-        style={{
-          background: isYou ? 'var(--accent-soft)' : 'var(--surface-1)',
-          color: 'var(--chrome-fg)',
-          padding: isYou ? '11px 14px' : '12px 14px',
-          maxWidth: isYou ? '88%' : '92%',
-          borderRadius: isYou ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-          boxShadow: isYou ? 'none' : '0 1px 2px rgba(20,15,10,0.04), 0 0 0 0.5px var(--chrome-border)',
-        }}
-      >
-        {m.loading && !m.text ? <ThinkingDots /> : m.text}
-      </div>
+      {(hasText || (m.loading && !hasText)) && (
+        <div
+          className="text-sm leading-relaxed"
+          style={{
+            background: isYou ? 'var(--accent-soft)' : 'var(--surface-1)',
+            color: 'var(--chrome-fg)',
+            padding: isYou ? '11px 14px' : '12px 14px',
+            maxWidth: isYou ? '88%' : '92%',
+            borderRadius: isYou ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+            boxShadow: isYou ? 'none' : '0 1px 2px rgba(20,15,10,0.04), 0 0 0 0.5px var(--chrome-border)',
+            wordBreak: 'break-word',
+          }}
+        >
+          {m.loading && !hasText ? (
+            <ThinkingDots />
+          ) : isYou ? (
+            // User messages: plain text, preserve their line breaks but
+            // don't render their markdown (an over-eager * mid-sentence
+            // shouldn't bold the rest of a paragraph).
+            <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
+          ) : (
+            <>
+              <ChatMarkdown text={m.text} />
+              {isLastAndStreaming && <StreamCursor />}
+            </>
+          )}
+        </div>
+      )}
       {m.tools && m.tools.length > 0 && (
-        <div className="flex flex-wrap gap-1 max-w-[92%]">
-          {m.tools.map((t) => (
-            <span
-              key={t.id}
-              title={JSON.stringify({ input: t.input, output: t.output }, null, 2)}
-              className="text-[11px] px-2 py-0.5 rounded-md font-mono"
-              style={{
-                background: t.isError ? 'rgba(212,77,77,0.10)' : 'var(--surface-2)',
-                color: t.isError ? 'var(--insecure)' : 'var(--chrome-fg-muted)',
-              }}
-            >
-              {t.name}{t.output === undefined ? '…' : ''}
-            </span>
-          ))}
+        <div className="flex flex-col gap-1 w-[92%] max-w-[92%]">
+          {m.tools.map((t) => <ToolChip key={t.id} tool={t} />)}
         </div>
       )}
       {m.followup && !m.loading && (
@@ -261,6 +286,90 @@ const MessageBubble: React.FC<{ m: Message }> = ({ m }) => {
     </div>
   );
 };
+
+const StreamCursor: React.FC = () => (
+  <span
+    aria-hidden
+    style={{
+      display: 'inline-block',
+      width: 6,
+      height: '0.95em',
+      verticalAlign: 'text-bottom',
+      marginLeft: 2,
+      background: 'var(--accent-primary)',
+      borderRadius: 1,
+      animation: 'hz-pulse 1s ease-in-out infinite',
+    }}
+  />
+);
+
+const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
+  const [open, setOpen] = useState(false);
+  const isImage = isImageResult(tool.output);
+  const isPending = tool.output === undefined;
+
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-left text-[11px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5 self-start"
+        style={{
+          background: tool.isError ? 'rgba(212,77,77,0.10)' : 'var(--surface-2)',
+          color: tool.isError ? 'var(--insecure)' : 'var(--chrome-fg-muted)',
+        }}
+      >
+        <span style={{ opacity: 0.5, fontSize: 9 }}>{open ? '▾' : '▸'}</span>
+        <span>{tool.name}</span>
+        {isPending ? (
+          <span className="inline-flex gap-0.5">
+            <span className="hz-dot" style={{ animation: 'hz-bounce 1.2s ease-in-out 0s infinite' }} />
+            <span className="hz-dot" style={{ animation: 'hz-bounce 1.2s ease-in-out 0.15s infinite' }} />
+            <span className="hz-dot" style={{ animation: 'hz-bounce 1.2s ease-in-out 0.30s infinite' }} />
+          </span>
+        ) : null}
+      </button>
+      {open && (
+        <div
+          className="mt-1 text-[11px] rounded-md font-mono"
+          style={{ background: 'var(--surface-2)', padding: '8px 10px', maxWidth: '100%', overflow: 'auto' }}
+        >
+          <div style={{ color: 'var(--chrome-fg-subtle)', marginBottom: 4 }}>input</div>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {JSON.stringify(tool.input, null, 2)}
+          </pre>
+          {!isPending && (
+            <>
+              <div style={{ color: 'var(--chrome-fg-subtle)', margin: '8px 0 4px' }}>output</div>
+              {isImage ? (
+                <img
+                  alt="screenshot"
+                  src={imageDataUri(tool.output)}
+                  style={{ maxWidth: '100%', borderRadius: 6, display: 'block' }}
+                />
+              ) : (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {typeof tool.output === 'string' ? tool.output : JSON.stringify(tool.output, null, 2)}
+                </pre>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** True when the tool result looks like a base64 PNG (browser_screenshot). */
+function isImageResult(out: unknown): boolean {
+  if (!out || typeof out !== 'object') return false;
+  const o = out as { format?: string; base64?: string };
+  return o.format === 'png' && typeof o.base64 === 'string';
+}
+function imageDataUri(out: unknown): string {
+  const o = out as { base64: string };
+  return `data:image/png;base64,${o.base64}`;
+}
 
 const ThinkingDots: React.FC = () => (
   <span className="inline-flex items-center gap-1.5" style={{ color: 'var(--chrome-fg-muted)' }}>

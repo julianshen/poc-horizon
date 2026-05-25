@@ -93,6 +93,26 @@ describe('PiSession', () => {
     ]);
   });
 
+  it('packages image content blocks into an {format,base64,width,height} payload', () => {
+    void session.startTurn('go');
+    emit({ type: 'tool_execution_start', toolCallId: 's1', toolName: 'browser_screenshot', args: {} });
+    emit({
+      type: 'tool_execution_end',
+      toolCallId: 's1',
+      toolName: 'browser_screenshot',
+      result: {
+        content: [{ type: 'image', data: 'BASE64DATA', mimeType: 'image/png' }],
+        details: { width: 1280, height: 800 },
+      },
+      isError: false,
+    });
+    const result = events.find((e) => e.type === 'tool_result' && e.id === 's1');
+    expect(result).toMatchObject({
+      type: 'tool_result',
+      output: { format: 'png', base64: 'BASE64DATA', width: 1280, height: 800 },
+    });
+  });
+
   it('on agent_end emits turn_end and requests get_state to learn the session path', () => {
     void session.startTurn('go');
     emit({ type: 'agent_end' });

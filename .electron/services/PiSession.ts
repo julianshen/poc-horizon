@@ -157,10 +157,24 @@ export class PiSession extends EventEmitter {
 
       case 'tool_execution_end': {
         const id = String(msg.toolCallId ?? '');
-        const result = msg.result as { content?: Array<{ text?: string }> } | undefined;
+        const result = msg.result as { content?: Array<{ type?: string; text?: string; data?: string; mimeType?: string }>; details?: unknown } | undefined;
         const isError = Boolean(msg.isError);
-        const text = result?.content?.map((c) => c.text ?? '').join('') ?? '';
-        this.emitEvent({ type: 'tool_result', id, output: text || result, isError });
+        const blocks = result?.content ?? [];
+        // Image content blocks (e.g. browser_screenshot) win — surface
+        // a stable {format,base64,width,height} shape the AI panel
+        // can render inline. Otherwise concatenate any text blocks; if
+        // both are absent fall back to the raw result (e.g. structured
+        // details from a non-text tool).
+        const image = blocks.find((b) => b.type === 'image' && typeof b.data === 'string');
+        let output: unknown;
+        if (image) {
+          const details = (result?.details ?? {}) as { width?: number; height?: number };
+          output = { format: 'png', base64: image.data, width: details.width ?? 0, height: details.height ?? 0 };
+        } else {
+          const text = blocks.map((c) => c.text ?? '').join('');
+          output = text || result;
+        }
+        this.emitEvent({ type: 'tool_result', id, output, isError });
         return;
       }
 

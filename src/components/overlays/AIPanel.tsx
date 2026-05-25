@@ -83,17 +83,24 @@ export const AIPanel: React.FC = () => {
           }
           case 'tool_result': {
             const tools = (last.tools ?? []).map((t) => t.id === ev.id ? { ...t, output: ev.output, isError: ev.isError } : t);
-            // If this is a render_ui result, merge the A2UI message into
-            // the message's surfaces map so <A2UISurface> can render it.
+            // If this is a render_ui result, merge the A2UI message(s)
+            // into the message's surfaces map so <A2UISurface> can
+            // render it. Also pass the agent's input (the message arg)
+            // — LLMs sometimes leave the body in the tool input and
+            // return only a stub output.
             const tool = tools.find((t) => t.id === ev.id);
             let surfaces = last.surfaces;
             if (tool?.name === 'render_ui' && !ev.isError) {
-              const a2uiMessage = extractA2UIMessage(ev.output);
-              if (a2uiMessage) {
-                const id = surfaceIdOf(a2uiMessage);
+              const messages = [
+                ...extractA2UIMessages(ev.output),
+                ...extractA2UIMessages(tool.input),
+              ];
+              if (messages.length > 0) {
                 surfaces = new Map(surfaces ?? new Map());
-                if (id) {
-                  const merged = applyA2UIMessage(surfaces.get(id) ?? null, a2uiMessage);
+                for (const m of messages) {
+                  const id = surfaceIdOf(m);
+                  if (!id) continue;
+                  const merged = applyA2UIMessage(surfaces.get(id) ?? null, m);
                   if (merged) surfaces.set(id, merged);
                   else surfaces.delete(id);
                 }
@@ -481,18 +488,52 @@ const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
 /**
  * Pi may return the render_ui payload either:
  *   - as the raw object (details survived round-trip), or
- *   - as a JSON-encoded string (PiSession concatenated content[0].text).
- * Handle both — return null if it doesn't parse to a valid A2UI shape.
+ *   - as a JSON-encoded string (PiSession concatenated content[0].text), or
+ *   - wrapped in {message: ...} (the agent passed the message as the
+ *     tool's input arg verbatim).
+ * Furthermore, LLMs frequently shortcut the strict A2UI envelope:
+ *   - {surfaceId, root, components: [...]} — emit BOTH beginRendering+update
+ *   - {root, components: [...]} — synthesize surfaceId
+ *   - {components: [...]} only — synthesize root from first component
+ * extractA2UIMessages returns an ORDERED LIST so the caller can apply
+ * begin + update in sequence.
  */
-function extractA2UIMessage(out: unknown): A2UIMessage | null {
+function extractA2UIMessages(out: unknown): A2UIMessage[] {
   let candidate: unknown = out;
   if (typeof candidate === 'string') {
-    try { candidate = JSON.parse(candidate); } catch { return null; }
+    try { candidate = JSON.parse(candidate); } catch { return []; }
   }
-  if (!candidate || typeof candidate !== 'object') return null;
-  const keys = ['beginRendering', 'surfaceUpdate', 'dataModelUpdate', 'deleteSurface'];
-  const hit = keys.find((k) => k in (candidate as Record<string, unknown>));
-  return hit ? (candidate as A2UIMessage) : null;
+  if (!candidate || typeof candidate !== 'object') return [];
+  let obj = candidate as Record<string, unknown>;
+  // Unwrap {message: ...} (the tool's input shape).
+  if ('message' in obj && obj.message && typeof obj.message === 'object' && !('beginRendering' in obj) && !('surfaceUpdate' in obj)) {
+    obj = obj.message as Record<string, unknown>;
+  }
+  // Strict envelope wins if present.
+  const envelope = ['beginRendering', 'surfaceUpdate', 'dataModelUpdate', 'deleteSurface'] as const;
+  const hit = envelope.find((k) => k in obj);
+  if (hit) {
+    const out: A2UIMessage[] = [{ [hit]: obj[hit] } as A2UIMessage];
+    // Some LLMs combine beginRendering + surfaceUpdate in one object.
+    if (hit === 'beginRendering' && 'surfaceUpdate' in obj) {
+      out.push({ surfaceUpdate: obj.surfaceUpdate } as A2UIMessage);
+    }
+    return out;
+  }
+  // Flat shortcut: {root, components}, with or without surfaceId.
+  const components = obj.components;
+  if (Array.isArray(components)) {
+    const surfaceId = typeof obj.surfaceId === 'string' ? obj.surfaceId : 'default';
+    const root = typeof obj.root === 'string'
+      ? obj.root
+      : (components[0] as { id?: string })?.id ?? '';
+    if (!root) return [];
+    return [
+      { beginRendering: { surfaceId, root } },
+      { surfaceUpdate: { surfaceId, components: components as never } },
+    ];
+  }
+  return [];
 }
 
 function surfaceIdOf(msg: A2UIMessage): string | null {

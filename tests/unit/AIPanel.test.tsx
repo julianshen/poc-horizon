@@ -131,6 +131,63 @@ describe('AIPanel', () => {
     act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
   });
 
+  it('render_ui accepts a flat {root, components} shape (LLM shortcut)', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'flat shape' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    act(() => api().emit('ai:event', { type: 'tool_use', id: 'u2', name: 'render_ui', input: { message: {} } }));
+    act(() => api().emit('ai:event', {
+      type: 'tool_result',
+      id: 'u2',
+      output: JSON.stringify({
+        root: 'h',
+        components: [
+          { id: 'h', component: { Heading: { text: { literalString: 'Flat shortcut' } } } },
+        ],
+      }),
+    }));
+    await waitFor(() => expect(screen.getByText('Flat shortcut')).toBeTruthy());
+    act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
+  });
+
+  it('render_ui falls back to first component when root is unspecified', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'no root' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    act(() => api().emit('ai:event', { type: 'tool_use', id: 'u3', name: 'render_ui', input: { message: {} } }));
+    act(() => api().emit('ai:event', {
+      type: 'tool_result',
+      id: 'u3',
+      output: {
+        components: [
+          { id: 'only', component: { Text: { text: { literalString: 'Auto-rooted' } } } },
+        ],
+      },
+    }));
+    await waitFor(() => expect(screen.getByText('Auto-rooted')).toBeTruthy());
+    act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
+  });
+
+  it('render_ui extracts the surface from tool.input when output is opaque', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'input-only' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    act(() => api().emit('ai:event', {
+      type: 'tool_use',
+      id: 'u4',
+      name: 'render_ui',
+      input: { message: { root: 'x', components: [{ id: 'x', component: { Text: { text: { literalString: 'From input' } } } }] } },
+    }));
+    // Pi sometimes returns just {ok:true} for our echo tool — surface
+    // should still render because we also inspect tool.input.
+    act(() => api().emit('ai:event', { type: 'tool_result', id: 'u4', output: { ok: true } }));
+    await waitFor(() => expect(screen.getByText('From input')).toBeTruthy());
+    act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
+  });
+
   it('mention chip × button removes the mention before send', async () => {
     useBrowserStore.setState({
       activeTabId: 't1',

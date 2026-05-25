@@ -206,15 +206,24 @@ export default function (pi: ExtensionAPI): void {
 		name: "render_ui",
 		label: "Render UI",
 		description:
-			"Render rich UI inside the AI panel using A2UI v0.8 declarative components " +
-			"(https://a2ui.org/specification/v0_8). Use for comparisons, summaries, dashboards. " +
-			"Pass a complete A2UI message object — one of beginRendering, surfaceUpdate, " +
-			"dataModelUpdate, deleteSurface. Components are adjacency-list style: " +
-			"a beginRendering names a root id; a surfaceUpdate carries the flat list of " +
-			"{id, component:{Type:{...}}} entries; container components reference children by id. " +
-			"Standard catalog: Text, Heading, Image, Row, Column, Card, Button, TextInput, Divider, List. " +
-			"For best UX: send beginRendering + surfaceUpdate as one render_ui call with the " +
-			"surfaceUpdate.components covering every id referenced from root.",
+			"Render rich UI inside the AI panel using A2UI v0.8 (https://a2ui.org/specification/v0_8). " +
+			"Use for comparisons, summaries, dashboards.\n\n" +
+			"PREFERRED shape — single call, complete tree:\n" +
+			"  render_ui({ message: { surfaceId: 's1', root: 'root', components: [\n" +
+			"    { id: 'root', component: { Card: { child: 'col' } } },\n" +
+			"    { id: 'col', component: { Column: { children: ['title', 'body'], gap: 6 } } },\n" +
+			"    { id: 'title', component: { Heading: { text: { literalString: 'Hello' }, level: 2 } } },\n" +
+			"    { id: 'body', component: { Text: { text: { literalString: 'World' } } } },\n" +
+			"  ] } })\n\n" +
+			"Components are adjacency-list: container components reference children by id. " +
+			"Standard catalog: Text (with usageHint h1..h5|body|caption), Heading (level 1..5), " +
+			"Image (src,alt), Row (children, gap, align), Column (children, gap, align), " +
+			"Card (child), Button (label, action), TextInput (placeholder, value, path), " +
+			"Divider, List (children). All text fields take {literalString:'...'} or {path:'/data/key'}.\n\n" +
+			"Alternate shape — strict envelope (one message per call):\n" +
+			"  render_ui({ message: { beginRendering: { surfaceId, root, styles? } } })\n" +
+			"  render_ui({ message: { surfaceUpdate: { surfaceId, components: [...] } } })\n" +
+			"  render_ui({ message: { dataModelUpdate: { surfaceId, path: '/x', contents: ... } } })",
 		parameters: Type.Object({
 			message: Type.Any({
 				description: "An A2UI v0.8 message object. See spec link above.",

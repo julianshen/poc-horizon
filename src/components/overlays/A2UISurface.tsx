@@ -12,6 +12,13 @@ interface Props { surface: SurfaceState }
  */
 export const A2UISurface: React.FC<Props> = ({ surface }) => {
   const ctx = useMemo<RenderCtx>(() => ({ surface, seen: new Set() }), [surface]);
+  // If the named root isn't (yet) in the components map, fall back to
+  // the first component we have — useful when an LLM streams components
+  // before a final beginRendering, or omits root entirely.
+  const rootId = surface.components.has(surface.root)
+    ? surface.root
+    : (Array.from(surface.components.keys())[0] ?? '');
+  const hasAny = surface.components.size > 0;
   return (
     <div
       style={{
@@ -23,7 +30,11 @@ export const A2UISurface: React.FC<Props> = ({ surface }) => {
         color: 'var(--chrome-fg)',
       }}
     >
-      {renderNode(surface.root, ctx)}
+      {hasAny ? renderNode(rootId, ctx) : (
+        <span style={{ color: 'var(--chrome-fg-subtle)', fontStyle: 'italic' }}>
+          A2UI surface received but no components yet…
+        </span>
+      )}
     </div>
   );
 };

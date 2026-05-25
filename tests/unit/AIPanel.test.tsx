@@ -131,6 +131,33 @@ describe('AIPanel', () => {
     act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
   });
 
+  it('Summarize header button auto-mentions the active tab and sends a canned prompt', () => {
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      tabs: [{ id: 't1', schemaVersion: 1, url: 'https://x', title: 'Some Page', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 }],
+    });
+    render(<AIPanel />);
+    fireEvent.click(screen.getByLabelText('Summarize this page'));
+    const call = api().invokes.find((i) => i.channel === 'ai:start');
+    expect(call).toBeTruthy();
+    expect((call!.payload as { prompt: string }).prompt).toMatch(/Summarize the page I @-mentioned/);
+    expect((call!.payload as { mentionTabIds: string[] }).mentionTabIds).toEqual(['t1']);
+  });
+
+  it('Followup chip "Compare my open tabs" auto-mentions every tab', () => {
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      tabs: [
+        { id: 't1', schemaVersion: 1, url: 'https://a', title: 'A', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 },
+        { id: 't2', schemaVersion: 1, url: 'https://b', title: 'B', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: false, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 },
+      ],
+    });
+    render(<AIPanel />);
+    fireEvent.click(screen.getByText('Compare my open tabs'));
+    const call = api().invokes.find((i) => i.channel === 'ai:start');
+    expect((call!.payload as { mentionTabIds: string[] }).mentionTabIds.sort()).toEqual(['t1', 't2']);
+  });
+
   it('pending llms.txt guides drain into a system card with site sections + links', async () => {
     useBrowserStore.setState({
       activeTabId: 't1',

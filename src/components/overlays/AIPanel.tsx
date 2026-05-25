@@ -44,9 +44,29 @@ const INITIAL: Message[] = [
   {
     who: 'ai',
     text: 'I can see the page you\'re reading. Want a summary, or shall I look something up?',
-    followup: ['Summarize this page', 'Find related in my history', 'Explain selected text'],
+    followup: ['Summarize this page', 'Compare my open tabs', 'Explain selected text'],
   },
 ];
+
+/**
+ * Known one-click presets. Maps the chip label (and the "Summarize"
+ * header button) to a prompt + which tabs to auto-@-mention.
+ *  - `activeTab`: include the focused tab as a mention.
+ *  - `allTabs`: include every non-pinned tab (for multi-tab compare).
+ *  - `none`: just send the literal prompt.
+ */
+function resolvePreset(label: string): { prompt: string; attach: 'activeTab' | 'allTabs' | 'none' } | null {
+  if (label === 'Summarize this page') {
+    return { prompt: 'Summarize the page I @-mentioned. Be concise — 4-6 bullet points covering what it is, key points, and any action items.', attach: 'activeTab' };
+  }
+  if (label === 'Compare my open tabs') {
+    return { prompt: 'Compare the pages I @-mentioned. Call out what each is best for and the most important differences. Use a short table if it helps.', attach: 'allTabs' };
+  }
+  if (label === 'Explain selected text') {
+    return { prompt: 'I\'ll send selected text in a moment — first acknowledge that you understand to wait for the selection, then I\'ll right-click on the page.', attach: 'none' };
+  }
+  return null;
+}
 
 const AI_WIDTH = 360;
 
@@ -164,16 +184,16 @@ export const AIPanel: React.FC = () => {
     return unsub;
   }, []);
 
-  const send = useCallback(() => {
-    const trimmed = draft.trim();
+  const send = useCallback((overridePrompt?: string, overrideMentions?: Mention[]) => {
+    const trimmed = (overridePrompt ?? draft).trim();
     if (!trimmed || running) return;
-    const sentMentions = mentions;
+    const sentMentions = overrideMentions ?? mentions;
     setMessages((m) => [
       ...m,
       { who: 'you', text: trimmed, mentions: sentMentions.length ? sentMentions : undefined },
       { who: 'ai', text: 'Thinking…', loading: true, tools: [] },
     ]);
-    setDraft('');
+    if (!overridePrompt) setDraft('');
     setMentions([]);
     setRunning(true);
     void window.horizonAPI.invoke('ai:start', {
@@ -181,6 +201,31 @@ export const AIPanel: React.FC = () => {
       mentionTabIds: sentMentions.length ? sentMentions.map((m) => m.tabId) : undefined,
     });
   }, [draft, running, mentions]);
+
+  /** Trigger a preset by label. Used by chips and the header Summarize button. */
+  const runPreset = useCallback((label: string) => {
+    if (running) return;
+    const preset = resolvePreset(label);
+    if (!preset) {
+      // Unknown preset — just put the label in the draft for the user to edit.
+      setDraft(label);
+      return;
+    }
+    const allTabs = useBrowserStore.getState().tabs;
+    const activeId = useBrowserStore.getState().activeTabId;
+    let mentions: Mention[] = [];
+    if (preset.attach === 'activeTab') {
+      const active = allTabs.find((t) => t.id === activeId);
+      if (active) mentions = [{ tabId: active.id, title: active.title || active.url }];
+    } else if (preset.attach === 'allTabs') {
+      mentions = allTabs
+        .filter((t) => !t.isPinned && t.id !== activeId)
+        .concat(allTabs.find((t) => t.id === activeId) ?? [])
+        .filter((t): t is NonNullable<typeof t> => Boolean(t))
+        .map((t) => ({ tabId: t.id, title: t.title || t.url }));
+    }
+    send(preset.prompt, mentions);
+  }, [running, send]);
 
   const addMention = useCallback((tabId: string, title: string) => {
     setMentions((cur) => cur.some((m) => m.tabId === tabId) ? cur : [...cur, { tabId, title }]);
@@ -242,6 +287,22 @@ export const AIPanel: React.FC = () => {
           </span>
         </div>
         <button
+          onClick={() => runPreset('Summarize this page')}
+          disabled={running}
+          aria-label="Summarize this page"
+          title="Summarize the current page"
+          className="icon-btn"
+          style={{ width: 26, height: 26 }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            {/* Document-with-lines glyph — the universal "summary" affordance. */}
+            <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+            <polyline points="14 3 14 9 20 9" />
+            <line x1="8" y1="13" x2="16" y2="13" />
+            <line x1="8" y1="17" x2="14" y2="17" />
+          </svg>
+        </button>
+        <button
           onClick={newChat}
           aria-label="New chat"
           title="Start a new conversation"
@@ -269,7 +330,12 @@ export const AIPanel: React.FC = () => {
         style={{ padding: '8px 18px 12px' }}
       >
         {messages.map((m, i) => (
-          <MessageBubble key={i} m={m} isLastAndStreaming={running && i === messages.length - 1} />
+          <MessageBubble
+            key={i}
+            m={m}
+            isLastAndStreaming={running && i === messages.length - 1}
+            onPreset={runPreset}
+          />
         ))}
       </div>
 
@@ -374,7 +440,7 @@ export const AIPanel: React.FC = () => {
   );
 };
 
-const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({ m, isLastAndStreaming }) => {
+const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean; onPreset?: (label: string) => void }> = ({ m, isLastAndStreaming, onPreset }) => {
   if (m.who === 'system' && m.guide) {
     return <LlmsTxtGuideCard guide={m.guide} />;
   }
@@ -436,17 +502,21 @@ const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({
       {m.followup && !m.loading && (
         <div className="flex flex-wrap gap-1.5 mt-0.5">
           {m.followup.map((f) => (
-            <span
+            <button
               key={f}
+              type="button"
+              onClick={() => onPreset?.(f)}
               className="text-xs px-2.5 py-1 rounded-full cursor-pointer"
               style={{
                 background: 'var(--surface-1)',
                 color: 'var(--chrome-fg-muted)',
                 boxShadow: '0 0 0 0.5px var(--chrome-border)',
+                border: 0,
+                font: 'inherit',
               }}
             >
               {f}
-            </span>
+            </button>
           ))}
         </div>
       )}

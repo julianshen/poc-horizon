@@ -22,6 +22,7 @@ import { installAppMenu } from './services/appMenu';
 import { BrowserHarness } from './services/BrowserHarness';
 import { PiSession } from './services/PiSession';
 import { LlmsTxtResolver } from './services/LlmsTxtResolver';
+import { HorizonBridgeServer } from './services/HorizonBridgeServer';
 import type { AgentEvent } from '../src/types/ai';
 import type { Tab } from '../src/types/browser';
 
@@ -62,6 +63,8 @@ let permissionBroker: PermissionBroker;
 // Lazy-init on first ai:start because spawning Pi is expensive.
 let browserHarness: BrowserHarness | null = null;
 let piSession: PiSession | null = null;
+let bridgeServer: HorizonBridgeServer | null = null;
+let bridgePort = 0;
 const llmsTxtResolver = new LlmsTxtResolver();
 
 function initSingletons(): void {
@@ -164,10 +167,19 @@ function registerHandlers(): void {
     }
 
     if (!piSession) {
+      // Bridge server (loopback TCP, random port) lets the Pi extension
+      // call BrowserHarness primitives in-process while Pi itself runs
+      // as a separate subprocess.
+      if (!bridgeServer) {
+        bridgeServer = new HorizonBridgeServer(browserHarness);
+        bridgePort = await bridgeServer.listen();
+      }
       const binary = (settingsManager.get('aiPiBinary' as never) as string) ?? 'pi';
-      const args = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'json'];
+      const baseArgs = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'rpc', '--no-session'];
+      const extensionPath = path.join(__dirname, '../resources/pi-extension/horizon-bridge.ts');
+      const args = [...baseArgs, '-e', extensionPath];
       const maxIterations = (settingsManager.get('aiMaxIterations' as never) as number) ?? 24;
-      piSession = new PiSession({ binary, args, maxIterations }, browserHarness);
+      piSession = new PiSession({ binary, args, maxIterations, env: { HORIZON_BRIDGE_PORT: String(bridgePort) } }, browserHarness);
       piSession.on('event', (e: AgentEvent) => {
         const wc = ctx.window?.webContents;
         if (wc && !wc.isDestroyed()) wc.send(IPC_CHANNELS.AI_EVENT, e);
@@ -323,6 +335,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   piSession?.dispose();
+  bridgeServer?.close();
   browserHarness?.detach();
 });
 

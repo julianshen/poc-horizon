@@ -7,6 +7,8 @@ interface PiOptions {
   binary: string;
   args: string[];
   maxIterations: number;
+  /** Extra env vars merged into the subprocess (e.g. HORIZON_BRIDGE_PORT). */
+  env?: Record<string, string>;
 }
 
 /**
@@ -54,7 +56,10 @@ export class PiSession extends EventEmitter {
   /** Spawn the subprocess. Throws if the binary isn't found. */
   start(): void {
     if (this.proc) return;
-    const proc = spawn(this.opts.binary, this.opts.args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(this.opts.binary, this.opts.args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ...(this.opts.env ?? {}) },
+    });
     proc.stdout!.setEncoding('utf8');
     proc.stderr!.setEncoding('utf8');
     proc.stdout!.on('data', (chunk: string) => this.onStdout(chunk));

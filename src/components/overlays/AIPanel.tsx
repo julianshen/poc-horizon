@@ -3,6 +3,8 @@ import { useBrowserStore } from '../../stores/browserStore';
 import type { AgentEvent } from '../../types/ai';
 import { ChatMarkdown } from './ChatMarkdown';
 import { MentionPicker } from './MentionPicker';
+import { A2UISurface } from './A2UISurface';
+import { applyA2UIMessage, type A2UIMessage, type SurfaceState } from '../../types/a2ui';
 
 interface Mention { tabId: string; title: string }
 
@@ -14,6 +16,13 @@ interface Message {
   loading?: boolean;
   tools?: ToolCall[];
   mentions?: Mention[];
+  /**
+   * A2UI surfaces produced by `render_ui` tool calls in this turn,
+   * keyed by surfaceId. The agent can stream multiple surfaceUpdate
+   * messages targeting the same surfaceId — applyA2UIMessage merges
+   * them into the existing state.
+   */
+  surfaces?: Map<string, SurfaceState>;
 }
 
 const INITIAL: Message[] = [
@@ -74,7 +83,23 @@ export const AIPanel: React.FC = () => {
           }
           case 'tool_result': {
             const tools = (last.tools ?? []).map((t) => t.id === ev.id ? { ...t, output: ev.output, isError: ev.isError } : t);
-            next[next.length - 1] = { ...last, tools };
+            // If this is a render_ui result, merge the A2UI message into
+            // the message's surfaces map so <A2UISurface> can render it.
+            const tool = tools.find((t) => t.id === ev.id);
+            let surfaces = last.surfaces;
+            if (tool?.name === 'render_ui' && !ev.isError) {
+              const a2uiMessage = extractA2UIMessage(ev.output);
+              if (a2uiMessage) {
+                const id = surfaceIdOf(a2uiMessage);
+                surfaces = new Map(surfaces ?? new Map());
+                if (id) {
+                  const merged = applyA2UIMessage(surfaces.get(id) ?? null, a2uiMessage);
+                  if (merged) surfaces.set(id, merged);
+                  else surfaces.delete(id);
+                }
+              }
+            }
+            next[next.length - 1] = { ...last, tools, surfaces };
             return next;
           }
           case 'turn_end':
@@ -349,6 +374,11 @@ const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean }> = ({
           )}
         </div>
       )}
+      {m.surfaces && m.surfaces.size > 0 && (
+        <div className="flex flex-col gap-2 w-[92%] max-w-[92%]">
+          {Array.from(m.surfaces.values()).map((s) => <A2UISurface key={s.id} surface={s} />)}
+        </div>
+      )}
       {m.tools && m.tools.length > 0 && (
         <div className="flex flex-col gap-1 w-[92%] max-w-[92%]">
           {m.tools.map((t) => <ToolChip key={t.id} tool={t} />)}
@@ -447,6 +477,31 @@ const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
     </div>
   );
 };
+
+/**
+ * Pi may return the render_ui payload either:
+ *   - as the raw object (details survived round-trip), or
+ *   - as a JSON-encoded string (PiSession concatenated content[0].text).
+ * Handle both — return null if it doesn't parse to a valid A2UI shape.
+ */
+function extractA2UIMessage(out: unknown): A2UIMessage | null {
+  let candidate: unknown = out;
+  if (typeof candidate === 'string') {
+    try { candidate = JSON.parse(candidate); } catch { return null; }
+  }
+  if (!candidate || typeof candidate !== 'object') return null;
+  const keys = ['beginRendering', 'surfaceUpdate', 'dataModelUpdate', 'deleteSurface'];
+  const hit = keys.find((k) => k in (candidate as Record<string, unknown>));
+  return hit ? (candidate as A2UIMessage) : null;
+}
+
+function surfaceIdOf(msg: A2UIMessage): string | null {
+  if ('beginRendering' in msg) return msg.beginRendering.surfaceId;
+  if ('surfaceUpdate' in msg) return msg.surfaceUpdate.surfaceId;
+  if ('dataModelUpdate' in msg) return msg.dataModelUpdate.surfaceId;
+  if ('deleteSurface' in msg) return msg.deleteSurface.surfaceId;
+  return null;
+}
 
 /** True when the tool result looks like a base64 PNG (browser_screenshot). */
 function isImageResult(out: unknown): boolean {

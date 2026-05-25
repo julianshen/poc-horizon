@@ -200,4 +200,35 @@ export default function (pi: ExtensionAPI): void {
 		parameters: Type.Object({}),
 		execute: async () => bridge("getTitle", {}),
 	});
+
+	// ─── A2UI: declarative UI inside the AI panel ────────────────────────
+	pi.registerTool({
+		name: "render_ui",
+		label: "Render UI",
+		description:
+			"Render rich UI inside the AI panel using A2UI v0.8 declarative components " +
+			"(https://a2ui.org/specification/v0_8). Use for comparisons, summaries, dashboards. " +
+			"Pass a complete A2UI message object — one of beginRendering, surfaceUpdate, " +
+			"dataModelUpdate, deleteSurface. Components are adjacency-list style: " +
+			"a beginRendering names a root id; a surfaceUpdate carries the flat list of " +
+			"{id, component:{Type:{...}}} entries; container components reference children by id. " +
+			"Standard catalog: Text, Heading, Image, Row, Column, Card, Button, TextInput, Divider, List. " +
+			"For best UX: send beginRendering + surfaceUpdate as one render_ui call with the " +
+			"surfaceUpdate.components covering every id referenced from root.",
+		parameters: Type.Object({
+			message: Type.Any({
+				description: "An A2UI v0.8 message object. See spec link above.",
+			}),
+		}),
+		execute: async (_id, params) => {
+			// The 'execute' just echoes the message back as the tool result.
+			// Pi sends it via tool_execution_end → PiSession.tool_result →
+			// AI panel detects render_ui and renders <A2UISurface>.
+			const message = (params as { message: unknown }).message;
+			return {
+				content: [{ type: "text" as const, text: JSON.stringify(message) }],
+				details: message,
+			};
+		},
+	});
 }

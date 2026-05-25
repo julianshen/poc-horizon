@@ -103,6 +103,34 @@ describe('AIPanel', () => {
     });
   });
 
+  it('a render_ui tool_result renders an A2UI surface inside the AI bubble', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'show me a card' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    // Agent calls render_ui with a Heading inside a Card.
+    act(() => api().emit('ai:event', { type: 'tool_use', id: 'u1', name: 'render_ui', input: { message: {} } }));
+    act(() => api().emit('ai:event', {
+      type: 'tool_result',
+      id: 'u1',
+      output: {
+        beginRendering: { surfaceId: 's1', root: 'card' },
+      },
+    }));
+    act(() => api().emit('ai:event', {
+      type: 'tool_result',
+      id: 'u1',
+      output: {
+        surfaceUpdate: { surfaceId: 's1', components: [
+          { id: 'card', component: { Card: { child: 'heading' } } },
+          { id: 'heading', component: { Heading: { text: { literalString: 'Hello A2UI' } } } },
+        ] },
+      },
+    }));
+    await waitFor(() => expect(screen.getByText('Hello A2UI')).toBeTruthy());
+    act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
+  });
+
   it('mention chip × button removes the mention before send', async () => {
     useBrowserStore.setState({
       activeTabId: 't1',

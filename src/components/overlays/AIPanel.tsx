@@ -1,11 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
+import type { AgentEvent } from '../../types/ai';
 
+interface ToolCall { id: string; name: string; input: Record<string, unknown>; output?: unknown; isError?: boolean }
 interface Message {
   who: 'you' | 'ai';
   text: string;
   followup?: string[];
   loading?: boolean;
+  tools?: ToolCall[];
 }
 
 const INITIAL: Message[] = [
@@ -22,45 +25,61 @@ export const AIPanel: React.FC = () => {
   const toggleAI = useBrowserStore((s) => s.toggleAI);
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
-  // Track in-flight stub-reply timers so we cancel them on unmount and
-  // don't call setMessages on an unmounted component.
-  const pendingTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const [running, setRunning] = useState(false);
 
+  // Listen for streaming agent events. Each event mutates the last AI
+  // message in place: text_delta appends, tool_use/result push into the
+  // tools array, turn_end clears the loading flag.
   useEffect(() => {
-    const timers = pendingTimers.current;
-    return () => {
-      for (const t of timers) clearTimeout(t);
-      timers.clear();
-    };
+    const unsub = window.horizonAPI.on('ai:event', (e: unknown) => {
+      const ev = e as AgentEvent;
+      setMessages((m) => {
+        const next = m.slice();
+        const last = next[next.length - 1];
+        if (!last || last.who !== 'ai') return m;
+        switch (ev.type) {
+          case 'text_delta':
+            next[next.length - 1] = { ...last, text: (last.text === 'Thinking…' ? '' : last.text) + ev.text, loading: false };
+            return next;
+          case 'tool_use': {
+            const tools = (last.tools ?? []).concat({ id: ev.id, name: ev.name, input: ev.input });
+            next[next.length - 1] = { ...last, tools };
+            return next;
+          }
+          case 'tool_result': {
+            const tools = (last.tools ?? []).map((t) => t.id === ev.id ? { ...t, output: ev.output, isError: ev.isError } : t);
+            next[next.length - 1] = { ...last, tools };
+            return next;
+          }
+          case 'turn_end':
+            next[next.length - 1] = { ...last, loading: false };
+            setRunning(false);
+            return next;
+          case 'error':
+            next[next.length - 1] = { ...last, text: (last.text || '') + `\n\n⚠️ ${ev.message}`, loading: false };
+            setRunning(false);
+            return next;
+          default:
+            return m;
+        }
+      });
+    });
+    return unsub;
   }, []);
 
   const send = useCallback(() => {
     const trimmed = draft.trim();
-    if (!trimmed) return;
-    setMessages((m) => [
-      ...m,
-      { who: 'you', text: trimmed },
-      { who: 'ai', text: 'Thinking…', loading: true },
-    ]);
+    if (!trimmed || running) return;
+    setMessages((m) => [...m, { who: 'you', text: trimmed }, { who: 'ai', text: 'Thinking…', loading: true, tools: [] }]);
     setDraft('');
-    // Stub: in a real build this would call out to an LLM via main process.
-    const timer = setTimeout(() => {
-      pendingTimers.current.delete(timer);
-      setMessages((m) => {
-        const next = m.slice();
-        const lastIdx = next.length - 1;
-        if (next[lastIdx]?.loading) {
-          next[lastIdx] = {
-            who: 'ai',
-            text: 'Horizon\'s AI surface is wired up but not connected to a model yet.',
-            followup: ['Open settings', 'Try a different prompt'],
-          };
-        }
-        return next;
-      });
-    }, 700);
-    pendingTimers.current.add(timer);
-  }, [draft]);
+    setRunning(true);
+    void window.horizonAPI.invoke('ai:start', { prompt: trimmed });
+  }, [draft, running]);
+
+  const cancel = useCallback(() => {
+    void window.horizonAPI.invoke('ai:cancel', {});
+    setRunning(false);
+  }, []);
 
   const onKey = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -114,6 +133,16 @@ export const AIPanel: React.FC = () => {
           <MessageBubble key={i} m={m} />
         ))}
       </div>
+
+      {running && (
+        <button
+          onClick={cancel}
+          className="self-end text-xs mr-4 mb-1 px-2 py-0.5 rounded-md"
+          style={{ color: 'var(--chrome-fg-muted)', background: 'var(--surface-hover)' }}
+        >
+          Stop
+        </button>
+      )}
 
       <div className="flex gap-2 items-end relative" style={{ padding: '4px 14px 14px' }}>
         <textarea
@@ -173,8 +202,25 @@ const MessageBubble: React.FC<{ m: Message }> = ({ m }) => {
           boxShadow: isYou ? 'none' : '0 1px 2px rgba(20,15,10,0.04), 0 0 0 0.5px var(--chrome-border)',
         }}
       >
-        {m.loading ? <ThinkingDots /> : m.text}
+        {m.loading && !m.text ? <ThinkingDots /> : m.text}
       </div>
+      {m.tools && m.tools.length > 0 && (
+        <div className="flex flex-wrap gap-1 max-w-[92%]">
+          {m.tools.map((t) => (
+            <span
+              key={t.id}
+              title={JSON.stringify({ input: t.input, output: t.output }, null, 2)}
+              className="text-[11px] px-2 py-0.5 rounded-md font-mono"
+              style={{
+                background: t.isError ? 'rgba(212,77,77,0.10)' : 'var(--surface-2)',
+                color: t.isError ? 'var(--insecure)' : 'var(--chrome-fg-muted)',
+              }}
+            >
+              {t.name}{t.output === undefined ? '…' : ''}
+            </span>
+          ))}
+        </div>
+      )}
       {m.followup && !m.loading && (
         <div className="flex flex-wrap gap-1.5 mt-0.5">
           {m.followup.map((f) => (

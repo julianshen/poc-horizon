@@ -51,6 +51,17 @@ export const DEFAULT_SETTINGS = {
   spellcheck: true,
   spellcheckLanguages: ['en-US'],
   certificateOverrides: {},
+  // ─── AI / Pi agent (POC) ─────────────────────────────────────────
+  /** Master toggle for the Pi agent integration. */
+  aiEnabled: false,
+  /** Path or name of the `pi` binary; if not on $PATH, an absolute path. */
+  aiPiBinary: 'pi',
+  /** Extra flags passed to `pi` (e.g. provider / model overrides). */
+  aiPiArgs: ['--mode', 'json'],
+  /** When true, fetch /llms.txt of the active site and prepend as agent context. */
+  aiUseLlmsTxt: true,
+  /** Hard cap on tool-call iterations per agent turn (safety). */
+  aiMaxIterations: 24,
 };
 
 export const SEARCH_ENGINES = {

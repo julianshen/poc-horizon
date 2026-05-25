@@ -110,6 +110,14 @@ export interface IpcChannels {
   'autofill:showDropdown': { tabId: string; fieldId: string; suggestions: import('./browser').AutofillMatch[]; position: { x: number; y: number; width: number; height: number } };
   /** Native application menu → renderer: ask the renderer to run a UI command. */
   'menu:command': { command: string };
+
+  // ─── AI agent (Pi integration) ────────────────────────────────────
+  /** Start a new agent turn with the user's prompt against the active tab. */
+  'ai:start': { prompt: string; tabId?: string };
+  /** Cancel the in-flight turn, if any. */
+  'ai:cancel': Record<string, never>;
+  /** Main → Renderer: streaming events from the agent loop. */
+  'ai:event': import('./ai').AgentEvent;
 }
 
 type PermissionType = import('./browser').PermissionType;

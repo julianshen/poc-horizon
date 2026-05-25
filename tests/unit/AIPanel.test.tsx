@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { setupRendererTest } from '../helpers/fakeHorizonAPI';
 import { AIPanel } from '@/components/overlays/AIPanel';
 
@@ -21,18 +21,48 @@ describe('AIPanel', () => {
     expect((send as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('Enter (no shift) submits and queues a stub AI reply', async () => {
+  it('Enter (no shift) submits and dispatches ai:start IPC with the prompt', async () => {
     render(<AIPanel />);
     const ta = screen.getByPlaceholderText(/Ask anything/);
     fireEvent.change(ta, { target: { value: 'hello' } });
     fireEvent.keyDown(ta, { key: 'Enter' });
     // The "you" bubble renders immediately.
     expect(screen.getByText('hello')).toBeTruthy();
-    // The stub reply fires after 700ms — wait for it.
-    await waitFor(
-      () => expect(screen.getByText(/AI surface is wired up/)).toBeTruthy(),
-      { timeout: 2000 }
-    );
+    // ai:start IPC fires with the prompt for the agent to take over.
+    await waitFor(() => {
+      expect(api().invokes).toContainEqual({ channel: 'ai:start', payload: { prompt: 'hello' } });
+    });
+  });
+
+  it('streams ai:event text_delta into the AI bubble', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'hi' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    act(() => api().emit('ai:event', { type: 'text_delta', text: 'Hello back!' }));
+    await waitFor(() => expect(screen.getByText('Hello back!')).toBeTruthy());
+    act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
+  });
+
+  it('renders tool_use chips in the AI bubble while the agent runs', async () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'go' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    act(() => api().emit('ai:event', { type: 'tool_use', id: 't1', name: 'navigate', input: { url: 'https://x' } }));
+    await waitFor(() => expect(screen.getByText(/navigate/)).toBeTruthy());
+    act(() => api().emit('ai:event', { type: 'tool_result', id: 't1', output: { ok: true } }));
+    act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
+  });
+
+  it('Stop button cancels the in-flight turn', () => {
+    render(<AIPanel />);
+    const ta = screen.getByPlaceholderText(/Ask anything/);
+    fireEvent.change(ta, { target: { value: 'go' } });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    const stop = screen.getByText('Stop');
+    fireEvent.click(stop);
+    expect(api().invokes).toContainEqual({ channel: 'ai:cancel', payload: {} });
   });
 
   it('Shift+Enter does not submit (the draft stays in the textarea)', () => {

@@ -19,6 +19,10 @@ import { TabSessionStore } from './services/TabSessionStore';
 import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
 import { applySpellcheckToSession } from './services/spellcheck';
 import { installAppMenu } from './services/appMenu';
+import { BrowserHarness } from './services/BrowserHarness';
+import { PiSession } from './services/PiSession';
+import { LlmsTxtResolver } from './services/LlmsTxtResolver';
+import type { AgentEvent } from '../src/types/ai';
 import type { Tab } from '../src/types/browser';
 
 
@@ -53,6 +57,12 @@ let passwordManager: PasswordManager;
 let autofillManager: AutofillManager;
 let tabSessionStore: TabSessionStore;
 let permissionBroker: PermissionBroker;
+
+// Single shared browser harness + Pi session for the AI panel POC.
+// Lazy-init on first ai:start because spawning Pi is expensive.
+let browserHarness: BrowserHarness | null = null;
+let piSession: PiSession | null = null;
+const llmsTxtResolver = new LlmsTxtResolver();
 
 function initSingletons(): void {
   if (settingsManager) return;
@@ -137,6 +147,52 @@ function registerHandlers(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.WINDOW_NEW_INCOGNITO, () => createWindow({ incognito: true }));
+
+  // ─── AI agent (Pi POC) ──────────────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.AI_START, async (event, { prompt }: { prompt: string }) => {
+    const ctx = resolve(event);
+    const active = ctx.tabManager.getActiveTabId();
+    if (!active) return { ok: false, error: 'No active tab' };
+    const view = ctx.tabManager.getBrowserView(active);
+    if (!view) return { ok: false, error: 'Active tab has no BrowserView' };
+
+    if (!browserHarness) browserHarness = new BrowserHarness();
+    try {
+      browserHarness.attach(view.webContents);
+    } catch (err) {
+      return { ok: false, error: `Could not attach debugger: ${(err as Error).message}` };
+    }
+
+    if (!piSession) {
+      const binary = (settingsManager.get('aiPiBinary' as never) as string) ?? 'pi';
+      const args = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'json'];
+      const maxIterations = (settingsManager.get('aiMaxIterations' as never) as number) ?? 24;
+      piSession = new PiSession({ binary, args, maxIterations }, browserHarness);
+      piSession.on('event', (e: AgentEvent) => {
+        const wc = ctx.window?.webContents;
+        if (wc && !wc.isDestroyed()) wc.send(IPC_CHANNELS.AI_EVENT, e);
+      });
+    }
+
+    // If enabled, prepend the active site's llms.txt as agent context.
+    // Done out-of-band so a slow fetch can't block the turn (3s timeout
+    // inside LlmsTxtResolver), and silently skipped if 404.
+    let augmentedPrompt = prompt;
+    const useLlmsTxt = settingsManager.get('aiUseLlmsTxt' as never) as boolean;
+    if (useLlmsTxt) {
+      try {
+        const origin = new URL(view.webContents.getURL()).origin;
+        const skills = await llmsTxtResolver.fetch(origin);
+        if (skills) {
+          augmentedPrompt = `<site-skills origin="${origin}">\n${skills}\n</site-skills>\n\n${prompt}`;
+        }
+      } catch { /* invalid URL (horizon:// etc.) — skip */ }
+    }
+    void piSession.startTurn(augmentedPrompt);
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AI_CANCEL, () => { piSession?.cancel(); return { ok: true }; });
   ipcMain.handle(IPC_CHANNELS.PERMISSION_RESPOND, (_event, { id, decision }: { id: string; decision: PermissionDecision }) => {
     if (!permissionBroker) return false;
     return permissionBroker.respond(id, decision);
@@ -263,6 +319,11 @@ app.whenReady().then(() => {
     openNewWindow: (opts) => createWindow(opts),
   });
   createWindow();
+});
+
+app.on('before-quit', () => {
+  piSession?.dispose();
+  browserHarness?.detach();
 });
 
 app.on('window-all-closed', () => {

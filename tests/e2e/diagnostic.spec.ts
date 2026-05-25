@@ -203,7 +203,6 @@ test('collect diagnostics', async () => {
   // ── Pi agent end-to-end: ai:start IPC → PiSession spawns pi --mode rpc
   // → text_delta events stream back via ai:event. Skipped if `pi` isn't
   // on PATH (CI without Pi installed).
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { spawnSync } = await import('child_process');
   const piAvailable = spawnSync('pi', ['--version']).status === 0;
   if (!piAvailable) {

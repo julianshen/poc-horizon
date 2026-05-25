@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, protocol, safeStorage, session, IpcMainInvokeEvent } from 'electron';
 import path from 'path';
+import { existsSync } from 'fs';
 import { WindowManager } from './services/WindowManager';
 import { TabManager } from './services/TabManager';
 import { SessionManager } from './services/SessionManager';
@@ -175,14 +176,26 @@ function registerHandlers(): void {
         bridgePort = await bridgeServer.listen();
       }
       const binary = (settingsManager.get('aiPiBinary' as never) as string) ?? 'pi';
-      const baseArgs = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'rpc', '--no-session'];
+      const baseArgs = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'rpc'];
       const extensionPath = path.join(__dirname, '../resources/pi-extension/horizon-bridge.ts');
-      const args = [...baseArgs, '-e', extensionPath];
+      // Resume a previous session if we saved its path last time. Pi
+      // accepts a full file path or short UUID prefix; we always pass
+      // the absolute path. If the saved file no longer exists, Pi
+      // starts a fresh session and we capture the new path below.
+      const savedSession = (settingsManager.get('aiSessionPath' as never) as string) || '';
+      const sessionArgs = savedSession && existsSync(savedSession) ? ['--session', savedSession] : [];
+      const args = [...baseArgs, ...sessionArgs, '-e', extensionPath];
       const maxIterations = (settingsManager.get('aiMaxIterations' as never) as number) ?? 24;
       piSession = new PiSession({ binary, args, maxIterations, env: { HORIZON_BRIDGE_PORT: String(bridgePort) } }, browserHarness);
       piSession.on('event', (e: AgentEvent) => {
         const wc = ctx.window?.webContents;
         if (wc && !wc.isDestroyed()) wc.send(IPC_CHANNELS.AI_EVENT, e);
+      });
+      // Capture the session file path so next launch can --session it.
+      piSession.on('session', (sessionFile: string) => {
+        try {
+          settingsManager.set('aiSessionPath' as never, sessionFile as never);
+        } catch { /* settings write failures are non-fatal */ }
       });
     }
 

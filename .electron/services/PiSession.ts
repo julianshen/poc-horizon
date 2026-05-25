@@ -42,6 +42,10 @@ export class PiSession extends EventEmitter {
   private proc: ChildProcess | null = null;
   private buf = '';
   private running = false;
+  /** Pi's session file path, captured from the first get_state response. */
+  private sessionFile: string | null = null;
+  /** Counter for request IDs we send to Pi (so we can correlate responses). */
+  private reqId = 0;
 
   constructor(
     private readonly opts: PiOptions,
@@ -52,6 +56,8 @@ export class PiSession extends EventEmitter {
   }
 
   get isRunning(): boolean { return this.running; }
+  /** Path of the Pi session file on disk, or null if not yet known. */
+  get sessionPath(): string | null { return this.sessionFile; }
 
   /** Spawn the subprocess. Throws if the binary isn't found. */
   start(): void {
@@ -167,6 +173,10 @@ export class PiSession extends EventEmitter {
         if (t === 'agent_end') {
           this.emitEvent({ type: 'turn_end', reason: 'stop' });
           this.running = false;
+          // Capture the session file path once per process, after the
+          // first turn completes (Pi has actually written something to
+          // it by now). main listens on 'session' to persist the path.
+          if (!this.sessionFile) this.requestSessionFile();
         }
         return;
       }
@@ -186,6 +196,15 @@ export class PiSession extends EventEmitter {
       case 'response': {
         if (msg.success === false) {
           this.emitEvent({ type: 'error', message: `Pi command failed: ${String(msg.error ?? 'unknown')}` });
+          return;
+        }
+        // get_state reply carries sessionFile — persist for later resume.
+        if (msg.command === 'get_state') {
+          const data = msg.data as { sessionFile?: string } | undefined;
+          if (data?.sessionFile && data.sessionFile !== this.sessionFile) {
+            this.sessionFile = data.sessionFile;
+            this.emit('session', data.sessionFile);
+          }
         }
         return;
       }
@@ -194,6 +213,10 @@ export class PiSession extends EventEmitter {
       default:
         return;
     }
+  }
+
+  private requestSessionFile(): void {
+    this.send({ id: `req-${++this.reqId}`, type: 'get_state' });
   }
 
   private send(msg: object): void {

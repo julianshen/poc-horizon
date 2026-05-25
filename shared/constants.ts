@@ -56,8 +56,10 @@ export const DEFAULT_SETTINGS = {
   aiEnabled: false,
   /** Path or name of the `pi` binary; if not on $PATH, an absolute path. */
   aiPiBinary: 'pi',
-  /** Extra flags passed to `pi`. --no-session keeps each Horizon AI turn ephemeral. */
-  aiPiArgs: ['--mode', 'rpc', '--no-session'],
+  /** Extra flags passed to `pi`. Session persists across app restarts via aiSessionPath. */
+  aiPiArgs: ['--mode', 'rpc'],
+  /** Path of the most recent Pi session file, captured automatically; used to resume. */
+  aiSessionPath: '' as string,
   /** When true, fetch /llms.txt of the active site and prepend as agent context. */
   aiUseLlmsTxt: true,
   /** Hard cap on tool-call iterations per agent turn (safety). */

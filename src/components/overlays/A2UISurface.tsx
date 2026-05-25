@@ -100,8 +100,14 @@ function renderBody(body: ComponentBody, ctx: RenderCtx): React.ReactNode {
     return (
       <button
         type="button"
-        // TODO(a2ui-actions): route to the agent via a client→server channel.
-        onClick={() => console.warn('[a2ui] Button action not wired:', body.Button.action)}
+        onClick={() => {
+          void window.horizonAPI.invoke('ai:uiAction', {
+            kind: 'button',
+            surfaceId: ctx.surface.id,
+            label,
+            action: body.Button.action,
+          });
+        }}
         style={{
           background: 'var(--accent-primary)',
           color: 'white',
@@ -124,7 +130,17 @@ function renderBody(body: ComponentBody, ctx: RenderCtx): React.ReactNode {
       <input
         defaultValue={value}
         placeholder={placeholder}
-        // TODO(a2ui-actions): on blur/change emit data-model update back to the agent.
+        onBlur={(e) => {
+          const next = e.currentTarget.value;
+          if (next === value) return; // no change → no spam
+          void window.horizonAPI.invoke('ai:uiAction', {
+            kind: 'input',
+            surfaceId: ctx.surface.id,
+            path: body.TextInput.path,
+            placeholder,
+            value: next,
+          });
+        }}
         style={{
           background: 'var(--surface-1)',
           border: '0.5px solid var(--chrome-border)',

@@ -139,6 +139,12 @@ export interface IpcChannels {
   /** User right-clicked a text selection and chose "Ask Horizon".
    *  Renderer opens AI panel and pre-populates the prompt. */
   'ai:askFromSelection': { selection: string; pageUrl: string; pageTitle: string };
+  /** User interacted with an A2UI element. The agent receives a
+   *  steering / prompt message describing the interaction so it can
+   *  decide what to do next. */
+  'ai:uiAction':
+    | { kind: 'button'; surfaceId: string; label: string; action?: string }
+    | { kind: 'input'; surfaceId: string; path?: string; placeholder?: string; value: string };
 }
 
 type PermissionType = import('./browser').PermissionType;

@@ -57,6 +57,7 @@ export const IPC_CHANNELS = {
   AI_EVENT: 'ai:event',
   AI_LLMS_TXT_FOUND: 'ai:llmsTxtFound',
   AI_ASK_FROM_SELECTION: 'ai:askFromSelection',
+  AI_UI_ACTION: 'ai:uiAction',
   APP_QUIT: 'app:quit',
   APP_GET_VERSION: 'app:getVersion',
   APP_CHECK_FOR_UPDATES: 'app:checkForUpdates',

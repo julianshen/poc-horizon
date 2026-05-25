@@ -304,6 +304,29 @@ function registerHandlers(): void {
     return { ok: true };
   });
 
+  ipcMain.handle(IPC_CHANNELS.AI_UI_ACTION, (event, payload: unknown) => {
+    const ctx = resolve(event);
+    const piSession = piSessions.get(ctx.window.webContents.id);
+    if (!piSession) return { ok: false, error: 'No active Pi session' };
+    const a = payload as
+      | { kind: 'button'; surfaceId: string; label: string; action?: string }
+      | { kind: 'input'; surfaceId: string; path?: string; placeholder?: string; value: string };
+    // Format the interaction as natural language. The agent sees this as
+    // a user message and decides whether to render a follow-up surface
+    // or take a different tool action.
+    let message: string;
+    if (a.kind === 'button') {
+      message = a.action
+        ? `[ui] On surface "${a.surfaceId}", I clicked the button "${a.label}" (action: ${a.action}).`
+        : `[ui] On surface "${a.surfaceId}", I clicked the button "${a.label}".`;
+    } else {
+      const label = a.path ? `field "${a.path}"` : a.placeholder ? `field "${a.placeholder}"` : 'a text field';
+      message = `[ui] On surface "${a.surfaceId}", I set ${label} to: ${JSON.stringify(a.value)}`;
+    }
+    void piSession.startTurn(message);
+    return { ok: true };
+  });
+
   ipcMain.handle(IPC_CHANNELS.AI_NEW_CHAT, (event) => {
     const ctx = resolve(event);
     const wcId = ctx.window.webContents.id;

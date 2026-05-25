@@ -25,6 +25,11 @@ interface BrowserState {
   }>;
   pushLlmsGuide: (g: BrowserState['pendingLlmsGuides'][number]) => void;
   consumeLlmsGuides: () => BrowserState['pendingLlmsGuides'];
+  /** A pending "ask AI about this selection" request — main pushes,
+   *  AIPanel drains by prefilling its draft. Null when nothing pending. */
+  pendingSelection: { selection: string; pageUrl: string; pageTitle: string } | null;
+  pushSelection: (s: { selection: string; pageUrl: string; pageTitle: string }) => void;
+  consumeSelection: () => { selection: string; pageUrl: string; pageTitle: string } | null;
   // Component-local menus lifted to the store so BrowserContentArea can
   // hide the BrowserView when they're open — Electron's BrowserView paints
   // above all DOM, so an open menu that crosses into the view region would
@@ -65,6 +70,13 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   consumeLlmsGuides: () => {
     let drained: BrowserState['pendingLlmsGuides'] = [];
     set((state) => { drained = state.pendingLlmsGuides; return { pendingLlmsGuides: [] }; });
+    return drained;
+  },
+  pendingSelection: null,
+  pushSelection: (s) => set({ pendingSelection: s }),
+  consumeSelection: () => {
+    let drained: BrowserState['pendingSelection'] = null;
+    set((state) => { drained = state.pendingSelection; return { pendingSelection: null }; });
     return drained;
   },
 

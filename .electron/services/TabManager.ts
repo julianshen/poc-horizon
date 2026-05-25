@@ -189,6 +189,19 @@ export class TabManager {
       const menu = buildWebContextMenu(params, {
         wc,
         openInNewTab: (url) => this.createTab(url),
+        // Tell the chrome renderer to open the AI panel and prefill
+        // a prompt with the selection. The chrome's webContents is on
+        // this.window — distinct from the BrowserView's wc.
+        askAI: (selection) => {
+          const chromeWc = this.window.webContents;
+          if (chromeWc && !chromeWc.isDestroyed()) {
+            chromeWc.send('ai:askFromSelection', {
+              selection,
+              pageUrl: wc.getURL(),
+              pageTitle: wc.getTitle(),
+            });
+          }
+        },
       });
       menu.popup({ window: this.window });
     });

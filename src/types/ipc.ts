@@ -136,6 +136,9 @@ export interface IpcChannels {
     hasFull: boolean;
     skillFile?: string;
   };
+  /** User right-clicked a text selection and chose "Ask Horizon".
+   *  Renderer opens AI panel and pre-populates the prompt. */
+  'ai:askFromSelection': { selection: string; pageUrl: string; pageTitle: string };
 }
 
 type PermissionType = import('./browser').PermissionType;

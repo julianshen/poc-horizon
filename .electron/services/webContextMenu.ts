@@ -3,6 +3,8 @@ import { Menu, MenuItemConstructorOptions, WebContents, clipboard, shell } from 
 interface BuildArgs {
   wc: WebContents;
   openInNewTab: (url: string) => void;
+  /** Optional: surface "Ask Horizon about this" for selected text. */
+  askAI?: (selection: string) => void;
 }
 
 /**
@@ -13,7 +15,7 @@ interface BuildArgs {
  */
 export function buildWebContextMenu(
   params: Electron.ContextMenuParams,
-  { wc, openInNewTab }: BuildArgs
+  { wc, openInNewTab, askAI }: BuildArgs
 ): Menu {
   const template: MenuItemConstructorOptions[] = [];
   const sep = (): void => { template.push({ type: 'separator' }); };
@@ -88,14 +90,18 @@ export function buildWebContextMenu(
     );
     sep();
   } else if (params.selectionText) {
-    // Non-editable but has selection — copy only.
-    template.push(
-      { label: 'Copy', role: 'copy' },
-      {
-        label: `Search the web for "${trim(params.selectionText, 28)}"`,
-        click: () => openInNewTab(`https://duckduckgo.com/?q=${encodeURIComponent(params.selectionText)}`),
-      },
-    );
+    // Non-editable but has selection — copy + AI affordances.
+    template.push({ label: 'Copy', role: 'copy' });
+    if (askAI) {
+      template.push({
+        label: `Ask Horizon about "${trim(params.selectionText, 28)}"`,
+        click: () => askAI(params.selectionText),
+      });
+    }
+    template.push({
+      label: `Search the web for "${trim(params.selectionText, 28)}"`,
+      click: () => openInNewTab(`https://duckduckgo.com/?q=${encodeURIComponent(params.selectionText)}`),
+    });
     sep();
   }
 

@@ -81,6 +81,8 @@ export const AIPanel: React.FC = () => {
   const toggleAI = useBrowserStore((s) => s.toggleAI);
   const pendingGuides = useBrowserStore((s) => s.pendingLlmsGuides);
   const consumeGuides = useBrowserStore((s) => s.consumeLlmsGuides);
+  const pendingSelection = useBrowserStore((s) => s.pendingSelection);
+  const consumeSelection = useBrowserStore((s) => s.consumeSelection);
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
   const [running, setRunning] = useState(false);
@@ -105,6 +107,17 @@ export const AIPanel: React.FC = () => {
     // a small overshoot when the user is reading the latest reply.
     stickyRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
   }, []);
+
+  // Drain a pending "ask AI about this selection" request into the
+  // draft. We prefill rather than auto-send so the user can refine
+  // the question before hitting Enter.
+  useEffect(() => {
+    if (!pendingSelection) return;
+    const { selection, pageUrl, pageTitle } = pendingSelection;
+    consumeSelection();
+    const quoted = selection.length > 600 ? selection.slice(0, 600) + '…' : selection;
+    setDraft(`Regarding this selection from "${pageTitle}" (${pageUrl}):\n\n> ${quoted}\n\n`);
+  }, [pendingSelection, consumeSelection]);
 
   // Drain queued llms.txt guides into the messages list as system cards.
   // Dedup per-origin within this AIPanel mount; main also dedups by

@@ -131,6 +131,19 @@ describe('AIPanel', () => {
     act(() => api().emit('ai:event', { type: 'turn_end', reason: 'stop' }));
   });
 
+  it('Ask AI on selection prefills the draft (and the panel opens via the store hook in App)', async () => {
+    // The pendingSelection field is normally set by the useAskFromSelection
+    // hook in response to an IPC; we set it directly here.
+    useBrowserStore.setState({
+      activeTabId: 't1',
+      pendingSelection: { selection: 'recursion is when a function calls itself', pageUrl: 'https://x', pageTitle: 'Wiki' },
+    });
+    render(<AIPanel />);
+    const ta = await screen.findByPlaceholderText(/Ask anything/) as HTMLTextAreaElement;
+    await waitFor(() => expect(ta.value).toMatch(/Regarding this selection from "Wiki"/));
+    expect(ta.value).toContain('recursion is when a function calls itself');
+  });
+
   it('Summarize header button auto-mentions the active tab and sends a canned prompt', () => {
     useBrowserStore.setState({
       activeTabId: 't1',

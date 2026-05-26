@@ -114,6 +114,8 @@ export interface Settings {
   spellcheck: boolean;
   spellcheckLanguages: string[];
   certificateOverrides: Record<string, { allow: boolean; errorTypes: string[] }>;
+  /** Agent action confirmation policy. See shared/constants.ts. */
+  aiConfirmActions?: 'never' | 'risky' | 'all';
 }
 
 export interface PasswordEntry {

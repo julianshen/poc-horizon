@@ -13,6 +13,7 @@ import { SettingsPanel } from './components/overlays/SettingsPanel';
 import { AIPanel } from './components/overlays/AIPanel';
 import { CommandPalette } from './components/overlays/CommandPalette';
 import { PermissionPrompt } from './components/overlays/PermissionPrompt';
+import { AiActionPrompt } from './components/overlays/AiActionPrompt';
 import { useBrowserStore } from './stores/browserStore';
 import { useTabs } from './hooks/useTabs';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -71,6 +72,7 @@ const App: React.FC = () => {
       <SettingsPanel />
       <CommandPalette />
       <PermissionPrompt />
+      <AiActionPrompt />
     </div>
   );
 };

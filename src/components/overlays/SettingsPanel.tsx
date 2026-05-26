@@ -72,6 +72,19 @@ export const SettingsPanel: React.FC = () => {
             onChange={(v) => update('doNotTrack', v)}
           />
         </Section>
+        <Section title="AI Agent">
+          <Field label="Confirm agent actions">
+            <Select
+              value={(settings?.aiConfirmActions as string) ?? 'never'}
+              onChange={(v) => update('aiConfirmActions', v as 'never' | 'risky' | 'all')}
+              options={[
+                ['never', 'Never (trust agent)'],
+                ['risky', 'Risky actions only'],
+                ['all', 'Every action'],
+              ]}
+            />
+          </Field>
+        </Section>
         <Section title="Downloads">
           <Toggle
             label="Ask where to save each file"

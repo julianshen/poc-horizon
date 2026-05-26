@@ -64,6 +64,31 @@ describe('DomainSkills', () => {
     expect(() => DomainSkills.normalizeHost('bad/host')).toThrow(/invalid host/);
   });
 
+  it('search() finds matches across all hosts, ranked by line count', async () => {
+    await ds.save('a.com', 'login.md', '# Login wall\nUse SSO button at top right.');
+    await ds.save('b.com', 'captcha.md', '# Captcha trap\nTrigger: 3 searches.\nFix: slow down past captcha checks.\ncaptcha widget id is #cap.');
+    await ds.save('c.com', 'misc.md', '# Misc\nNothing about captchas here.');
+    const hits = await ds.search('captcha');
+    // b.com matches 3 times, c.com once.
+    expect(hits[0].host).toBe('b.com');
+    expect(hits[0].score).toBe(3);
+    expect(hits.map((h) => h.host)).toEqual(['b.com', 'c.com']);
+  });
+
+  it('search() returns [] for empty query', async () => {
+    await ds.save('a.com', 'x.md', 'foo');
+    expect(await ds.search('')).toEqual([]);
+    expect(await ds.search('  ')).toEqual([]);
+  });
+
+  it('search() limits each file to 5 matching lines', async () => {
+    const body = Array.from({ length: 20 }, (_, i) => `line ${i} captcha here`).join('\n');
+    await ds.save('a.com', 'big.md', body);
+    const hits = await ds.search('captcha');
+    expect(hits[0].lines).toHaveLength(5);
+    expect(hits[0].score).toBe(20);
+  });
+
   it('listHosts returns directories with at least one note', async () => {
     await ds.save('a.com', 'x.md', '1');
     await ds.save('b.com', 'y.md', '2');

@@ -106,6 +106,8 @@ Per-site notes you've accumulated live in **`domain-skills/<host>/`**, stored in
 
 If that list is non-empty, **read every entry before inventing an approach**. The agent (you, on previous turns) left those notes for a reason — usually a quirk specific to that site.
 
+When you're on a *new* site but suspect you've handled a similar problem before (captcha, infinite scroll, login wall), search across all saved notes with `browser_domain_skill_search({ query: "captcha" })` — it scans every host's files and returns the best matches.
+
 To add a new one when you discover a quirk worth remembering:
 
 ```

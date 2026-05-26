@@ -482,6 +482,22 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool({
+		name: "browser_domain_skill_search",
+		label: "Search domain skills",
+		description:
+			"Case-insensitive substring search across every saved domain skill, across all " +
+			"hosts. Use when you suspect you've handled a similar problem before but you're on " +
+			"a new site (e.g. 'captcha', 'infinite scroll', 'oauth flow'). Returns up to `limit` " +
+			"files with the matching line numbers + snippets and a score (more matching lines = " +
+			"higher score). Read promising hits in full with browser_domain_skill_read.",
+		parameters: Type.Object({
+			query: Type.String(),
+			limit: Type.Optional(Type.Number()),
+		}),
+		execute: async (_id, params) => bridge("domainSkillSearch", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
 		name: "browser_domain_skill_remove",
 		label: "Remove domain skill",
 		description:

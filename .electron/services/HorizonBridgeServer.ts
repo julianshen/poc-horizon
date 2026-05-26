@@ -232,6 +232,13 @@ export class HorizonBridgeServer {
         if (!host || !name || !body) throw new Error('domainSkillSave: host + name + body required');
         return await this.domainSkills.save(host, name, body);
       }
+      case 'domainSkillSearch': {
+        if (!this.domainSkills) throw new Error('domain skills not enabled');
+        const query = String(args.query ?? '');
+        if (!query) throw new Error('domainSkillSearch: query required');
+        const limit = typeof args.limit === 'number' ? args.limit : 20;
+        return await this.domainSkills.search(query, limit);
+      }
       case 'domainSkillRemove': {
         if (!this.domainSkills) throw new Error('domain skills not enabled');
         const host = String(args.host ?? '');

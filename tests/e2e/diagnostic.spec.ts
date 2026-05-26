@@ -15,7 +15,7 @@ test.beforeAll(async () => {
   fs.mkdirSync('./test-results', { recursive: true });
   app = await electron.launch({
     args: [path.join(__dirname, '../../dist-electron/main.js')],
-    env: { ...process.env, HORIZON_DISABLE_RESTORE: '1' },
+    env: { ...process.env, HORIZON_DISABLE_RESTORE: '1', HORIZON_DISABLE_AI_SPAWN: '1' },
     timeout: 20_000,
   });
   win = await app.firstWindow();
@@ -256,8 +256,16 @@ test('collect diagnostics', async () => {
   });
   log(`Active tab id from DOM: ${tabId}`);
   expect(tabId, 'Expected a tab in the DOM').not.toBeNull();
+  // Make sure no CDP debugger is squatting the BrowserView's wc — the
+  // Pi agent test (above) attached via BrowserHarness, and although
+  // main detaches on turn_end, on slow runs the order can race.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0]!;
+    const wc = w.getBrowserViews()[0]!.webContents;
+    try { if (wc.debugger.isAttached()) wc.debugger.detach(); } catch { /* */ }
+  });
   await win.evaluate((id) => window.horizonAPI.invoke('devtools:toggle', { tabId: id as string }), tabId!);
-  await win.waitForTimeout(500);
+  await win.waitForTimeout(1000);
   const devToolsOpen = await app.evaluate(({ BrowserWindow, webContents }) => {
     const w = BrowserWindow.getAllWindows()[0]!;
     const wc = w.getBrowserViews()[0]!.webContents;

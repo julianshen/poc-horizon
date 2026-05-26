@@ -84,6 +84,52 @@ function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/**
+ * Get-or-create the PiSession for a window. Spawns the Pi subprocess +
+ * bridge server (once per app session). Shared by ai:start, ai:preWarm,
+ * and the post-createWindow proactive warm. Idempotent.
+ *
+ * Promise rejections (e.g. bridge bind failure) are caller-handled —
+ * createWindow's caller wraps in try/catch so a missing pi binary or
+ * port-bind failure doesn't crash startup.
+ */
+async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Promise<PiSession> {
+  const wcId = ctx.window.webContents.id;
+  const existing = piSessions.get(wcId);
+  if (existing) return existing;
+  if (!bridgeServer) {
+    bridgeServer = new HorizonBridgeServer(harness);
+    bridgePort = await bridgeServer.listen();
+  }
+  const kind = aiSessionKindFor(ctx.tabManager);
+  const binary = (settingsManager.get('aiPiBinary' as never) as string) ?? 'pi';
+  const baseArgs = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'rpc'];
+  const extensionPath = path.join(__dirname, '../resources/pi-extension/horizon-bridge.ts');
+  const sessions = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
+  const savedSession = sessions[kind] ?? '';
+  const sessionArgs = savedSession && existsSync(savedSession) ? ['--session', savedSession] : [];
+  const args = [...baseArgs, ...sessionArgs, '-e', extensionPath];
+  const maxIterations = (settingsManager.get('aiMaxIterations' as never) as number) ?? 24;
+  const piSession = new PiSession({ binary, args, maxIterations, env: { HORIZON_BRIDGE_PORT: String(bridgePort) } }, harness);
+  piSession.on('event', (e: AgentEvent) => {
+    const wc = ctx.window?.webContents;
+    if (wc && !wc.isDestroyed()) wc.send(IPC_CHANNELS.AI_EVENT, e);
+    // Release the CDP debugger when the turn ends so DevTools and other
+    // single-client CDP consumers can attach. We re-attach on next
+    // ai:start (cheap — ~50ms).
+    if (e.type === 'turn_end') harness.detach();
+  });
+  piSession.on('session', (sessionFile: string) => {
+    try {
+      const current = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
+      settingsManager.set('aiSessions' as never, { ...current, [kind]: sessionFile } as never);
+    } catch { /* */ }
+  });
+  piSessions.set(wcId, piSession);
+  piSession.start();
+  return piSession;
+}
+
 /** Origins for which we've already surfaced the llms.txt guide this app session. */
 const llmsTxtShownOrigins = new Set<string>();
 
@@ -203,47 +249,6 @@ function registerHandlers(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.WINDOW_NEW_INCOGNITO, () => createWindow({ incognito: true }));
-
-  // ─── AI agent (Pi POC) ──────────────────────────────────────────────
-  /**
-   * Get-or-create the PiSession for a window. Spawns the Pi subprocess
-   * + the bridge server (lazily, once per app session). Shared by
-   * ai:start and ai:preWarm so we can hide spawn latency.
-   */
-  async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Promise<PiSession> {
-    const wcId = ctx.window.webContents.id;
-    const existing = piSessions.get(wcId);
-    if (existing) return existing;
-    if (!bridgeServer) {
-      bridgeServer = new HorizonBridgeServer(harness);
-      bridgePort = await bridgeServer.listen();
-    }
-    const kind = aiSessionKindFor(ctx.tabManager);
-    const binary = (settingsManager.get('aiPiBinary' as never) as string) ?? 'pi';
-    const baseArgs = (settingsManager.get('aiPiArgs' as never) as string[]) ?? ['--mode', 'rpc'];
-    const extensionPath = path.join(__dirname, '../resources/pi-extension/horizon-bridge.ts');
-    const sessions = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
-    const savedSession = sessions[kind] ?? '';
-    const sessionArgs = savedSession && existsSync(savedSession) ? ['--session', savedSession] : [];
-    const args = [...baseArgs, ...sessionArgs, '-e', extensionPath];
-    const maxIterations = (settingsManager.get('aiMaxIterations' as never) as number) ?? 24;
-    const piSession = new PiSession({ binary, args, maxIterations, env: { HORIZON_BRIDGE_PORT: String(bridgePort) } }, harness);
-    piSession.on('event', (e: AgentEvent) => {
-      const wc = ctx.window?.webContents;
-      if (wc && !wc.isDestroyed()) wc.send(IPC_CHANNELS.AI_EVENT, e);
-    });
-    piSession.on('session', (sessionFile: string) => {
-      try {
-        const current = (settingsManager.get('aiSessions' as never) as { default?: string; incognito?: string }) ?? {};
-        settingsManager.set('aiSessions' as never, { ...current, [kind]: sessionFile } as never);
-      } catch { /* */ }
-    });
-    piSessions.set(wcId, piSession);
-    // Spawn the subprocess now — without this it'd be deferred until the
-    // first send() inside startTurn, which is what we're trying to avoid.
-    piSession.start();
-    return piSession;
-  }
 
   ipcMain.handle(IPC_CHANNELS.AI_PRE_WARM, async (event) => {
     const ctx = resolve(event);
@@ -482,6 +487,26 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
     }
     localTabManager.createTab('horizon://newtab');
   });
+
+  // Proactively spawn Pi after the window's first tab is ready. By the
+  // time the user opens the AI panel for the first time, the subprocess
+  // and bridge are already live — first-prompt latency drops by 1-3s.
+  // Wrapped in try/catch so a missing 'pi' binary or bind failure
+  // doesn't crash the browser launch. Skipped for incognito windows
+  // (transient by intent — don't pay the spawn cost) and skippable via
+  // aiSpawnOnStartup = false for users who don't want Pi running.
+  if (!incognito && process.env.HORIZON_DISABLE_AI_SPAWN !== '1') {
+    win.webContents.once('did-finish-load', () => {
+      const enabled = settingsManager.get('aiSpawnOnStartup' as never) as boolean | undefined;
+      if (enabled === false) return;
+      if (!browserHarness) browserHarness = new BrowserHarness();
+      const ctx = contexts.get(wcId);
+      if (!ctx) return;
+      void ensurePiSession(ctx, browserHarness).catch((err) => {
+        console.warn('[main] Pi pre-warm failed (will retry on user-initiated ai:start):', err.message);
+      });
+    });
+  }
 }
 
 app.whenReady().then(() => {

@@ -68,6 +68,8 @@ export const DEFAULT_SETTINGS = {
   aiUseLlmsTxt: true,
   /** Hard cap on tool-call iterations per agent turn (safety). */
   aiMaxIterations: 24,
+  /** Spawn Pi at app startup (vs. lazily on first AI panel open). */
+  aiSpawnOnStartup: true,
   /** Max characters of page text per @-mention prepended to the prompt. */
   aiMentionMaxChars: 30_000,
 };

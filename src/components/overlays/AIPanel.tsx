@@ -553,17 +553,12 @@ const MessageBubbleInner: React.FC<{ m: Message; isLastAndStreaming?: boolean; o
             // don't render their markdown (an over-eager * mid-sentence
             // shouldn't bold the rest of a paragraph).
             <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
-          ) : isLastAndStreaming ? (
-            // During streaming, render plain text — react-markdown parses
-            // the full string on each delta, which costs ~2ms per parse
-            // and creates GC pressure at high delta rates. Swap to
-            // ChatMarkdown after turn_end (the !isLastAndStreaming branch).
-            <>
-              <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
-              <StreamCursor />
-            </>
           ) : (
-            <ChatMarkdown text={m.text} />
+            // Streamdown tolerates incomplete markdown (unclosed code
+            // fences, dangling bold markers etc) and renders a built-in
+            // streaming caret while isAnimating is true — so the same
+            // component drives both streaming and post-stream output.
+            <ChatMarkdown text={m.text} isAnimating={isLastAndStreaming} />
           )}
         </div>
       )}
@@ -813,22 +808,6 @@ const LlmsTxtGuideCard: React.FC<{ guide: LlmsTxtGuide }> = ({ guide }) => {
     </div>
   );
 };
-
-const StreamCursor: React.FC = () => (
-  <span
-    aria-hidden
-    style={{
-      display: 'inline-block',
-      width: 6,
-      height: '0.95em',
-      verticalAlign: 'text-bottom',
-      marginLeft: 2,
-      background: 'var(--accent-primary)',
-      borderRadius: 1,
-      animation: 'hz-pulse 1s ease-in-out infinite',
-    }}
-  />
-);
 
 const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
   const [open, setOpen] = useState(false);

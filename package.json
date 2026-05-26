@@ -22,7 +22,7 @@
     "@types/uuid": "^10.0.0",
     "better-sqlite3": "^12.10.0",
     "electron-updater": "^6.3.0",
-    "react-markdown": "^10.1.0",
+    "streamdown": "^2.5.0",
     "uuid": "^14.0.0",
     "zustand": "^5.0.0"
   },

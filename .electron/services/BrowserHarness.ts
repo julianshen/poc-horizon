@@ -9,6 +9,16 @@ export interface TypeArgs { text: string; delayMs?: number }
 export interface ScrollArgs { x?: number; y?: number; deltaX?: number; deltaY?: number }
 export interface ScreenshotResult { format: 'png'; base64: string; width: number; height: number }
 export type EvaluateResult = { ok: true; value: unknown } | { ok: false; error: string };
+export interface Mark {
+  id: number;
+  x: number; y: number;          // click target = center of rect
+  w: number; h: number;
+  tag: string;
+  role: string | null;
+  label: string;                  // accessible name / text, trimmed
+  href: string | null;
+}
+
 export interface DomNode {
   nodeId: number;
   nodeType: number;
@@ -107,6 +117,49 @@ export class BrowserHarness {
       type: 'mouseWheel',
       x, y, deltaX, deltaY,
     });
+  }
+
+  /**
+   * Screenshot the viewport with numbered boxes overlaid on every visible
+   * interactive element. Returns the PNG plus a `marks` array mapping each
+   * number to the click target's center + descriptor.
+   *
+   * Pattern: agent calls this once, then `browser_click({x, y})` with the
+   * coords of mark N instead of pixel-hunting. Cuts the perception loop
+   * from "screenshot → human-eye → guess pixel → verify" to "screenshot
+   * → pick number". Same idea as Anthropic Computer Use's set-of-marks
+   * and browser-use's SoM.
+   *
+   * The overlay is injected, captured, and removed in one Runtime.evaluate
+   * call so we leave no DOM residue if the agent's next action races us.
+   */
+  async screenshotMarked(): Promise<ScreenshotResult & { marks: Mark[] }> {
+    const wc = this.require();
+    // Phase 1: mount the overlay + collect marks. Returns marks; we use them
+    // *after* the screenshot so we can remove the overlay first.
+    const mount = (await wc.debugger.sendCommand('Runtime.evaluate', {
+      expression: MARK_INJECT_JS,
+      returnByValue: true,
+      awaitPromise: true,
+    })) as { exceptionDetails?: { text: string }; result: { value?: Mark[] } };
+    if (mount.exceptionDetails) throw new Error(`screenshotMarked mount: ${mount.exceptionDetails.text}`);
+    const marks: Mark[] = mount.result.value ?? [];
+    // Phase 2: capture.
+    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', { format: 'png' })) as { data: string };
+    const metrics = (await wc.debugger.sendCommand('Page.getLayoutMetrics')) as {
+      visualViewport: { clientWidth: number; clientHeight: number };
+    };
+    // Phase 3: remove the overlay. Best-effort — page may already be navigating.
+    try {
+      await wc.debugger.sendCommand('Runtime.evaluate', { expression: MARK_REMOVE_JS, returnByValue: true });
+    } catch { /* */ }
+    return {
+      format: 'png',
+      base64: data,
+      width: Math.round(metrics.visualViewport.clientWidth),
+      height: Math.round(metrics.visualViewport.clientHeight),
+      marks,
+    };
   }
 
   async screenshot(): Promise<ScreenshotResult> {
@@ -422,3 +475,71 @@ export class BrowserHarness {
     return r.ok ? r.value : null;
   }
 }
+
+/**
+ * Page-side script: find visible interactive elements, draw numbered
+ * badges over them in a single mount, return the rect + descriptor of
+ * each. The overlay is a single absolutely-positioned div with
+ * `id="__horizon_marks"`; removal is one line. Each badge is rendered
+ * as an inline-block with a fixed style so we don't pollute the page's
+ * own CSS.
+ */
+const MARK_INJECT_JS = `(() => {
+  const PREV = document.getElementById('__horizon_marks');
+  if (PREV) PREV.remove();
+  const cap = 80;
+  const sel = [
+    'a[href]', 'button', 'input:not([type=hidden])', 'select', 'textarea',
+    '[role=button]', '[role=link]', '[role=tab]', '[role=menuitem]',
+    '[role=checkbox]', '[role=radio]', '[role=switch]',
+    '[contenteditable=""]', '[contenteditable=true]', '[tabindex]:not([tabindex="-1"])',
+  ].join(',');
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const seen = new Set();
+  const marks = [];
+  for (const el of document.querySelectorAll(sel)) {
+    if (seen.has(el) || marks.length >= cap) continue;
+    seen.add(el);
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) continue;
+    if (r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') continue;
+    const label = (el.getAttribute('aria-label') ||
+                   el.getAttribute('title') ||
+                   el.getAttribute('placeholder') ||
+                   el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 80);
+    marks.push({
+      id: marks.length + 1,
+      x: Math.round(r.left + r.width / 2),
+      y: Math.round(r.top + r.height / 2),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+      tag: el.tagName.toLowerCase(),
+      role: el.getAttribute('role'),
+      label,
+      href: el.getAttribute('href'),
+      _rect: { l: r.left, t: r.top, w: r.width, h: r.height },
+    });
+  }
+  const overlay = document.createElement('div');
+  overlay.id = '__horizon_marks';
+  overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
+  const colors = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#46f0f0','#f032e6'];
+  for (const m of marks) {
+    const r = m._rect;
+    const box = document.createElement('div');
+    const c = colors[(m.id - 1) % colors.length];
+    box.style.cssText = 'position:absolute;left:'+r.l+'px;top:'+r.t+'px;width:'+r.w+'px;height:'+r.h+'px;border:2px solid '+c+';box-sizing:border-box';
+    const tag = document.createElement('div');
+    tag.textContent = String(m.id);
+    tag.style.cssText = 'position:absolute;left:-2px;top:-18px;background:'+c+';color:#fff;font:bold 12px/16px sans-serif;padding:0 4px;min-width:14px;text-align:center;border-radius:2px';
+    box.appendChild(tag);
+    overlay.appendChild(box);
+    delete m._rect;
+  }
+  document.documentElement.appendChild(overlay);
+  return marks;
+})()`;
+
+const MARK_REMOVE_JS = `(() => { const o = document.getElementById('__horizon_marks'); if (o) o.remove(); })()`;

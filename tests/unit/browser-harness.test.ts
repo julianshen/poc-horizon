@@ -194,6 +194,32 @@ describe('BrowserHarness', () => {
     expect(r.cleared).toBe(2);
   });
 
+  it('screenshotMarked returns PNG + marks and removes the overlay', async () => {
+    const fakeMarks = [
+      { id: 1, x: 50, y: 30, w: 100, h: 20, tag: 'a', role: null, label: 'Home', href: '/' },
+      { id: 2, x: 200, y: 100, w: 80, h: 24, tag: 'button', role: null, label: 'Buy', href: null },
+    ];
+    const sendCommand = vi.fn(async (method: string) => {
+      if (method === 'Page.captureScreenshot') return { data: 'BASE64MARKED' };
+      if (method === 'Page.getLayoutMetrics') return { visualViewport: { clientWidth: 1200, clientHeight: 800 } };
+      if (method === 'Runtime.evaluate') return { result: { value: fakeMarks } };
+      return {};
+    });
+    const { wc } = fakeWc({
+      debugger: { isAttached: () => true, attach: vi.fn(), detach: vi.fn(), on: vi.fn(), off: vi.fn(), sendCommand },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const r = await h.screenshotMarked();
+    expect(r.base64).toBe('BASE64MARKED');
+    expect(r.width).toBe(1200);
+    expect(r.marks).toEqual(fakeMarks);
+    // Mount evaluate + capture + remove evaluate — 3 calls; last must be the remove (no overlay residue).
+    const calls = sendCommand.mock.calls.map((c) => c[0]);
+    expect(calls.filter((c) => c === 'Runtime.evaluate').length).toBe(2);
+    expect(calls).toContain('Page.captureScreenshot');
+  });
+
   it('describeElementAt returns the element descriptor via evaluate', async () => {
     const { wc } = fakeWc({
       debugger: {

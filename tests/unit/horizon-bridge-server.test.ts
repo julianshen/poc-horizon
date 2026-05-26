@@ -11,6 +11,7 @@ function fakeHarness() {
     type: vi.fn(async () => {}),
     scroll: vi.fn(async () => {}),
     screenshot: vi.fn(async () => ({ format: 'png', base64: 'X', width: 100, height: 200 })),
+    screenshotMarked: vi.fn(async () => ({ format: 'png', base64: 'M', width: 100, height: 200, marks: [{ id: 1, x: 10, y: 10, w: 50, h: 20, tag: 'button', role: null, label: 'Go', href: null }] })),
     evaluate: vi.fn(async (e: string) => ({ ok: true, value: e })),
     getDom: vi.fn(async () => ({ nodeId: 1 })),
     getUrl: vi.fn(async () => 'https://x'),
@@ -112,6 +113,15 @@ describe('HorizonBridgeServer', () => {
     const sock = await connectClient(port);
     const resp = await sendRecv(sock, { id: 'e', tool: 'navigate', args: { url: 'x' } });
     expect(resp).toMatchObject({ id: 'e', ok: false, error: 'boom' });
+    sock.destroy();
+  });
+
+  it('routes screenshotMarked through harness.screenshotMarked', async () => {
+    const sock = await connectClient(port);
+    const resp = await sendRecv(sock, { id: 'sm', tool: 'screenshotMarked', args: {} });
+    expect(resp).toMatchObject({ id: 'sm', ok: true });
+    expect((resp.result as { marks: unknown[] }).marks).toHaveLength(1);
+    expect(harness.screenshotMarked).toHaveBeenCalledOnce();
     sock.destroy();
   });
 

@@ -170,6 +170,38 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool({
+		name: "browser_screenshot_marked",
+		label: "Screenshot with marks",
+		description:
+			"Screenshot the viewport with numbered boxes overlaid on every visible " +
+			"interactive element (links, buttons, inputs, role=button, tabindex, etc). " +
+			"Returns the PNG plus `marks`: an array of {id, x, y, w, h, tag, role, label, href}. " +
+			"PREFER this over browser_screenshot when you're about to click — pick a mark id " +
+			"and click its (x, y) directly, instead of eyeballing pixel coordinates from a raw " +
+			"image. Up to 80 marks per call; off-screen and hidden elements are filtered.",
+		parameters: Type.Object({}),
+		execute: async () => {
+			try {
+				const result = (await callBridge("screenshotMarked", {})) as {
+					base64: string; width: number; height: number; marks: Array<Record<string, unknown>>
+				};
+				return {
+					content: [
+						{ type: "image" as const, data: result.base64, mimeType: "image/png" },
+						{ type: "text" as const, text: JSON.stringify({ marks: result.marks, width: result.width, height: result.height }) },
+					],
+					details: { width: result.width, height: result.height, marks: result.marks },
+				};
+			} catch (err) {
+				return {
+					content: [{ type: "text" as const, text: `Marked screenshot failed: ${(err as Error).message}` }],
+					details: { error: (err as Error).message },
+				};
+			}
+		},
+	});
+
+	pi.registerTool({
 		name: "browser_evaluate",
 		label: "Evaluate JS",
 		description: "Run a JavaScript expression in the page and return the value. Useful for reading page data without a screenshot.",

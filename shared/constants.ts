@@ -70,6 +70,9 @@ export const DEFAULT_SETTINGS = {
   aiMaxIterations: 24,
   /** Spawn Pi at app startup (vs. lazily on first AI panel open). */
   aiSpawnOnStartup: true,
+  /** Default target language for Translate Page / Translate Selection.
+   *  Free-form so the user can write "Traditional Chinese", "Spanish", etc. */
+  translateTargetLang: 'English',
   /** Max characters of page text per @-mention prepended to the prompt. */
   aiMentionMaxChars: 30_000,
 };

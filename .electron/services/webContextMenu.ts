@@ -5,6 +5,8 @@ interface BuildArgs {
   openInNewTab: (url: string) => void;
   /** Optional: surface "Ask Horizon about this" for selected text. */
   askAI?: (selection: string) => void;
+  /** Optional: translate selection — opens the in-page overlay with the result. */
+  translateSelection?: (selection: string) => void;
 }
 
 /**
@@ -15,7 +17,7 @@ interface BuildArgs {
  */
 export function buildWebContextMenu(
   params: Electron.ContextMenuParams,
-  { wc, openInNewTab, askAI }: BuildArgs
+  { wc, openInNewTab, askAI, translateSelection }: BuildArgs
 ): Menu {
   const template: MenuItemConstructorOptions[] = [];
   const sep = (): void => { template.push({ type: 'separator' }); };
@@ -96,6 +98,12 @@ export function buildWebContextMenu(
       template.push({
         label: `Ask Horizon about "${trim(params.selectionText, 28)}"`,
         click: () => askAI(params.selectionText),
+      });
+    }
+    if (translateSelection) {
+      template.push({
+        label: `Translate "${trim(params.selectionText, 28)}"`,
+        click: () => translateSelection(params.selectionText),
       });
     }
     template.push({

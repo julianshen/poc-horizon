@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, MenuItemConstructorOptions, shell } from 'electron';
 import type { TabManager } from './TabManager';
+import { translatePage, restorePage } from './pageTranslator';
 
 interface Deps {
   /** Lookup the TabManager of the currently focused window. */
@@ -125,6 +126,26 @@ export function installAppMenu(deps: Deps): void {
         label: 'Zoom Out',
         accelerator: 'CmdOrCtrl+-',
         click: () => bumpZoom(tabOf(), -0.1),
+      },
+      { type: 'separator' },
+      {
+        label: 'Translate Page to English',
+        accelerator: 'CmdOrCtrl+Alt+T',
+        click: () => {
+          const tm = tabOf();
+          const id = tm?.getActiveTabId();
+          const view = id ? tm?.getBrowserView(id) : undefined;
+          if (view) void translatePage(view.webContents, 'English');
+        },
+      },
+      {
+        label: 'Restore Original Page',
+        click: () => {
+          const tm = tabOf();
+          const id = tm?.getActiveTabId();
+          const view = id ? tm?.getBrowserView(id) : undefined;
+          if (view) void restorePage(view.webContents);
+        },
       },
       { type: 'separator' },
       { role: 'togglefullscreen' },

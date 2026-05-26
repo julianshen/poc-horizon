@@ -4,12 +4,66 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Tab, TabGroup, TabGroupColor } from '../../src/types/browser';
 import type { HistoryManager } from './HistoryManager';
 import { buildWebContextMenu } from './webContextMenu';
+import { translateText } from './LlmTranslator';
 
 export type TabManagerMode =
   | { kind: 'default'; historyManager: HistoryManager }
   | { kind: 'incognito' };
 
 const INCOGNITO_PARTITION = 'incognito';
+
+/**
+ * In-page overlay shown next to the user's text selection while a
+ * "Translate selection" is in flight. The overlay starts in
+ * "Translating…" state; main runs the LLM in the background and then
+ * replaces textContent + flips data-state to "done". A click anywhere
+ * outside or the close button removes the overlay.
+ */
+const SELECTION_TRANSLATE_OVERLAY_SHOW = `(function() {
+  document.getElementById('horizon-translate-overlay')?.remove();
+  const sel = window.getSelection();
+  let rect = null;
+  if (sel && sel.rangeCount > 0) {
+    const r = sel.getRangeAt(0).getBoundingClientRect();
+    if (r && (r.width > 0 || r.height > 0)) rect = r;
+  }
+  const overlay = document.createElement('div');
+  overlay.id = 'horizon-translate-overlay';
+  overlay.dataset.state = 'loading';
+  overlay.textContent = 'Translating…';
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    zIndex: '2147483647',
+    top: (rect ? (rect.bottom + 6) : 80) + 'px',
+    left: (rect ? Math.max(8, rect.left) : 8) + 'px',
+    maxWidth: '420px',
+    minWidth: '180px',
+    padding: '10px 14px',
+    background: '#ffffff',
+    color: '#1a1814',
+    border: '0.5px solid rgba(20,15,10,0.14)',
+    borderRadius: '10px',
+    boxShadow: '0 1px 2px rgba(20,15,10,0.04), 0 12px 32px rgba(20,15,10,0.10)',
+    font: '13px -apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+    lineHeight: '1.45',
+    whiteSpace: 'pre-wrap',
+    cursor: 'default',
+  });
+  const close = document.createElement('button');
+  close.textContent = '×';
+  Object.assign(close.style, {
+    position: 'absolute', top: '2px', right: '6px',
+    border: '0', background: 'transparent', color: '#9a948b',
+    fontSize: '14px', cursor: 'pointer', padding: '2px 4px',
+  });
+  close.onclick = () => overlay.remove();
+  overlay.appendChild(close);
+  document.body.appendChild(overlay);
+  const dismiss = (e) => {
+    if (!overlay.contains(e.target)) { overlay.remove(); document.removeEventListener('mousedown', dismiss, true); }
+  };
+  setTimeout(() => document.addEventListener('mousedown', dismiss, true), 10);
+})()`;
 
 export class TabManager {
   private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
@@ -201,6 +255,23 @@ export class TabManager {
               pageTitle: wc.getTitle(),
             });
           }
+        },
+        translateSelection: (selection) => {
+          // Pop a small overlay near the selection that says "Translating…",
+          // call the LLM in the background, then replace with the result.
+          // Live state is kept in window.__horizonTranslateOverlay so a
+          // second invocation can reuse / re-position the same box.
+          void wc.executeJavaScript(SELECTION_TRANSLATE_OVERLAY_SHOW, true);
+          translateText(selection, 'English').then((translated) => {
+            const payload = translated ?? '⚠ Translation failed';
+            const safe = JSON.stringify(payload);
+            void wc.executeJavaScript(`(function(){
+              const el = document.getElementById('horizon-translate-overlay');
+              if (!el) return;
+              el.textContent = ${safe};
+              el.dataset.state = 'done';
+            })()`, true);
+          }).catch(() => { /* */ });
         },
       });
       menu.popup({ window: this.window });

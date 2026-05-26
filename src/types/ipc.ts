@@ -152,6 +152,15 @@ export interface IpcChannels {
    *  textarea, or contenteditable element. Returns whether a target was
    *  found and the text was applied. */
   'ai:pasteToPage': { text: string };
+  /** Translate the active tab's visible text into targetLang via headless Pi. */
+  'translate:page': { targetLang: string };
+  /** Roll back a previously-translated page to its original text. */
+  'translate:restore': Record<string, never>;
+  /** Translate a selected text snippet; returns the translation
+   *  (used by the right-click "Translate selection" overlay). */
+  'translate:selection': { text: string; targetLang: string };
+  /** Main → Renderer: progress updates while a page translation runs. */
+  'translate:progress': { translated: number; total: number; done: boolean };
   // Saved workflows.
   'workflow:list': Record<string, never>;
   'workflow:create': { name: string; prompt: string; attach: 'activeTab' | 'allTabs' | 'none' };

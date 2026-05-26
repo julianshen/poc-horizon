@@ -26,6 +26,8 @@ import { LlmsTxtResolver } from './services/LlmsTxtResolver';
 import { parseLlmsTxt } from './services/llmsTxtParser';
 import { writePiSkill } from './services/piSkillWriter';
 import { WorkflowsManager } from './services/WorkflowsManager';
+import { translateText } from './services/LlmTranslator';
+import { translatePage, restorePage } from './services/pageTranslator';
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
 import type { AgentEvent } from '../src/types/ai';
 import type { Tab } from '../src/types/browser';
@@ -332,6 +334,41 @@ function registerHandlers(): void {
     workflowsManager.create(input)
   );
   ipcMain.handle(IPC_CHANNELS.WORKFLOW_DELETE, (_event, { id }: { id: string }) => workflowsManager.delete(id));
+
+  // ─── Translation ──────────────────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.TRANSLATE_PAGE, async (event, payload: { targetLang: string }) => {
+    const ctx = resolve(event);
+    const active = ctx.tabManager.getActiveTabId();
+    if (!active) return { ok: false, error: 'No active tab' };
+    const view = ctx.tabManager.getBrowserView(active);
+    if (!view) return { ok: false, error: 'Active tab has no BrowserView' };
+    const chromeWc = ctx.window.webContents;
+    const result = await translatePage(view.webContents, payload.targetLang, (translated, total) => {
+      if (!chromeWc.isDestroyed()) {
+        chromeWc.send(IPC_CHANNELS.TRANSLATE_PROGRESS, { translated, total, done: false });
+      }
+    });
+    if (!chromeWc.isDestroyed()) {
+      chromeWc.send(IPC_CHANNELS.TRANSLATE_PROGRESS, {
+        translated: result.translated ?? 0, total: result.total ?? 0, done: true,
+      });
+    }
+    return result;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.TRANSLATE_RESTORE, async (event) => {
+    const ctx = resolve(event);
+    const active = ctx.tabManager.getActiveTabId();
+    if (!active) return { ok: false, error: 'No active tab' };
+    const view = ctx.tabManager.getBrowserView(active);
+    if (!view) return { ok: false, error: 'Active tab has no BrowserView' };
+    return await restorePage(view.webContents);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.TRANSLATE_SELECTION, async (_event, { text, targetLang }: { text: string; targetLang: string }) => {
+    const translated = await translateText(text, targetLang);
+    return { ok: translated !== null, translated };
+  });
 
   ipcMain.handle(IPC_CHANNELS.AI_PASTE_TO_PAGE, async (event, payload: { text: string }) => {
     const ctx = resolve(event);

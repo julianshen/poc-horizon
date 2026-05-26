@@ -333,6 +333,57 @@ function registerHandlers(): void {
   );
   ipcMain.handle(IPC_CHANNELS.WORKFLOW_DELETE, (_event, { id }: { id: string }) => workflowsManager.delete(id));
 
+  ipcMain.handle(IPC_CHANNELS.AI_PASTE_TO_PAGE, async (event, payload: { text: string }) => {
+    const ctx = resolve(event);
+    const active = ctx.tabManager.getActiveTabId();
+    if (!active) return { ok: false, error: 'No active tab' };
+    const view = ctx.tabManager.getBrowserView(active);
+    if (!view) return { ok: false, error: 'Active tab has no BrowserView' };
+    // Inject the text into the focused element. Handles <input>, <textarea>,
+    // and contenteditable; fires input + change events so React/Vue/other
+    // frameworks notice the change. Returns {ok, target} so the renderer
+    // can surface "no input focused" feedback.
+    const script = `(function(text){
+      try {
+        var el = document.activeElement;
+        if (!el || el === document.body) return { ok: false, reason: 'no-focused-input' };
+        var tag = (el.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea') {
+          var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value');
+          if (setter && setter.set) setter.set.call(el, text); else el.value = text;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return { ok: true, target: tag };
+        }
+        if (el.isContentEditable) {
+          // Replace selection with the text, or append at the end if no selection.
+          var sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            var range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(text));
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          } else {
+            el.textContent = (el.textContent || '') + text;
+          }
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+          return { ok: true, target: 'contenteditable' };
+        }
+        return { ok: false, reason: 'focused-element-not-editable' };
+      } catch (err) {
+        return { ok: false, reason: String(err && err.message || err) };
+      }
+    })(${JSON.stringify(payload.text)})`;
+    try {
+      const result = await view.webContents.executeJavaScript(script, true);
+      return result as { ok: boolean; target?: string; reason?: string };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.AI_UI_ACTION, (event, payload: unknown) => {
     const ctx = resolve(event);
     const piSession = piSessions.get(ctx.window.webContents.id);

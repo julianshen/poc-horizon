@@ -59,6 +59,7 @@ export const IPC_CHANNELS = {
   AI_LLMS_TXT_FOUND: 'ai:llmsTxtFound',
   AI_ASK_FROM_SELECTION: 'ai:askFromSelection',
   AI_UI_ACTION: 'ai:uiAction',
+  AI_PASTE_TO_PAGE: 'ai:pasteToPage',
   WORKFLOW_LIST: 'workflow:list',
   WORKFLOW_CREATE: 'workflow:create',
   WORKFLOW_DELETE: 'workflow:delete',

@@ -148,6 +148,10 @@ export interface IpcChannels {
   'ai:uiAction':
     | { kind: 'button'; surfaceId: string; label: string; action?: string }
     | { kind: 'input'; surfaceId: string; path?: string; placeholder?: string; value: string };
+  /** Paste the given text into the active tab's currently-focused input,
+   *  textarea, or contenteditable element. Returns whether a target was
+   *  found and the text was applied. */
+  'ai:pasteToPage': { text: string };
   // Saved workflows.
   'workflow:list': Record<string, never>;
   'workflow:create': { name: string; prompt: string; attach: 'activeTab' | 'allTabs' | 'none' };

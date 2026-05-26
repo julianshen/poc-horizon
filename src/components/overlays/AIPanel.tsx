@@ -567,6 +567,9 @@ const MessageBubbleInner: React.FC<{ m: Message; isLastAndStreaming?: boolean; o
           )}
         </div>
       )}
+      {!isYou && !m.loading && hasText && !isLastAndStreaming && (
+        <AiBubbleActions text={m.text} />
+      )}
       {m.surfaces && m.surfaces.size > 0 && (
         <div className="flex flex-col gap-2 w-[92%] max-w-[92%]">
           {Array.from(m.surfaces.values()).map((s) => <A2UISurface key={s.id} surface={s} />)}
@@ -616,6 +619,114 @@ const MessageBubble = React.memo(MessageBubbleInner, (prev, next) =>
   prev.isLastAndStreaming === next.isLastAndStreaming &&
   prev.onPreset === next.onPreset
 );
+
+/**
+ * Action toolbar that appears under each completed AI message. Two
+ * affordances:
+ *   - Copy: write the message text to the OS clipboard
+ *   - Paste into page: inject the text into the active page's currently
+ *     focused <input>, <textarea>, or contenteditable element. Falls
+ *     back to a "no input focused" hint when no editable target is on
+ *     the page.
+ * Both buttons show a one-second checkmark/label after the action
+ * completes for tactile feedback.
+ */
+const AiBubbleActions: React.FC<{ text: string }> = ({ text }) => {
+  const [copied, setCopied] = useState(false);
+  const [pasted, setPasted] = useState<'ok' | 'no-target' | 'err' | null>(null);
+
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch { /* clipboard permission denied — ignore */ }
+  }, [text]);
+
+  const paste = useCallback(async () => {
+    const r = (await window.horizonAPI.invoke('ai:pasteToPage', { text })) as
+      | { ok: true; target?: string }
+      | { ok: false; reason?: string };
+    if (r.ok) setPasted('ok');
+    else if (r.reason === 'no-focused-input' || r.reason === 'focused-element-not-editable') setPasted('no-target');
+    else setPasted('err');
+    setTimeout(() => setPasted(null), 1500);
+  }, [text]);
+
+  return (
+    <div className="flex gap-1 items-center" style={{ marginTop: 2 }}>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label="Copy AI response"
+        title={copied ? 'Copied' : 'Copy'}
+        className="text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+        style={{ color: 'var(--chrome-fg-subtle)', background: 'transparent', border: 0, cursor: 'pointer', font: 'inherit' }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      >
+        {copied ? (
+          <>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Copied
+          </>
+        ) : (
+          <>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            Copy
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={paste}
+        aria-label="Paste AI response into the page's focused input"
+        title={
+          pasted === 'ok' ? 'Pasted into page' :
+          pasted === 'no-target' ? 'No input focused on the page' :
+          pasted === 'err' ? 'Paste failed' :
+          'Paste into the active input on the page'
+        }
+        className="text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+        style={{
+          color: pasted === 'no-target' || pasted === 'err' ? 'var(--insecure)' : 'var(--chrome-fg-subtle)',
+          background: 'transparent',
+          border: 0,
+          cursor: 'pointer',
+          font: 'inherit',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      >
+        {pasted === 'ok' ? (
+          <>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Pasted
+          </>
+        ) : pasted === 'no-target' ? (
+          'No input focused'
+        ) : pasted === 'err' ? (
+          'Paste failed'
+        ) : (
+          <>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" />
+            </svg>
+            Paste into page
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
 
 const LlmsTxtGuideCard: React.FC<{ guide: LlmsTxtGuide }> = ({ guide }) => {
   const goTo = (url: string): void => {

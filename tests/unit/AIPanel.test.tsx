@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { setupRendererTest } from '../helpers/fakeHorizonAPI';
 import { AIPanel } from '@/components/overlays/AIPanel';
@@ -142,6 +142,45 @@ describe('AIPanel', () => {
     const ta = await screen.findByPlaceholderText(/Ask anything/) as HTMLTextAreaElement;
     await waitFor(() => expect(ta.value).toMatch(/Regarding this selection from "Wiki"/));
     expect(ta.value).toContain('recursion is when a function calls itself');
+  });
+
+  it('AI bubble Copy button writes the message text to clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(<AIPanel />);
+    // The INITIAL message has a known text — find its Copy button and click.
+    const copyBtn = screen.getAllByLabelText('Copy AI response')[0];
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toMatch(/I can see the page you're reading/);
+    await waitFor(() => expect(screen.getAllByText('Copied').length).toBeGreaterThan(0));
+  });
+
+  it('AI bubble Paste-to-page button dispatches ai:pasteToPage with the message text', async () => {
+    api().invoke.mockImplementation(async (channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'ai:pasteToPage') return { ok: true, target: 'textarea' };
+      return undefined;
+    });
+    render(<AIPanel />);
+    const pasteBtn = screen.getAllByLabelText(/Paste AI response into the page/)[0];
+    fireEvent.click(pasteBtn);
+    await waitFor(() => {
+      const call = api().invokes.find((i) => i.channel === 'ai:pasteToPage');
+      expect(call).toBeTruthy();
+      expect((call!.payload as { text: string }).text).toMatch(/I can see the page you're reading/);
+    });
+  });
+
+  it('AI bubble Paste shows "No input focused" when the page has no editable target', async () => {
+    api().invoke.mockImplementation(async (channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'ai:pasteToPage') return { ok: false, reason: 'no-focused-input' };
+      return undefined;
+    });
+    render(<AIPanel />);
+    fireEvent.click(screen.getAllByLabelText(/Paste AI response into the page/)[0]);
+    await waitFor(() => expect(screen.getByText('No input focused')).toBeTruthy());
   });
 
   it('Workflows popover opens, loads list, and runs a workflow on click', async () => {

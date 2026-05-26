@@ -20,6 +20,10 @@ function fakeWc(overrides: Partial<Record<string, unknown>> = {}) {
         calls.push([method, params]);
         return responses.get(method) ?? {};
       }),
+      // BrowserHarness.attach now binds a 'message' listener for CDP
+      // event subscriptions; default fakes need on/off no-ops.
+      on: vi.fn(),
+      off: vi.fn(),
     },
     getURL: () => 'https://example.com/page',
     getTitle: () => 'Page Title',
@@ -88,6 +92,7 @@ describe('BrowserHarness', () => {
         isAttached: () => true,
         attach: vi.fn(),
         detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
         sendCommand: vi.fn(async () => ({
           exceptionDetails: { text: 'Script error', exception: { description: 'ReferenceError: foo is not defined' } },
           result: {},
@@ -106,6 +111,7 @@ describe('BrowserHarness', () => {
         isAttached: () => true,
         attach: vi.fn(),
         detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
         sendCommand: vi.fn(async () => ({ userAgent: 'horizon/1.0' })),
       },
     });
@@ -127,6 +133,7 @@ describe('BrowserHarness', () => {
         isAttached: () => true,
         attach: vi.fn(),
         detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
         sendCommand: vi.fn(async () => ({ nodes: [{ nodeId: '1', role: { value: 'button' } }] })),
       },
     });
@@ -138,12 +145,62 @@ describe('BrowserHarness', () => {
     expect(cap[0][0]).toBe('Accessibility.getFullAXTree');
   });
 
+  it('subscribeEvent + collectEvents buffers CDP events and drains them on demand', async () => {
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
+        sendCommand: vi.fn(async () => ({})),
+        on: vi.fn(),
+        off: vi.fn(),
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const sub = await h.subscribeEvent('Network.responseReceived');
+    expect(sub.ok).toBe(true);
+    // Simulate the debugger emitting two events by calling the harness's
+    // internal listener — the easiest way without a real Electron wc.
+    type Pvt = { cdpListener?: ((e: Electron.Event, m: string, p: unknown) => void) | null };
+    const listener = (h as unknown as Pvt).cdpListener!;
+    listener({} as Electron.Event, 'Network.responseReceived', { url: 'https://a' });
+    listener({} as Electron.Event, 'Network.responseReceived', { url: 'https://b' });
+    listener({} as Electron.Event, 'Page.frameNavigated', { url: 'unrelated' });
+    const drained = h.collectEvents('Network.responseReceived');
+    expect(drained).toHaveLength(2);
+    // Second collect returns empty — the bucket was cleared.
+    expect(h.collectEvents('Network.responseReceived')).toHaveLength(0);
+  });
+
+  it('unsubscribeEvent() with no arg clears all subscriptions and buffers', async () => {
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
+        sendCommand: vi.fn(async () => ({})),
+        on: vi.fn(),
+        off: vi.fn(),
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    await h.subscribeEvent('Network.responseReceived');
+    await h.subscribeEvent('Page.frameNavigated');
+    const r = h.unsubscribeEvent();
+    expect(r.cleared).toBe(2);
+  });
+
   it('describeElementAt returns the element descriptor via evaluate', async () => {
     const { wc } = fakeWc({
       debugger: {
         isAttached: () => true,
         attach: vi.fn(),
         detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
         sendCommand: vi.fn(async () => ({
           result: { value: { tag: 'button', id: 'go', classes: ['cta'], rect: { x: 1, y: 2, width: 80, height: 24 } } },
         })),
@@ -161,6 +218,7 @@ describe('BrowserHarness', () => {
         isAttached: () => true,
         attach: vi.fn(),
         detach: vi.fn(),
+        on: vi.fn(), off: vi.fn(),
         sendCommand: vi.fn(async () => ({ ok: true })),
       },
     });

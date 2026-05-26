@@ -20,7 +20,27 @@ function fakeHarness() {
     waitFor: vi.fn(async () => ({ ok: true, reason: 'selector' })),
     dismissOverlays: vi.fn(async () => ({ removed: 2, nodes: ['div#banner', 'div.modal'] })),
     describeElementAt: vi.fn(async (x: number, y: number) => ({ tag: 'button', rect: { x, y, width: 80, height: 24 } })),
+    subscribeEvent: vi.fn(async () => ({ ok: true })),
+    unsubscribeEvent: vi.fn(() => ({ ok: true, cleared: 1 })),
+    collectEvents: vi.fn(() => [{ at: 0, method: 'Network.responseReceived', params: { url: 'x' } }]),
+    callHelper: vi.fn(async () => ({ ok: true, value: 42 })),
   } as unknown as BrowserHarness;
+}
+
+function fakeRegistry() {
+  const saved: Array<{ name: string; expression: string; description?: string; createdAt: number }> = [];
+  return {
+    list: vi.fn(() => saved),
+    get: vi.fn((name: string) => saved.find((h) => h.name === name)),
+    save: vi.fn(async (h: { name: string; expression: string; description?: string }) => {
+      const created = { ...h, createdAt: Date.now() };
+      const idx = saved.findIndex((s) => s.name === h.name);
+      if (idx === -1) saved.push(created); else saved[idx] = created;
+      return created;
+    }),
+    remove: vi.fn(async (name: string) => { const i = saved.findIndex((h) => h.name === name); if (i !== -1) saved.splice(i, 1); }),
+    inlineInjection: vi.fn(() => '/* injection */'),
+  };
 }
 
 function connectClient(port: number): Promise<Socket> {
@@ -108,6 +128,35 @@ describe('HorizonBridgeServer', () => {
       result: { echoed: { method: 'Browser.getVersion', params: { foo: 1 } } },
     });
     expect(harness.cdp).toHaveBeenCalledWith('Browser.getVersion', { foo: 1 });
+    sock.destroy();
+  });
+
+  it('routes JS helper save/list/remove/call through HelperRegistry', async () => {
+    const reg = fakeRegistry();
+    const srv2 = new HorizonBridgeServer(harness, reg as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const save = await sendRecv(sock, { id: 'h1', tool: 'saveHelper', args: { name: 'dbl', expression: '(x) => x * 2', description: 'double' } });
+    expect(save).toMatchObject({ id: 'h1', ok: true });
+    expect(reg.save).toHaveBeenCalledOnce();
+    const list = await sendRecv(sock, { id: 'h2', tool: 'listHelpers', args: {} });
+    expect((list.result as unknown[]).length).toBe(1);
+    const call = await sendRecv(sock, { id: 'h3', tool: 'callHelper', args: { name: 'dbl', args: [21] } });
+    expect(call).toMatchObject({ id: 'h3', ok: true, result: { value: 42 } });
+    const rm = await sendRecv(sock, { id: 'h4', tool: 'removeHelper', args: { name: 'dbl' } });
+    expect(rm).toMatchObject({ id: 'h4', ok: true });
+    sock.destroy();
+    srv2.close();
+  });
+
+  it('routes cdpSubscribe / cdpCollect / cdpUnsubscribe to BrowserHarness', async () => {
+    const sock = await connectClient(port);
+    const s = await sendRecv(sock, { id: 's1', tool: 'cdpSubscribe', args: { method: 'Network.responseReceived' } });
+    expect(s).toMatchObject({ id: 's1', ok: true, result: { ok: true } });
+    const c = await sendRecv(sock, { id: 's2', tool: 'cdpCollect', args: {} });
+    expect((c.result as unknown[]).length).toBe(1);
+    const u = await sendRecv(sock, { id: 's3', tool: 'cdpUnsubscribe', args: { method: 'Network.responseReceived' } });
+    expect(u).toMatchObject({ id: 's3', ok: true });
     sock.destroy();
   });
 

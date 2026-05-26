@@ -1,5 +1,6 @@
 import { createServer, Server, Socket } from 'net';
 import type { BrowserHarness } from './BrowserHarness';
+import type { HelperRegistry } from './HelperRegistry';
 import { readerExtract } from './readerExtract';
 
 interface ToolRequest {
@@ -29,7 +30,10 @@ export class HorizonBridgeServer {
   private server: Server | null = null;
   private connections = new Set<Socket>();
 
-  constructor(private readonly harness: BrowserHarness) {}
+  constructor(
+    private readonly harness: BrowserHarness,
+    private readonly helpers?: HelperRegistry,
+  ) {}
 
   /** Listen on a random loopback port. Resolves with the bound port. */
   async listen(): Promise<number> {
@@ -115,6 +119,45 @@ export class HorizonBridgeServer {
       case 'waitFor':          return await this.harness.waitFor(args as never);
       case 'dismissOverlays':  return await this.harness.dismissOverlays();
       case 'describeAt':       return await this.harness.describeElementAt(Number(args.x), Number(args.y));
+      // ─── JS helper registry ─────────────────────────────────────
+      case 'saveHelper': {
+        if (!this.helpers) throw new Error('helpers not enabled');
+        const name = String(args.name ?? '');
+        const expression = String(args.expression ?? '');
+        if (!name || !expression) throw new Error('saveHelper: name + expression required');
+        const description = typeof args.description === 'string' ? args.description : undefined;
+        return await this.helpers.save({ name, expression, description });
+      }
+      case 'listHelpers': return this.helpers ? this.helpers.list() : [];
+      case 'removeHelper': {
+        if (!this.helpers) throw new Error('helpers not enabled');
+        const name = String(args.name ?? '');
+        if (!name) throw new Error('removeHelper: name required');
+        await this.helpers.remove(name);
+        return { ok: true };
+      }
+      case 'callHelper': {
+        if (!this.helpers) throw new Error('helpers not enabled');
+        const name = String(args.name ?? '');
+        if (!name) throw new Error('callHelper: name required');
+        const helperArgs = Array.isArray(args.args) ? (args.args as unknown[]) : [];
+        return await this.harness.callHelper(this.helpers.inlineInjection(), name, helperArgs);
+      }
+      // ─── CDP event subscription ─────────────────────────────────
+      case 'cdpSubscribe': {
+        const method = String(args.method ?? '');
+        if (!method) throw new Error('cdpSubscribe: method required');
+        return await this.harness.subscribeEvent(method);
+      }
+      case 'cdpUnsubscribe': {
+        const method = typeof args.method === 'string' ? args.method : undefined;
+        return this.harness.unsubscribeEvent(method);
+      }
+      case 'cdpCollect': {
+        const method = typeof args.method === 'string' ? args.method : undefined;
+        const max = typeof args.max === 'number' ? args.max : undefined;
+        return this.harness.collectEvents(method, max);
+      }
       case 'reader_extract': {
         const url = await this.harness.getUrl();
         const html = await this.harness.getHtml();

@@ -30,6 +30,14 @@ export interface DomNode {
  */
 export class BrowserHarness {
   private attachedTo: WebContents | null = null;
+  /** CDP events buffered for the agent to collect later, keyed by method.
+   *  Capped per-method to keep memory bounded. */
+  private eventBuf = new Map<string, unknown[]>();
+  /** Set of CDP methods the agent has subscribed to. */
+  private subscribed = new Set<string>();
+  /** Bound listener — kept so we can remove cleanly on detach. */
+  private cdpListener: ((event: Electron.Event, method: string, params: unknown) => void) | null = null;
+  private static EVENT_BUF_CAP = 200;
 
   /** Attach the debugger to the given webContents. Idempotent per tab. */
   attach(wc: WebContents): void {
@@ -37,17 +45,33 @@ export class BrowserHarness {
     if (this.attachedTo) this.detach();
     if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
     this.attachedTo = wc;
+    // Re-bind the CDP event listener so existing subscriptions resume on the new wc.
+    this.cdpListener = (_event: Electron.Event, method: string, params: unknown): void => {
+      if (!this.subscribed.has(method)) return;
+      const bucket = this.eventBuf.get(method) ?? [];
+      bucket.push({ at: Date.now(), method, params });
+      if (bucket.length > BrowserHarness.EVENT_BUF_CAP) {
+        bucket.splice(0, bucket.length - BrowserHarness.EVENT_BUF_CAP);
+      }
+      this.eventBuf.set(method, bucket);
+    };
+    wc.debugger.on('message', this.cdpListener);
   }
 
   /** Detach if attached. Safe to call multiple times. */
   detach(): void {
     if (!this.attachedTo) return;
     try {
+      if (this.cdpListener) this.attachedTo.debugger.off('message', this.cdpListener);
       if (this.attachedTo.debugger.isAttached()) this.attachedTo.debugger.detach();
     } catch {
       /* webContents may be destroyed; ignore */
     }
     this.attachedTo = null;
+    this.cdpListener = null;
+    // Keep subscribed set + buffered events across detach/re-attach so the
+    // agent doesn't lose interest in events between turns; only an explicit
+    // unsubscribe clears them.
   }
 
   private require(): WebContents {
@@ -308,6 +332,78 @@ export class BrowserHarness {
    * overlay, click-jacking layer). Returns the tag, id, classes,
    * bounding rect, and aria-role of the element at the point.
    */
+  /**
+   * Subscribe to a CDP event method. Events arriving while subscribed
+   * land in an in-memory ring buffer the agent can drain later with
+   * collectEvents(). Auto-enables the matching CDP domain so the
+   * agent doesn't have to think about Network.enable / Page.enable etc.
+   *
+   * Example:
+   *   subscribeEvent('Network.responseReceived')
+   *   // user clicks a button → events accumulate
+   *   collectEvents() → ten Network.responseReceived events
+   */
+  async subscribeEvent(method: string): Promise<{ ok: boolean }> {
+    if (!method.includes('.')) return { ok: false };
+    this.subscribed.add(method);
+    if (!this.eventBuf.has(method)) this.eventBuf.set(method, []);
+    const domain = method.split('.')[0];
+    try { await this.cdp(`${domain}.enable`, {}); } catch { /* not all domains have .enable */ }
+    return { ok: true };
+  }
+
+  /** Stop receiving a specific method, or all methods if no arg. */
+  unsubscribeEvent(method?: string): { ok: boolean; cleared: number } {
+    if (!method) {
+      const n = this.subscribed.size;
+      this.subscribed.clear();
+      this.eventBuf.clear();
+      return { ok: true, cleared: n };
+    }
+    this.subscribed.delete(method);
+    this.eventBuf.delete(method);
+    return { ok: true, cleared: 1 };
+  }
+
+  /**
+   * Drain buffered events. After drain, the buffer for the given method
+   * (or all methods) is cleared so the next collect only returns NEW
+   * events. Caller can pass a method to filter, otherwise gets all.
+   */
+  collectEvents(method?: string, max?: number): unknown[] {
+    if (method) {
+      const bucket = this.eventBuf.get(method) ?? [];
+      const out = max ? bucket.slice(0, max) : bucket;
+      this.eventBuf.set(method, max ? bucket.slice(out.length) : []);
+      return out;
+    }
+    const all: unknown[] = [];
+    for (const [m, bucket] of this.eventBuf) {
+      for (const ev of bucket) {
+        all.push(ev);
+        if (max && all.length >= max) break;
+      }
+      if (max && all.length >= max) break;
+      this.eventBuf.set(m, []);
+    }
+    return all;
+  }
+
+  /**
+   * Inject + call a saved JS helper from a HelperRegistry. The
+   * registry's inlineInjection() defines window.__horizon.helpers,
+   * then we call the named function with the supplied args.
+   */
+  async callHelper(registryInjection: string, name: string, args: unknown[] = []): Promise<EvaluateResult> {
+    const callExpr = `(function(){
+      ${registryInjection};
+      var fn = window.__horizon && window.__horizon.helpers && window.__horizon.helpers[${JSON.stringify(name)}];
+      if (typeof fn !== 'function') return { __horizonError: 'helper not found: ' + ${JSON.stringify(name)} };
+      return fn.apply(null, ${JSON.stringify(args)});
+    })()`;
+    return await this.evaluate(callExpr);
+  }
+
   async describeElementAt(x: number, y: number): Promise<unknown> {
     const r = await this.evaluate(`(() => {
       const el = document.elementFromPoint(${x}, ${y});

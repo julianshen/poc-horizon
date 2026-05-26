@@ -271,6 +271,105 @@ export default function (pi: ExtensionAPI): void {
 		execute: async (_id, params) => bridge("describeAt", params as Record<string, unknown>),
 	});
 
+	// ─── JS helper registry ──────────────────────────────────────────────
+	pi.registerTool({
+		name: "browser_save_helper",
+		label: "Save JS helper",
+		description:
+			"Save a JS function for reuse across this and future turns. The first time " +
+			"you figure out a useful page-specific snippet (dismissing a site's modal, " +
+			"extracting a structured value, normalising a date format), save it with a " +
+			"descriptive name and call it later via browser_call_helper. Helpers persist to " +
+			"disk and are available across app restarts.\n\n" +
+			"expression MUST be a JS expression that evaluates to a function. Examples:\n" +
+			"  expression: '(x) => x * 2'\n" +
+			"  expression: 'function(url) { return fetch(url).then(r => r.json()); }'\n" +
+			"  expression: '() => document.querySelectorAll(\"article h2\").length'\n\n" +
+			"Saving with an existing name overwrites — use this to refine a helper that " +
+			"didn't work the first time. Functions run in the page's context (full DOM access).",
+		parameters: Type.Object({
+			name: Type.String(),
+			expression: Type.String(),
+			description: Type.Optional(Type.String()),
+		}),
+		execute: async (_id, params) => bridge("saveHelper", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_call_helper",
+		label: "Call JS helper",
+		description:
+			"Invoke a previously-saved JS helper on the active page. Helpers are defined " +
+			"on window.__horizon.helpers by name; we inject the definitions then call " +
+			"(helpers[name])(...args) and return the result.\n\n" +
+			"Returns {ok:true, value} on success or {ok:false, error} when the helper throws " +
+			"or doesn't exist.",
+		parameters: Type.Object({
+			name: Type.String(),
+			args: Type.Optional(Type.Array(Type.Any())),
+		}),
+		execute: async (_id, params) => bridge("callHelper", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_list_helpers",
+		label: "List JS helpers",
+		description: "List the saved JS helpers — names + descriptions. Check this first before deriving a snippet you may already have.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("listHelpers", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_remove_helper",
+		label: "Remove JS helper",
+		description: "Delete a saved JS helper by name. Use when a helper no longer applies (site redesigned, wrong implementation, etc).",
+		parameters: Type.Object({ name: Type.String() }),
+		execute: async (_id, params) => bridge("removeHelper", params as Record<string, unknown>),
+	});
+
+	// ─── CDP event subscription (hooks) ──────────────────────────────────
+	pi.registerTool({
+		name: "browser_cdp_subscribe",
+		label: "Subscribe to CDP event",
+		description:
+			"Hook into a CDP event method — events arriving from now on are buffered until " +
+			"you call browser_cdp_collect. Auto-enables the matching CDP domain (Network, " +
+			"Page, etc.) so you don't have to call .enable separately.\n\n" +
+			"Common methods:\n" +
+			"  'Network.responseReceived' — watch every HTTP response on the page\n" +
+			"  'Network.webSocketFrameReceived' — capture WS traffic\n" +
+			"  'Page.frameNavigated' — observe SPA route changes\n" +
+			"  'Page.javascriptDialogOpening' — see alert/confirm/prompt dialogs\n" +
+			"  'Runtime.consoleAPICalled' — capture console.log output\n\n" +
+			"Pattern: subscribe → take user action (click, type, navigate) → collect to read " +
+			"what the page actually did. Far better than scraping the DOM post-hoc.",
+		parameters: Type.Object({ method: Type.String() }),
+		execute: async (_id, params) => bridge("cdpSubscribe", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_cdp_collect",
+		label: "Collect CDP events",
+		description:
+			"Drain the buffer of events you've subscribed to. After collect, the buffer for " +
+			"the given method (or all methods if none given) is cleared so the next collect " +
+			"returns only NEW events. Optionally cap by `max` if you only want the first N.\n\n" +
+			"Returns an array of {at, method, params} objects in arrival order.",
+		parameters: Type.Object({
+			method: Type.Optional(Type.String()),
+			max: Type.Optional(Type.Number()),
+		}),
+		execute: async (_id, params) => bridge("cdpCollect", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_cdp_unsubscribe",
+		label: "Unsubscribe CDP",
+		description: "Stop receiving a specific event method, or all methods if no arg.",
+		parameters: Type.Object({ method: Type.Optional(Type.String()) }),
+		execute: async (_id, params) => bridge("cdpUnsubscribe", params as Record<string, unknown>),
+	});
+
 	pi.registerTool({
 		name: "browser_cdp",
 		label: "Raw CDP",

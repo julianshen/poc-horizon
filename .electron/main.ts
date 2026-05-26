@@ -26,6 +26,7 @@ import { LlmsTxtResolver } from './services/LlmsTxtResolver';
 import { parseLlmsTxt } from './services/llmsTxtParser';
 import { writePiSkill } from './services/piSkillWriter';
 import { WorkflowsManager } from './services/WorkflowsManager';
+import { HelperRegistry } from './services/HelperRegistry';
 import { translateText } from './services/LlmTranslator';
 import { translatePage, restorePage } from './services/pageTranslator';
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
@@ -65,6 +66,7 @@ let autofillManager: AutofillManager;
 let tabSessionStore: TabSessionStore;
 let permissionBroker: PermissionBroker;
 let workflowsManager: WorkflowsManager;
+let helperRegistry: HelperRegistry;
 
 // Single shared browser harness + Pi session for the AI panel POC.
 // Lazy-init on first ai:start because spawning Pi is expensive.
@@ -100,7 +102,7 @@ async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Pro
   const existing = piSessions.get(wcId);
   if (existing) return existing;
   if (!bridgeServer) {
-    bridgeServer = new HorizonBridgeServer(harness);
+    bridgeServer = new HorizonBridgeServer(harness, helperRegistry);
     bridgePort = await bridgeServer.listen();
   }
   const kind = aiSessionKindFor(ctx.tabManager);
@@ -181,6 +183,7 @@ function initSingletons(): void {
   });
   autofillManager = new AutofillManager(path.join(data, 'addresses.json'));
   workflowsManager = new WorkflowsManager(path.join(data, 'workflows.json'));
+  helperRegistry = new HelperRegistry(path.join(data, 'js-helpers.json'));
   tabSessionStore = new TabSessionStore(path.join(data, 'session.json'));
 
   protocol.registerFileProtocol('horizon', (request, callback) => {

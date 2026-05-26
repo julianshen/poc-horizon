@@ -86,7 +86,11 @@ export async function translatePage(
   wc: WebContents,
   targetLang: string,
   onProgress?: (translated: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<TranslateResult> {
+  if (signal?.aborted) {
+    return { ok: false, error: 'translation aborted' };
+  }
   let nodes: Array<{ id: number; text: string }>;
   try {
     nodes = (await wc.executeJavaScript(EXTRACT_SCRIPT, true)) as Array<{ id: number; text: string }>;
@@ -114,7 +118,13 @@ export async function translatePage(
 
   let totalApplied = 0;
   for (const batch of batches) {
-    const translated = await translateBatch(batch.map((n) => n.text), targetLang);
+    if (signal?.aborted) {
+      break;
+    }
+    const translated = await translateBatch(batch.map((n) => n.text), targetLang, { signal });
+    if (signal?.aborted) {
+      break;
+    }
     const out: { id: number; text: string }[] = [];
     for (let i = 0; i < batch.length; i++) {
       const t = translated[i];

@@ -5,6 +5,8 @@ interface TranslateOptions {
   binary?: string;
   /** Hard timeout in ms (default: 60_000). */
   timeoutMs?: number;
+  /** Abort signal to cancel translation. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -34,17 +36,42 @@ export async function translateText(
     text;
 
   return new Promise<string | null>((resolve) => {
+    if (opts.signal?.aborted) {
+      resolve(null);
+      return;
+    }
+
     const proc = spawn(binary, ['-p', '--no-session', '--no-tools', prompt], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
     let killed = false;
+
+    const onAbort = () => {
+      killed = true;
+      proc.kill();
+      resolve(null);
+    };
+
+    if (opts.signal) {
+      opts.signal.addEventListener('abort', onAbort);
+    }
+
     const timer = setTimeout(() => { killed = true; proc.kill(); }, timeoutMs);
     proc.stdout.setEncoding('utf8');
     proc.stdout.on('data', (c: string) => { out += c; });
-    proc.on('error', () => { clearTimeout(timer); resolve(null); });
+    proc.on('error', () => {
+      clearTimeout(timer);
+      if (opts.signal) {
+        opts.signal.removeEventListener('abort', onAbort);
+      }
+      resolve(null);
+    });
     proc.on('exit', () => {
       clearTimeout(timer);
+      if (opts.signal) {
+        opts.signal.removeEventListener('abort', onAbort);
+      }
       if (killed) { resolve(null); return; }
       const trimmed = out.trim();
       resolve(trimmed.length > 0 ? trimmed : null);

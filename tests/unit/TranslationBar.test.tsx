@@ -17,7 +17,7 @@ describe('TranslationBar', () => {
   it('renders and fetches initial target language setting when showTranslationBar is true', async () => {
     useBrowserStore.setState({ ...initialState, showTranslationBar: true });
     
-    api().invoke.mockImplementation((channel: string, payload: any) => {
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
       if (channel === 'settings:get' && payload?.key === 'translateTargetLang') {
         return Promise.resolve('Spanish');
@@ -40,7 +40,7 @@ describe('TranslationBar', () => {
   it('changing target language calls settings:set', async () => {
     useBrowserStore.setState({ ...initialState, showTranslationBar: true });
     
-    api().invoke.mockImplementation((channel: string, payload: any) => {
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
       if (channel === 'settings:get' && payload?.key === 'translateTargetLang') {
         return Promise.resolve('English');
@@ -67,7 +67,7 @@ describe('TranslationBar', () => {
   it('Translate button calls translate:page and shows progress bar', async () => {
     useBrowserStore.setState({ ...initialState, showTranslationBar: true });
     
-    api().invoke.mockImplementation((channel: string, payload: any) => {
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
       if (channel === 'settings:get' && payload?.key === 'translateTargetLang') {
         return Promise.resolve('English');
@@ -110,7 +110,7 @@ describe('TranslationBar', () => {
   it('Show Original button calls translate:restore', async () => {
     useBrowserStore.setState({ ...initialState, showTranslationBar: true });
     
-    api().invoke.mockImplementation((channel: string, payload: any) => {
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
       if (channel === 'settings:get' && payload?.key === 'translateTargetLang') {
         return Promise.resolve('English');
@@ -144,10 +144,40 @@ describe('TranslationBar', () => {
     });
   });
 
+  it('Cancel button during translation calls translate:cancel', async () => {
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'settings:get' && payload?.key === 'translateTargetLang') {
+        return Promise.resolve('English');
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<TranslationBar />);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const translateBtn = screen.getByRole('button', { name: 'Translate' });
+    fireEvent.click(translateBtn);
+
+    // Done event is NOT simulated, status is 'translating'
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
+    fireEvent.click(cancelBtn);
+
+    expect(api().invokes).toContainEqual({
+      channel: 'translate:cancel',
+      payload: undefined,
+    });
+  });
+
   it('Close button hides TranslationBar via toggleOverlay', async () => {
     useBrowserStore.setState({ ...initialState, showTranslationBar: true });
     
-    api().invoke.mockImplementation((channel: string, payload: any) => {
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
       if (channel === 'settings:get' && payload?.key === 'translateTargetLang') {
         return Promise.resolve('English');

@@ -84,6 +84,17 @@ export const TranslationBar: React.FC = () => {
     }
   }, [setTranslationProgress]);
 
+  const handleCancel = useCallback(async () => {
+    setStatus('idle');
+    setTranslationProgress(null);
+    try {
+      await window.horizonAPI.invoke('translate:cancel');
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg((err as Error).message || 'Cancellation failed');
+    }
+  }, [setTranslationProgress]);
+
   const close = useCallback(() => {
     toggleOverlay('showTranslationBar');
     setTranslationProgress(null);
@@ -195,7 +206,22 @@ export const TranslationBar: React.FC = () => {
             Translate
           </button>
         )}
-        {(status === 'translating' || status === 'done' || status === 'error') && (
+        {status === 'translating' && (
+          <button
+            onClick={handleCancel}
+            className="text-xs px-2.5 py-1 rounded"
+            style={{
+              borderColor: '#fca5a5',
+              color: '#b91c1c',
+              background: '#fef2f2',
+              fontWeight: 500,
+              border: '1px solid #fca5a5',
+            }}
+          >
+            Cancel
+          </button>
+        )}
+        {(status === 'done' || status === 'error') && (
           <button
             onClick={handleRestore}
             className="text-xs px-2.5 py-1 rounded border"

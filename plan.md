@@ -26,8 +26,8 @@
 - [x] Add unit tests for `TranslationBar.tsx`
 
 ## Phase 4: Cancellation support
-- [ ] Add `AbortSignal` to `pageTranslator.ts` `translatePage()`
-- [ ] Add `AbortSignal` to `LlmTranslator.ts` `translateText()`
-- [ ] Add `TRANSLATE_CANCEL` IPC channel + handler in `main.ts`
-- [ ] Add cancel button to `TranslationBar.tsx`
-- [ ] Add unit tests for cancellation
+- [x] Add `AbortSignal` to `pageTranslator.ts` `translatePage()`
+- [x] Add `AbortSignal` to `LlmTranslator.ts` `translateText()`
+- [x] Add `TRANSLATE_CANCEL` IPC channel + handler in `main.ts`
+- [x] Add cancel button to `TranslationBar.tsx`
+- [x] Add unit tests for cancellation

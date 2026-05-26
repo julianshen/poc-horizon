@@ -12,6 +12,8 @@ import { PasswordManager } from '../services/PasswordManager';
 import { AutofillManager } from '../services/AutofillManager';
 import type { IpcChannels } from '../../src/types/ipc';
 
+const activeTranslations = new Map<string, AbortController>();
+
 export interface WindowContext {
   tabManager: TabManager;
   window: BrowserWindow;
@@ -170,11 +172,21 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
 
   handle('translate:page', async (event, { targetLang }) => {
     const context = ctx(event);
-    const view = context.tabManager.getBrowserView(context.tabManager.getActiveTabId() ?? '');
+    const tabId = context.tabManager.getActiveTabId();
+    if (!tabId) return { ok: false, error: 'no active tab' };
+    const view = context.tabManager.getBrowserView(tabId);
     if (!view) return { ok: false, error: 'no active tab' };
 
+    const existing = activeTranslations.get(tabId);
+    if (existing) {
+      existing.abort();
+    }
+
+    const controller = new AbortController();
+    activeTranslations.set(tabId, controller);
+
     const onProgress = (translated: number, total: number) => {
-      if (!context.window.isDestroyed()) {
+      if (!context.window.isDestroyed() && !controller.signal.aborted) {
         context.window.webContents.send('translate:progress', {
           translated,
           total,
@@ -183,15 +195,34 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
       }
     };
 
-    const result = await translatePage(view.webContents, targetLang, onProgress);
-    if (!context.window.isDestroyed()) {
-      context.window.webContents.send('translate:progress', {
-        translated: result.translated ?? 0,
-        total: result.total ?? 0,
-        done: true,
-      });
+    try {
+      const result = await translatePage(view.webContents, targetLang, onProgress, controller.signal);
+      if (!context.window.isDestroyed() && !controller.signal.aborted) {
+        context.window.webContents.send('translate:progress', {
+          translated: result.translated ?? 0,
+          total: result.total ?? 0,
+          done: true,
+        });
+      }
+      return result;
+    } finally {
+      if (activeTranslations.get(tabId) === controller) {
+        activeTranslations.delete(tabId);
+      }
     }
-    return result;
+  });
+
+  handle('translate:cancel', (event) => {
+    const context = ctx(event);
+    const tabId = context.tabManager.getActiveTabId();
+    if (tabId) {
+      const controller = activeTranslations.get(tabId);
+      if (controller) {
+        controller.abort();
+        activeTranslations.delete(tabId);
+      }
+    }
+    return {};
   });
 
   handle('translate:restore', async (event) => {

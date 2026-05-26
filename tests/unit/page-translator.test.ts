@@ -33,7 +33,7 @@ describe('pageTranslator', () => {
       const res = await translatePage(mockWebContents as WebContents, 'Spanish', onProgress);
 
       expect(executeJavaScriptMock).toHaveBeenNthCalledWith(1, expect.stringContaining('__horizonTranslate'), true);
-      expect(translateBatch).toHaveBeenCalledWith(['Hello', 'World'], 'Spanish');
+      expect(translateBatch).toHaveBeenCalledWith(['Hello', 'World'], 'Spanish', { signal: undefined });
       expect(executeJavaScriptMock).toHaveBeenNthCalledWith(2, expect.stringContaining('applied'), true);
       expect(onProgress).toHaveBeenCalledWith(2, 2);
       expect(res).toEqual({ ok: true, translated: 2, total: 2 });
@@ -65,8 +65,8 @@ describe('pageTranslator', () => {
       const res = await translatePage(mockWebContents as WebContents, 'Spanish', onProgress);
 
       expect(translateBatch).toHaveBeenCalledTimes(2);
-      expect(translateBatch).toHaveBeenNthCalledWith(1, [text1], 'Spanish');
-      expect(translateBatch).toHaveBeenNthCalledWith(2, [text2, text3], 'Spanish');
+      expect(translateBatch).toHaveBeenNthCalledWith(1, [text1], 'Spanish', { signal: undefined });
+      expect(translateBatch).toHaveBeenNthCalledWith(2, [text2, text3], 'Spanish', { signal: undefined });
 
       expect(executeJavaScriptMock).toHaveBeenCalledTimes(3); // Extract + Apply 1 + Apply 2
       expect(onProgress).toHaveBeenNthCalledWith(1, 1, 3);
@@ -185,8 +185,39 @@ describe('pageTranslator', () => {
 
       const res = await translatePage(mockWebContents as WebContents, 'Spanish');
 
-      expect(translateBatch).toHaveBeenCalledWith([hugeText], 'Spanish');
+      expect(translateBatch).toHaveBeenCalledWith([hugeText], 'Spanish', { signal: undefined });
       expect(res).toEqual({ ok: true, translated: 1, total: 1 });
+    });
+
+    it('returns { ok: false } if the AbortSignal is already aborted', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const res = await translatePage(mockWebContents as WebContents, 'Spanish', undefined, controller.signal);
+
+      expect(res).toEqual({ ok: false, error: 'translation aborted' });
+      expect(executeJavaScriptMock).not.toHaveBeenCalled();
+    });
+
+    it('aborts mid-translation when the AbortSignal is triggered', async () => {
+      executeJavaScriptMock.mockResolvedValueOnce([
+        { id: 1, text: 'a'.repeat(3000) },
+        { id: 2, text: 'b'.repeat(2000) },
+      ]);
+
+      const controller = new AbortController();
+
+      // Mock translateBatch to abort signal when called
+      vi.mocked(translateBatch).mockImplementationOnce(() => {
+        controller.abort();
+        return Promise.resolve([null]);
+      });
+
+      const res = await translatePage(mockWebContents as WebContents, 'Spanish', undefined, controller.signal);
+
+      // It should translate batch 1, get aborted, and immediately break without translating batch 2
+      expect(translateBatch).toHaveBeenCalledTimes(1);
+      expect(res).toEqual({ ok: true, translated: 0, total: 2 });
     });
   });
 

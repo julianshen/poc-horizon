@@ -178,11 +178,20 @@ export default function (pi: ExtensionAPI): void {
 			"Returns the PNG plus `marks`: an array of {id, x, y, w, h, tag, role, label, href}. " +
 			"PREFER this over browser_screenshot when you're about to click — pick a mark id " +
 			"and click its (x, y) directly, instead of eyeballing pixel coordinates from a raw " +
-			"image. Up to 80 marks per call; off-screen and hidden elements are filtered.",
-		parameters: Type.Object({}),
-		execute: async () => {
+			"image. Up to 80 marks per call; off-screen and hidden elements are filtered.\n\n" +
+			"`order` controls how marks are numbered:\n" +
+			"  'reading' (DEFAULT) — top-to-bottom rows, left-to-right within each row, like a " +
+			"human reads the page. Mark 1 is the top-left interactive element, increasing " +
+			"toward bottom-right. Match this to phrases like 'click the third button' — they " +
+			"mean visual order, not DOM order.\n" +
+			"  'dom' — document order. Useful when you also need browser_get_dom output and " +
+			"want indices to line up; otherwise stick with 'reading'.",
+		parameters: Type.Object({
+			order: Type.Optional(Type.Union([Type.Literal("reading"), Type.Literal("dom")])),
+		}),
+		execute: async (_id, params) => {
 			try {
-				const result = (await callBridge("screenshotMarked", {})) as {
+				const result = (await callBridge("screenshotMarked", params as Record<string, unknown>)) as {
 					base64: string; width: number; height: number; marks: Array<Record<string, unknown>>
 				};
 				return {

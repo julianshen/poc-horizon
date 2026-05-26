@@ -151,7 +151,10 @@ export class HorizonBridgeServer {
       case 'type':       await this.harness.type(args as never);                               return { ok: true };
       case 'scroll':     await this.harness.scroll(args as never);                             return { ok: true };
       case 'screenshot': return await this.harness.screenshot();
-      case 'screenshotMarked': return await this.harness.screenshotMarked();
+      case 'screenshotMarked': {
+        const order = args.order === 'dom' ? 'dom' : 'reading';
+        return await this.harness.screenshotMarked({ order });
+      }
       case 'evaluate':   return await this.harness.evaluate(String(args.expression));
       case 'getDom':     return await this.harness.getDom(Number(args.depth ?? 4));
       case 'getUrl':     return await this.harness.getUrl();

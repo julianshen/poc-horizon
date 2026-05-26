@@ -153,12 +153,14 @@ export class BrowserHarness {
    * The overlay is injected, captured, and removed in one Runtime.evaluate
    * call so we leave no DOM residue if the agent's next action races us.
    */
-  async screenshotMarked(): Promise<ScreenshotResult & { marks: Mark[] }> {
+  async screenshotMarked({ order = 'reading' }: { order?: 'reading' | 'dom' } = {}): Promise<ScreenshotResult & { marks: Mark[] }> {
     const wc = this.require();
     // Phase 1: mount the overlay + collect marks. Returns marks; we use them
     // *after* the screenshot so we can remove the overlay first.
+    // `order` is JSON-encoded so the script is still a single self-contained
+    // expression that Runtime.evaluate accepts.
     const mount = (await wc.debugger.sendCommand('Runtime.evaluate', {
-      expression: MARK_INJECT_JS,
+      expression: MARK_INJECT_JS.replace('"__ORDER__"', JSON.stringify(order)),
       returnByValue: true,
       awaitPromise: true,
     })) as { exceptionDetails?: { text: string }; result: { value?: Mark[] } };
@@ -549,6 +551,7 @@ export class BrowserHarness {
  * own CSS.
  */
 const MARK_INJECT_JS = `(() => {
+  const ORDER = "__ORDER__";
   const PREV = document.getElementById('__horizon_marks');
   if (PREV) PREV.remove();
   const cap = 80;
@@ -560,9 +563,10 @@ const MARK_INJECT_JS = `(() => {
   ].join(',');
   const vw = window.innerWidth, vh = window.innerHeight;
   const seen = new Set();
-  const marks = [];
+  // Phase 1: collect candidate rects (no numbering, no painting yet).
+  const cand = [];
   for (const el of document.querySelectorAll(sel)) {
-    if (seen.has(el) || marks.length >= cap) continue;
+    if (seen.has(el)) continue;
     seen.add(el);
     const r = el.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) continue;
@@ -573,8 +577,7 @@ const MARK_INJECT_JS = `(() => {
                    el.getAttribute('title') ||
                    el.getAttribute('placeholder') ||
                    el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 80);
-    marks.push({
-      id: marks.length + 1,
+    cand.push({
       x: Math.round(r.left + r.width / 2),
       y: Math.round(r.top + r.height / 2),
       w: Math.round(r.width),
@@ -586,6 +589,29 @@ const MARK_INJECT_JS = `(() => {
       _rect: { l: r.left, t: r.top, w: r.width, h: r.height },
     });
   }
+  // Phase 2: re-rank by visual reading order (top-to-bottom rows, left-to-right
+  // within a row). DOM order is hostile here — a sticky footer or absolutely-
+  // positioned nav can give "click 3" wildly counterintuitive coordinates.
+  if (ORDER === 'reading') {
+    // Cluster by y. Row tolerance scales with median element height so dense
+    // grids cluster differently from text-paragraphs of icons.
+    const heights = cand.map(c => c.h).sort((a, b) => a - b);
+    const medianH = heights.length ? heights[Math.floor(heights.length / 2)] : 24;
+    const rowTol = Math.max(8, Math.min(medianH * 0.6, 40));
+    // Sort by y first so we can sweep rows in order.
+    const byY = cand.slice().sort((a, b) => a._rect.t - b._rect.t);
+    const rows = [];
+    for (const c of byY) {
+      const last = rows[rows.length - 1];
+      if (last && Math.abs(c._rect.t - last[0]._rect.t) <= rowTol) last.push(c);
+      else rows.push([c]);
+    }
+    for (const row of rows) row.sort((a, b) => a._rect.l - b._rect.l);
+    cand.length = 0;
+    for (const row of rows) for (const c of row) cand.push(c);
+  }
+  // Phase 3: number + paint.
+  const marks = cand.slice(0, cap).map((c, i) => ({ id: i + 1, ...c }));
   const overlay = document.createElement('div');
   overlay.id = '__horizon_marks';
   overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
@@ -607,3 +633,40 @@ const MARK_INJECT_JS = `(() => {
 })()`;
 
 const MARK_REMOVE_JS = `(() => { const o = document.getElementById('__horizon_marks'); if (o) o.remove(); })()`;
+
+/**
+ * Shape of an as-yet-unsorted mark candidate. Mirrors the object built
+ * by MARK_INJECT_JS phase 1, before numbering. `_rect` is the original
+ * page-coordinate rectangle the sort needs to read.
+ */
+export interface RawMark {
+  x: number; y: number; w: number; h: number;
+  tag: string;
+  role: string | null;
+  label: string;
+  href: string | null;
+  _rect: { l: number; t: number; w: number; h: number };
+}
+
+/**
+ * Visual reading-order rerank: cluster by y into rows (tolerance scales
+ * with the median element height so dense grids and loose paragraphs
+ * cluster sensibly), then sort each row left-to-right. The exact same
+ * algorithm runs inside MARK_INJECT_JS — exported here so it's testable
+ * without a real DOM.
+ */
+export function rerankMarksReadingOrder<T extends RawMark>(marks: T[]): T[] {
+  if (marks.length === 0) return marks;
+  const heights = marks.map((m) => m.h).sort((a, b) => a - b);
+  const medianH = heights[Math.floor(heights.length / 2)];
+  const rowTol = Math.max(8, Math.min(medianH * 0.6, 40));
+  const byY = marks.slice().sort((a, b) => a._rect.t - b._rect.t);
+  const rows: T[][] = [];
+  for (const c of byY) {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(c._rect.t - last[0]._rect.t) <= rowTol) last.push(c);
+    else rows.push([c]);
+  }
+  for (const row of rows) row.sort((a, b) => a._rect.l - b._rect.l);
+  return rows.flat();
+}

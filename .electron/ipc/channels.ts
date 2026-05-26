@@ -54,6 +54,7 @@ export const IPC_CHANNELS = {
   AI_START: 'ai:start',
   AI_CANCEL: 'ai:cancel',
   AI_NEW_CHAT: 'ai:newChat',
+  AI_PRE_WARM: 'ai:preWarm',
   AI_EVENT: 'ai:event',
   AI_LLMS_TXT_FOUND: 'ai:llmsTxtFound',
   AI_ASK_FROM_SELECTION: 'ai:askFromSelection',

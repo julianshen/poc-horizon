@@ -84,6 +84,13 @@ export const AIPanel: React.FC = () => {
   const consumeGuides = useBrowserStore((s) => s.consumeLlmsGuides);
   const pendingSelection = useBrowserStore((s) => s.pendingSelection);
   const consumeSelection = useBrowserStore((s) => s.consumeSelection);
+
+  // Hide Pi spawn latency: on first mount of the panel (which happens
+  // when showAI flips true), kick off ai:preWarm so the subprocess is
+  // ready by the time the user finishes typing.
+  useEffect(() => {
+    void window.horizonAPI.invoke('ai:preWarm', {});
+  }, []);
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState('');
   const [running, setRunning] = useState(false);
@@ -505,7 +512,7 @@ export const AIPanel: React.FC = () => {
   );
 };
 
-const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean; onPreset?: (label: string) => void }> = ({ m, isLastAndStreaming, onPreset }) => {
+const MessageBubbleInner: React.FC<{ m: Message; isLastAndStreaming?: boolean; onPreset?: (label: string) => void }> = ({ m, isLastAndStreaming, onPreset }) => {
   if (m.who === 'system' && m.guide) {
     return <LlmsTxtGuideCard guide={m.guide} />;
   }
@@ -546,11 +553,17 @@ const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean; onPres
             // don't render their markdown (an over-eager * mid-sentence
             // shouldn't bold the rest of a paragraph).
             <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
-          ) : (
+          ) : isLastAndStreaming ? (
+            // During streaming, render plain text — react-markdown parses
+            // the full string on each delta, which costs ~2ms per parse
+            // and creates GC pressure at high delta rates. Swap to
+            // ChatMarkdown after turn_end (the !isLastAndStreaming branch).
             <>
-              <ChatMarkdown text={m.text} />
-              {isLastAndStreaming && <StreamCursor />}
+              <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
+              <StreamCursor />
             </>
+          ) : (
+            <ChatMarkdown text={m.text} />
           )}
         </div>
       )}
@@ -588,6 +601,21 @@ const MessageBubble: React.FC<{ m: Message; isLastAndStreaming?: boolean; onPres
     </div>
   );
 };
+
+/**
+ * Memo wrapper around MessageBubbleInner. The chat panel re-renders
+ * on every text_delta (~60Hz with coalescing). Without memo, every
+ * bubble in the conversation re-renders on every delta — re-parsing
+ * markdown for static history. Custom comparator: skip render when
+ * the message reference is identical AND isLastAndStreaming hasn't
+ * flipped. (m identity changes only when the streaming bubble's text
+ * grows, since setMessages does a shallow copy.)
+ */
+const MessageBubble = React.memo(MessageBubbleInner, (prev, next) =>
+  prev.m === next.m &&
+  prev.isLastAndStreaming === next.isLastAndStreaming &&
+  prev.onPreset === next.onPreset
+);
 
 const LlmsTxtGuideCard: React.FC<{ guide: LlmsTxtGuide }> = ({ guide }) => {
   const goTo = (url: string): void => {

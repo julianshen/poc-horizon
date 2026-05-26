@@ -120,6 +120,9 @@ export interface IpcChannels {
   'ai:cancel': Record<string, never>;
   /** Forget the current conversation: kill Pi, clear the saved session path. */
   'ai:newChat': Record<string, never>;
+  /** Start spawning the Pi subprocess + bridge ahead of the first turn so
+   *  the user doesn't wait 1-3 s on first prompt. Idempotent. */
+  'ai:preWarm': Record<string, never>;
   /** Main → Renderer: streaming events from the agent loop. */
   'ai:event': import('./ai').AgentEvent;
   /** Main → Renderer: discovered an llms.txt for the active tab's

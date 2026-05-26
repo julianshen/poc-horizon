@@ -149,13 +149,14 @@ describe('AIPanel', () => {
       activeTabId: 't1',
       tabs: [{ id: 't1', schemaVersion: 1, url: 'https://x', title: 'X', isLoading: false, loadProgress: 0, canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true, isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0 }],
     });
-    // Stub workflow:list once to return a saved workflow — other channels
-    // fall through to the default fake that records invokes.
-    api().invoke.mockImplementationOnce(async (channel: string, payload: unknown) => {
+    // Stub workflow:list to return a saved workflow; all other channels
+    // fall through to the default fake's record-then-return-undefined.
+    api().invoke.mockImplementation(async (channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
-      return channel === 'workflow:list'
-        ? [{ id: 'w1', name: 'Daily Brief', prompt: 'Brief me.', attach: 'activeTab', createdAt: 0 }]
-        : undefined;
+      if (channel === 'workflow:list') {
+        return [{ id: 'w1', name: 'Daily Brief', prompt: 'Brief me.', attach: 'activeTab', createdAt: 0 }];
+      }
+      return undefined;
     });
     render(<AIPanel />);
     fireEvent.click(screen.getByLabelText('Workflows'));

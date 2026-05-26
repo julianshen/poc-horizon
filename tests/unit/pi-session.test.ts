@@ -71,14 +71,25 @@ describe('PiSession', () => {
     expect(sent).toMatchObject({ type: 'prompt', message: 'hello' });
   });
 
-  it('streams text_delta from message_update events', () => {
+  it('coalesces adjacent text_delta events into a single flush (60Hz)', async () => {
     void session.startTurn('hi');
     emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Hello' } });
     emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: ' world' } });
+    // Coalescing schedules a 16ms timer; wait it out.
+    await new Promise((r) => setTimeout(r, 30));
     expect(events.filter((e) => e.type === 'text_delta')).toEqual([
-      { type: 'text_delta', text: 'Hello' },
-      { type: 'text_delta', text: ' world' },
+      { type: 'text_delta', text: 'Hello world' },
     ]);
+  });
+
+  it('flushes pending text_delta immediately on agent_end', () => {
+    void session.startTurn('hi');
+    emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'done.' } });
+    emit({ type: 'agent_end' });
+    // No setTimeout wait — flushDeltas runs synchronously before turn_end.
+    const types = events.map((e) => e.type);
+    expect(types.indexOf('text_delta')).toBeLessThan(types.indexOf('turn_end'));
+    expect(events.find((e) => e.type === 'text_delta')).toEqual({ type: 'text_delta', text: 'done.' });
   });
 
   it('emits tool_use on tool_execution_start and tool_result on tool_execution_end', () => {

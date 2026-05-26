@@ -422,6 +422,68 @@ export default function (pi: ExtensionAPI): void {
 		execute: async (_id, params) => bridge("cdp", params as Record<string, unknown>),
 	});
 
+	// ─── Workflow recording / replay ─────────────────────────────────────
+	pi.registerTool({
+		name: "browser_workflow_record_start",
+		label: "Start recording",
+		description:
+			"Begin capturing the tool calls you make into a named, replayable sequence. " +
+			"Use when you're about to perform a multi-step task you'd want to repeat (an " +
+			"order-history export, a daily report download, a form submission). After this " +
+			"call, every side-effecting tool you run (click, type, navigate, evaluate, etc.) " +
+			"is appended to the recording until browser_workflow_record_stop. Read-only " +
+			"tools (screenshot, axtree) are NOT recorded — they don't need replay.",
+		parameters: Type.Object({
+			name: Type.String(),
+			description: Type.Optional(Type.String()),
+		}),
+		execute: async (_id, params) => bridge("workflowRecordStart", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_workflow_record_stop",
+		label: "Stop recording",
+		description:
+			"Stop the in-progress recording and persist it to disk. Returns the saved " +
+			"workflow with all captured steps. Overwrites by name if one already exists with " +
+			"the same name (refining an existing recording is one stop call, not a delete + " +
+			"redo).",
+		parameters: Type.Object({}),
+		execute: async () => bridge("workflowRecordStop", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_workflow_run",
+		label: "Run workflow",
+		description:
+			"Replay a saved workflow. Each step dispatches through the same tool router as a " +
+			"fresh agent call, so all the existing safety checks (AiActionGuard, etc.) still " +
+			"apply. Stops on the first failed step — the page state has diverged from the " +
+			"recording at that point. `stepDelayMs` (default 200ms) is the pause between " +
+			"steps so the page can settle between actions.",
+		parameters: Type.Object({
+			name: Type.String(),
+			stepDelayMs: Type.Optional(Type.Number()),
+		}),
+		execute: async (_id, params) => bridge("workflowRun", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_workflow_list",
+		label: "List workflows",
+		description: "List saved workflows by name (no step bodies). Check first before recording — you may already have one.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("workflowList", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_workflow_delete",
+		label: "Delete workflow",
+		description: "Delete a saved workflow by name. Returns {removed: true|false}.",
+		parameters: Type.Object({ name: Type.String() }),
+		execute: async (_id, params) => bridge("workflowDelete", params as Record<string, unknown>),
+	});
+
 	// ─── Multi-tab orchestration ────────────────────────────────────────
 	pi.registerTool({
 		name: "browser_tab_open",

@@ -120,6 +120,36 @@ describe('HorizonBridgeServer', () => {
     sock.destroy();
   });
 
+  it('records side-effecting tool calls and replays them via workflowRun', async () => {
+    // Use a real ActionRecorder against a tmpfile so the file format gets exercised.
+    const { ActionRecorder } = await import('@electron/services/ActionRecorder');
+    const { promises: fsp } = await import('fs');
+    const path = await import('path');
+    const os = await import('os');
+    const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rec-bridge-'));
+    const rec = new ActionRecorder(path.join(tmpDir, 'wf.json'));
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, rec);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+
+    await sendRecv(sock, { id: '1', tool: 'workflowRecordStart', args: { name: 'demo' } });
+    await sendRecv(sock, { id: '2', tool: 'navigate', args: { url: 'https://x' } });
+    await sendRecv(sock, { id: '3', tool: 'screenshot', args: {} });   // not recorded
+    await sendRecv(sock, { id: '4', tool: 'click', args: { x: 10, y: 20 } });
+    const stop = await sendRecv(sock, { id: '5', tool: 'workflowRecordStop', args: {} });
+    expect((stop.result as { steps: unknown[] }).steps).toHaveLength(2);
+
+    // Reset call counts to verify replay drives the harness fresh.
+    (harness.navigate as ReturnType<typeof vi.fn>).mockClear();
+    (harness.click as ReturnType<typeof vi.fn>).mockClear();
+    const run = await sendRecv(sock, { id: '6', tool: 'workflowRun', args: { name: 'demo', stepDelayMs: 0 } });
+    expect((run.result as { results: Array<{ ok: boolean }> }).results.every((r) => r.ok)).toBe(true);
+    expect(harness.navigate).toHaveBeenCalledWith('https://x');
+    expect(harness.click).toHaveBeenCalledWith({ x: 10, y: 20 });
+
+    sock.destroy(); srv2.close();
+  });
+
   it('routes multi-tab tools through BrowserHarness', async () => {
     const sock = await connectClient(port);
     const open = await sendRecv(sock, { id: 'to', tool: 'tabOpen', args: { url: 'https://x' } });

@@ -4,6 +4,7 @@ import type { HelperRegistry } from './HelperRegistry';
 import type { DomainSkills } from './DomainSkills';
 import type { SkillsLibrary } from './SkillsLibrary';
 import type { AiActionGuard } from './AiActionGuard';
+import type { ActionRecorder } from './ActionRecorder';
 import { readerExtract } from './readerExtract';
 
 interface ToolRequest {
@@ -39,6 +40,7 @@ export class HorizonBridgeServer {
     private readonly domainSkills?: DomainSkills,
     private readonly skillsLibrary?: SkillsLibrary,
     private readonly guard?: AiActionGuard,
+    private readonly recorder?: ActionRecorder,
   ) {}
 
   /**
@@ -121,6 +123,9 @@ export class HorizonBridgeServer {
         }
       }
       const result = await this.run(req.tool, req.args);
+      // Append to in-progress recording after success (read-only + meta
+      // tools are filtered inside capture()).
+      this.recorder?.capture(req.tool, req.args);
       return { id: req.id, ok: true, result };
     } catch (err) {
       return { id: req.id, ok: false, error: (err as Error).message };
@@ -258,6 +263,45 @@ export class HorizonBridgeServer {
         const name = String(args.name ?? '');
         if (!host || !name) throw new Error('domainSkillRemove: host + name required');
         return { ok: await this.domainSkills.remove(host, name) };
+      }
+      // ─── Workflow recording / replay ────────────────────────────
+      case 'workflowRecordStart': {
+        if (!this.recorder) throw new Error('recorder not enabled');
+        const name = String(args.name ?? '');
+        const description = typeof args.description === 'string' ? args.description : undefined;
+        this.recorder.start(name, description);
+        return { recording: name };
+      }
+      case 'workflowRecordStop': {
+        if (!this.recorder) throw new Error('recorder not enabled');
+        return await this.recorder.stop();
+      }
+      case 'workflowList': return this.recorder ? this.recorder.list() : [];
+      case 'workflowDelete': {
+        if (!this.recorder) throw new Error('recorder not enabled');
+        const name = String(args.name ?? '');
+        return { removed: await this.recorder.remove(name) };
+      }
+      case 'workflowRun': {
+        if (!this.recorder) throw new Error('recorder not enabled');
+        const name = String(args.name ?? '');
+        const wf = this.recorder.get(name);
+        if (!wf) throw new Error(`workflow not found: ${name}`);
+        const stepDelayMs = typeof args.stepDelayMs === 'number' ? args.stepDelayMs : 200;
+        const results: Array<{ step: number; tool: string; ok: boolean; error?: string }> = [];
+        for (let i = 0; i < wf.steps.length; i++) {
+          const step = wf.steps[i];
+          try {
+            await this.run(step.tool, step.args);
+            results.push({ step: i, tool: step.tool, ok: true });
+          } catch (err) {
+            results.push({ step: i, tool: step.tool, ok: false, error: (err as Error).message });
+            // Stop on first failure — the page state has diverged from the recording.
+            break;
+          }
+          if (stepDelayMs > 0 && i < wf.steps.length - 1) await new Promise((r) => setTimeout(r, stepDelayMs));
+        }
+        return { name, steps: wf.steps.length, results };
       }
       case 'reader_extract': {
         const url = await this.harness.getUrl();

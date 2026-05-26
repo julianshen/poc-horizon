@@ -57,6 +57,29 @@ The navigate call returns when the request is committed, not when the page is in
 
 `browser_dismiss_overlays()` strips cookie banners, GDPR walls, newsletter pop-ups, and "we use cookies" toasts. Run it once after navigate; saves you having to model each site's bespoke modal.
 
+### Record action sequences for deterministic replay
+
+A helper is a snippet you call inside the page. A **workflow** is a sequence of *tool calls* the agent will replay later — perfect for "export my order history monthly", "post the daily standup", "download yesterday's report."
+
+```
+browser_workflow_record_start({ name: "amazon-orders-export" })
+browser_navigate({ url: "https://amazon.com/orders" })
+browser_wait_for({ networkIdleMs: 500 })
+browser_click({ x: ..., y: ... })       // "Download report"
+...
+browser_workflow_record_stop()
+```
+
+Next time:
+
+```
+browser_workflow_run({ name: "amazon-orders-export" })
+```
+
+The replay dispatches each step through the same tools — same safety checks, same error handling. Stops on the first failed step (the page has diverged from what was recorded). Read-only calls (screenshot, axtree) aren't recorded; you call those at run time, not during replay.
+
+When to record vs save a helper: a helper extracts/reads (one JS call → value). A workflow performs (many tool calls → side effects). Use both — the workflow can call helpers as one of its steps.
+
 ### Persist anything you derive
 
 If you write a JS snippet that works — a price extractor, a deep-link constructor, a state-machine probe — **save it**:

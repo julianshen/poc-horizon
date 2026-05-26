@@ -30,6 +30,7 @@ import { HelperRegistry } from './services/HelperRegistry';
 import { DomainSkills } from './services/DomainSkills';
 import { SkillsLibrary } from './services/SkillsLibrary';
 import { AiActionGuard, type ActionPolicy, type ActionPrompt } from './services/AiActionGuard';
+import { ActionRecorder } from './services/ActionRecorder';
 import { translateText } from './services/LlmTranslator';
 import { translatePage, restorePage } from './services/pageTranslator';
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
@@ -73,6 +74,7 @@ let helperRegistry: HelperRegistry;
 let domainSkills: DomainSkills;
 let skillsLibrary: SkillsLibrary;
 let aiActionGuard: AiActionGuard;
+let actionRecorder: ActionRecorder;
 
 // Single shared browser harness + Pi session for the AI panel POC.
 // Lazy-init on first ai:start because spawning Pi is expensive.
@@ -108,7 +110,7 @@ async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Pro
   const existing = piSessions.get(wcId);
   if (existing) return existing;
   if (!bridgeServer) {
-    bridgeServer = new HorizonBridgeServer(harness, helperRegistry, domainSkills, skillsLibrary, aiActionGuard);
+    bridgeServer = new HorizonBridgeServer(harness, helperRegistry, domainSkills, skillsLibrary, aiActionGuard, actionRecorder);
     bridgePort = await bridgeServer.listen();
   }
   const kind = aiSessionKindFor(ctx.tabManager);
@@ -192,6 +194,7 @@ function initSingletons(): void {
   helperRegistry = new HelperRegistry(path.join(data, 'js-helpers.json'));
   domainSkills = new DomainSkills(path.join(data, 'domain-skills'));
   skillsLibrary = new SkillsLibrary(path.join(__dirname, '../resources/pi-extension/skills'));
+  actionRecorder = new ActionRecorder(path.join(data, 'action-workflows.json'));
   aiActionGuard = new AiActionGuard(
     () => ((settingsManager.get('aiConfirmActions' as never) as ActionPolicy | undefined) ?? 'never'),
   );

@@ -60,6 +60,8 @@ export const IPC_CHANNELS = {
   AI_ASK_FROM_SELECTION: 'ai:askFromSelection',
   AI_UI_ACTION: 'ai:uiAction',
   AI_PASTE_TO_PAGE: 'ai:pasteToPage',
+  AI_ACTION_PROMPT: 'ai:actionPrompt',
+  AI_ACTION_DECIDE: 'ai:actionDecide',
   TRANSLATE_PAGE: 'translate:page',
   TRANSLATE_RESTORE: 'translate:restore',
   TRANSLATE_SELECTION: 'translate:selection',

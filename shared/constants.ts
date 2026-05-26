@@ -68,6 +68,16 @@ export const DEFAULT_SETTINGS = {
   aiUseLlmsTxt: true,
   /** Hard cap on tool-call iterations per agent turn (safety). */
   aiMaxIterations: 24,
+  /**
+   * Agent-action confirmation policy.
+   *   'never' (default) — pass through; preserves POC behavior
+   *   'risky' — prompt the user before tools that have side effects
+   *             (click, type, navigate, evaluate, cdp, callHelper, etc).
+   *             Read-only tools (screenshot, axtree, getDom) always pass.
+   *   'all'   — prompt before every single tool call.
+   * Prompts time out (deny) after 60s.
+   */
+  aiConfirmActions: 'never' as 'never' | 'risky' | 'all',
   /** Spawn Pi at app startup (vs. lazily on first AI panel open). */
   aiSpawnOnStartup: true,
   /** Default target language for Translate Page / Translate Selection.

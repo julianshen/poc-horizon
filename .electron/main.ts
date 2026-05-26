@@ -29,6 +29,7 @@ import { WorkflowsManager } from './services/WorkflowsManager';
 import { HelperRegistry } from './services/HelperRegistry';
 import { DomainSkills } from './services/DomainSkills';
 import { SkillsLibrary } from './services/SkillsLibrary';
+import { AiActionGuard, type ActionPolicy, type ActionPrompt } from './services/AiActionGuard';
 import { translateText } from './services/LlmTranslator';
 import { translatePage, restorePage } from './services/pageTranslator';
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
@@ -71,6 +72,7 @@ let workflowsManager: WorkflowsManager;
 let helperRegistry: HelperRegistry;
 let domainSkills: DomainSkills;
 let skillsLibrary: SkillsLibrary;
+let aiActionGuard: AiActionGuard;
 
 // Single shared browser harness + Pi session for the AI panel POC.
 // Lazy-init on first ai:start because spawning Pi is expensive.
@@ -106,7 +108,7 @@ async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Pro
   const existing = piSessions.get(wcId);
   if (existing) return existing;
   if (!bridgeServer) {
-    bridgeServer = new HorizonBridgeServer(harness, helperRegistry, domainSkills, skillsLibrary);
+    bridgeServer = new HorizonBridgeServer(harness, helperRegistry, domainSkills, skillsLibrary, aiActionGuard);
     bridgePort = await bridgeServer.listen();
   }
   const kind = aiSessionKindFor(ctx.tabManager);
@@ -190,6 +192,16 @@ function initSingletons(): void {
   helperRegistry = new HelperRegistry(path.join(data, 'js-helpers.json'));
   domainSkills = new DomainSkills(path.join(data, 'domain-skills'));
   skillsLibrary = new SkillsLibrary(path.join(__dirname, '../resources/pi-extension/skills'));
+  aiActionGuard = new AiActionGuard(
+    () => ((settingsManager.get('aiConfirmActions' as never) as ActionPolicy | undefined) ?? 'never'),
+  );
+  aiActionGuard.on('prompt', (p: ActionPrompt) => {
+    // Broadcast to every window — the AI panel that's currently visible
+    // is the one that'll render and decide. Other windows ignore unknown ids.
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send(IPC_CHANNELS.AI_ACTION_PROMPT, p);
+    }
+  });
   tabSessionStore = new TabSessionStore(path.join(data, 'session.json'));
 
   protocol.registerFileProtocol('horizon', (request, callback) => {
@@ -336,6 +348,11 @@ function registerHandlers(): void {
     const ctx = resolve(event);
     piSessions.get(ctx.window.webContents.id)?.cancel();
     return { ok: true };
+  });
+
+  // Renderer → main: user decided on an agent action prompt.
+  ipcMain.handle(IPC_CHANNELS.AI_ACTION_DECIDE, (_event, payload: { id: string; allow: boolean }) => {
+    return { handled: aiActionGuard.decide(payload.id, payload.allow) };
   });
 
   ipcMain.handle(IPC_CHANNELS.WORKFLOW_LIST, () => workflowsManager.list());

@@ -152,6 +152,12 @@ export interface IpcChannels {
    *  textarea, or contenteditable element. Returns whether a target was
    *  found and the text was applied. */
   'ai:pasteToPage': { text: string };
+  /** Main → Renderer: the agent is about to run a tool that needs the
+   *  user's nod (policy: 'risky' or 'all'). Renderer shows a prompt and
+   *  replies via ai:actionDecide. */
+  'ai:actionPrompt': { id: string; tool: string; args: Record<string, unknown>; summary: string };
+  /** Renderer → Main: the user decided on a pending action prompt. */
+  'ai:actionDecide': { id: string; allow: boolean };
   /** Translate the active tab's visible text into targetLang via headless Pi. */
   'translate:page': { targetLang: string };
   /** Roll back a previously-translated page to its original text. */

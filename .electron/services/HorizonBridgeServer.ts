@@ -3,6 +3,7 @@ import type { BrowserHarness } from './BrowserHarness';
 import type { HelperRegistry } from './HelperRegistry';
 import type { DomainSkills } from './DomainSkills';
 import type { SkillsLibrary } from './SkillsLibrary';
+import type { AiActionGuard } from './AiActionGuard';
 import { readerExtract } from './readerExtract';
 
 interface ToolRequest {
@@ -37,6 +38,7 @@ export class HorizonBridgeServer {
     private readonly helpers?: HelperRegistry,
     private readonly domainSkills?: DomainSkills,
     private readonly skillsLibrary?: SkillsLibrary,
+    private readonly guard?: AiActionGuard,
   ) {}
 
   /**
@@ -112,6 +114,12 @@ export class HorizonBridgeServer {
 
   private async dispatch(req: ToolRequest): Promise<ToolResponse> {
     try {
+      if (this.guard?.needsApproval(req.tool)) {
+        const allowed = await this.guard.request(req.tool, req.args);
+        if (!allowed) {
+          return { id: req.id, ok: false, error: `denied by user: ${req.tool}` };
+        }
+      }
       const result = await this.run(req.tool, req.args);
       return { id: req.id, ok: true, result };
     } catch (err) {

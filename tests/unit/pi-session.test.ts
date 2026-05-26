@@ -86,6 +86,43 @@ describe('PiSession', () => {
     expect(lastProc!.writes.map((w) => JSON.parse(w))).toContainEqual({ type: 'compact', customInstructions: 'focus on the cart state' });
   });
 
+  it('emits turn_end (reason:"error") + clears running on upstream LLM error', async () => {
+    void session.startTurn('hi');
+    expect(session.isRunning).toBe(true);
+    // Pi emits this when the upstream LLM call fails outright (size limit,
+    // auth, 4xx that auto-retry can't fix). No agent_end follows.
+    emit({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'error', reason: 'error', errorMessage: '400 message size exceeds limit' },
+    });
+    const turnEnd = events.find((e) => e.type === 'turn_end');
+    expect(turnEnd).toMatchObject({ type: 'turn_end', reason: 'error' });
+    const errEv = events.find((e) => e.type === 'error');
+    expect(errEv).toMatchObject({ type: 'error' });
+    expect((errEv as { message: string }).message).toContain('size exceeds limit');
+    expect(session.isRunning).toBe(false);
+  });
+
+  it('emits turn_end on auto_retry_end with aborted:true (retry gave up)', async () => {
+    void session.startTurn('hi');
+    expect(session.isRunning).toBe(true);
+    emit({
+      type: 'auto_retry_end',
+      aborted: true,
+      finalError: '529 overloaded_error: Overloaded',
+    });
+    const turnEnd = events.find((e) => e.type === 'turn_end');
+    expect(turnEnd).toMatchObject({ type: 'turn_end', reason: 'error' });
+    expect(session.isRunning).toBe(false);
+  });
+
+  it('auto_retry_end with aborted:false (retry succeeded) does NOT end the turn', async () => {
+    void session.startTurn('hi');
+    emit({ type: 'auto_retry_end', aborted: false });
+    expect(events.find((e) => e.type === 'turn_end')).toBeUndefined();
+    expect(session.isRunning).toBe(true);
+  });
+
   it('coalesces adjacent text_delta events into a single flush (60Hz)', async () => {
     void session.startTurn('hi');
     emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Hello' } });

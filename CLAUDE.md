@@ -45,7 +45,7 @@ If `npm install` hits peer-dep conflicts with `electron-vite`, use `--legacy-pee
 
 Electron three-process split with sources in distinct trees:
 
-- **`.electron/`** (note the leading dot) — main + preload TypeScript. `main.ts`, `preload.ts`, `ipc/channels.ts` (channel name constants), `ipc/main-handlers.ts` (handler registration), and `services/` (one manager per domain: `TabManager`, `WindowManager`, `SessionManager`, `HistoryManager`, `BookmarkManager`, `DownloadManager`, `PasswordManager`, `AutofillManager`, `SettingsManager`). Built to `dist-electron/`.
+- **`.electron/`** (note the leading dot) — main + preload TypeScript. `main.ts`, `preload.ts`, `ipc/channels.ts` (channel name constants), `ipc/main-handlers.ts` (handler registration), and `services/`. Browser-core managers: `TabManager`, `WindowManager`, `SessionManager`, `HistoryManager`, `BookmarkManager`, `DownloadManager`, `PasswordManager`, `AutofillManager`, `SettingsManager`, `WorkflowsManager`. AI-agent services: `BrowserHarness`, `HorizonBridgeServer`, `HelperRegistry`, `DomainSkills`, `SkillsLibrary`, `AiActionGuard`, `ActionRecorder`. Built to `dist-electron/`.
 - **`src/`** — React renderer. `components/chrome/` is the browser UI shell (TabBar, Omnibox, Toolbar, TitleBar, BrowserContentArea), `components/overlays/` is in-page UI (FindInPage, PageErrorOverlay), `hooks/` wraps IPC for the UI (`useTabs`, `useNavigation`, `useKeyboardShortcuts`), `stores/browserStore.ts` is the single Zustand store, `types/` holds shared TS types including the `window.horizonAPI` global. Built to `dist/`.
 - **`shared/`** — code reachable from any process (`constants.ts` has `IPC_CHANNELS`, `DEFAULT_SETTINGS`, `SEARCH_ENGINES`). Aliased as `@shared` in all three Vite configs.
 
@@ -62,6 +62,17 @@ Path aliases: `@` → `src/`, `@shared` → `shared/`. Both must be added to `el
 4. **Native modules are externalized, not bundled.** `better-sqlite3`, `electron`, `electron-updater`, and Node built-ins (`path`, `fs`, `os`, `crypto`) are in `rollupOptions.external` of `electron.vite.config.ts` main build. History currently uses JSON (not sqlite) for dev-mode compatibility — see commit `b507862`. Adding a native module requires updating the external list.
 
 5. **State flow is one-way.** Main → IPC event → hook updates Zustand store → components re-render. Components never mutate state outside store actions; hooks never bypass the store to call IPC handlers that should update shared state.
+
+## AI agent layer
+
+See [`docs/ai-agent.md`](docs/ai-agent.md) for the full architecture. The short version for spans-multiple-files work:
+
+- **Tools are added in three places**, in this order: route in `HorizonBridgeServer.run()` switch → method on `BrowserHarness` or a service → `pi.registerTool` entry in `resources/pi-extension/horizon-bridge.ts` with an LLM-facing description. Skipping the description hurts the agent's ability to choose the right tool.
+- **One global `BrowserHarness`** per app session, attached to the active tab's `webContents` at the start of each AI turn, detached on `turn_end`. Per-window isolation comes from per-window `PiSession`s keyed by `webContents.id` — not from per-window harnesses. Multi-tab tools require `attach(wc, tabManager)`; single-tab harness usage passes just `(wc)`.
+- **Three knowledge layers**: bundled `SKILL.md` + `interaction-skills/*.md` under `resources/pi-extension/skills/` (read-only, ships with the binary) vs `domain-skills/<host>/*.md` under `userData/` (agent-writable, per-site). `HelperRegistry` (`userData/js-helpers.json`) and `ActionRecorder` (`userData/action-workflows.json`) are the agent's other persistence layers — runtime JS snippets and replayable tool-call sequences respectively.
+- **Risky-tool list lives in two places** that evolve together but aren't shared: `RISKY_TOOLS` in `AiActionGuard.ts` (gates) and `READ_ONLY` in `ActionRecorder.ts` (record/replay filter). They overlap but aren't the same — a tool can be "state-mutating, should be gated" yet "stateless from a replay standpoint" (or vice versa). Don't try to unify them; cross-check when adding a new tool.
+- **The bridge auto-hints domain skills on navigate.** A successful `navigate({ url })` response includes `{ host, domainSkillsAvailable: [...] }` when the host has saved notes. Don't strip that field if you touch the navigate case.
+- **AiActionGuard policy is read on every call**, not cached, so flipping `aiConfirmActions` in Settings takes effect on the next tool call without restart. The renderer-side prompt UI lives in `src/components/overlays/AiActionPrompt.tsx`; queues FIFO; one decision per Allow/Block click.
 
 ## Config files of note
 

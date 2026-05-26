@@ -120,6 +120,25 @@ describe('HorizonBridgeServer', () => {
     sock.destroy();
   });
 
+  it('routes browser_compact to the wired compactSession callback', async () => {
+    const compactSession = vi.fn();
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, undefined, compactSession);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const resp = await sendRecv(sock, { id: 'c', tool: 'compact', args: { customInstructions: 'preserve last screenshot' } });
+    expect(resp).toMatchObject({ id: 'c', ok: true, result: { ok: true } });
+    expect(compactSession).toHaveBeenCalledWith('preserve last screenshot');
+    sock.destroy(); srv2.close();
+  });
+
+  it('compact returns ok:false when not wired', async () => {
+    const sock = await connectClient(port);
+    const resp = await sendRecv(sock, { id: 'cn', tool: 'compact', args: {} });
+    expect(resp).toMatchObject({ ok: false });
+    expect(String(resp.error)).toContain('not wired');
+    sock.destroy();
+  });
+
   it('records side-effecting tool calls and replays them via workflowRun', async () => {
     // Use a real ActionRecorder against a tmpfile so the file format gets exercised.
     const { ActionRecorder } = await import('@electron/services/ActionRecorder');

@@ -168,3 +168,4 @@ Use kebab-case file names ending in `.md`. Keep them short — a few hundred wor
 - **Don't try to solve a CAPTCHA.** Detect it, surface it to the user, ask them to clear it.
 - **Don't enter passwords or credit cards.** Hand off to the user.
 - **Don't `evaluate` huge return values.** Crossing the bridge costs JSON serialization; prefer narrowed reads (single field, count, slice) over `JSON.stringify(document)`.
+- **Screenshots are JPEG by default** for `browser_screenshot_marked` (~10x smaller than PNG). You almost never need PNG unless you're doing OCR-quality work — JPEG quality 70 is fine for "what's on the page." If a long task starts feeling sluggish or upstream rejects with "message size", call `browser_compact` to summarize history and drop bulky tool returns.

@@ -147,18 +147,22 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "browser_screenshot",
 		label: "Screenshot",
-		description: "Take a PNG screenshot of the visible viewport. Returns an image the LLM can see directly (vision-capable models only).",
-		parameters: Type.Object({}),
-		execute: async () => {
+		description:
+			"Screenshot the visible viewport. Defaults to PNG (lossless). Pass `format: 'jpeg'` " +
+			"and an optional `quality` (1-100, default 70) for a smaller payload — JPEG is " +
+			"typically 5-10x smaller and the LLM doesn't care about the difference for most " +
+			"reading/verification tasks. Returns an image the LLM can see directly.",
+		parameters: Type.Object({
+			format: Type.Optional(Type.Union([Type.Literal("png"), Type.Literal("jpeg")])),
+			quality: Type.Optional(Type.Number()),
+		}),
+		execute: async (_id, params) => {
 			try {
-				const result = (await callBridge("screenshot", {})) as { base64: string; width: number; height: number };
+				const result = (await callBridge("screenshot", params as Record<string, unknown>)) as { base64: string; width: number; height: number; format: 'png' | 'jpeg' };
+				const mimeType = result.format === 'jpeg' ? 'image/jpeg' : 'image/png';
 				return {
-					// Vision-capable models receive the PNG bytes directly via the
-					// image content block. Non-vision models will see a placeholder
-					// (Pi/the upstream API decides) — we don't fall back to base64
-					// text because that wastes ~200KB of context per screenshot.
-					content: [{ type: "image" as const, data: result.base64, mimeType: "image/png" }],
-					details: { width: result.width, height: result.height },
+					content: [{ type: "image" as const, data: result.base64, mimeType }],
+					details: { width: result.width, height: result.height, format: result.format },
 				};
 			} catch (err) {
 				return {
@@ -175,10 +179,13 @@ export default function (pi: ExtensionAPI): void {
 		description:
 			"Screenshot the viewport with numbered boxes overlaid on every visible " +
 			"interactive element (links, buttons, inputs, role=button, tabindex, etc). " +
-			"Returns the PNG plus `marks`: an array of {id, x, y, w, h, tag, role, label, href}. " +
+			"Returns the image plus `marks`: an array of {id, x, y, w, h, tag, role, label, href}. " +
 			"PREFER this over browser_screenshot when you're about to click — pick a mark id " +
 			"and click its (x, y) directly, instead of eyeballing pixel coordinates from a raw " +
 			"image. Up to 80 marks per call; off-screen and hidden elements are filtered.\n\n" +
+			"DEFAULT format is JPEG quality 70 — small enough that accumulated screenshots " +
+			"across many turns don't blow upstream message-size limits. Pass `format: 'png'` " +
+			"only when you specifically need lossless image data (rare).\n\n" +
 			"`order` controls how marks are numbered:\n" +
 			"  'reading' (DEFAULT) — top-to-bottom rows, left-to-right within each row, like a " +
 			"human reads the page. Mark 1 is the top-left interactive element, increasing " +
@@ -188,18 +195,21 @@ export default function (pi: ExtensionAPI): void {
 			"want indices to line up; otherwise stick with 'reading'.",
 		parameters: Type.Object({
 			order: Type.Optional(Type.Union([Type.Literal("reading"), Type.Literal("dom")])),
+			format: Type.Optional(Type.Union([Type.Literal("png"), Type.Literal("jpeg")])),
+			quality: Type.Optional(Type.Number()),
 		}),
 		execute: async (_id, params) => {
 			try {
 				const result = (await callBridge("screenshotMarked", params as Record<string, unknown>)) as {
-					base64: string; width: number; height: number; marks: Array<Record<string, unknown>>
+					base64: string; width: number; height: number; format: 'png' | 'jpeg'; marks: Array<Record<string, unknown>>
 				};
+				const mimeType = result.format === 'jpeg' ? 'image/jpeg' : 'image/png';
 				return {
 					content: [
-						{ type: "image" as const, data: result.base64, mimeType: "image/png" },
+						{ type: "image" as const, data: result.base64, mimeType },
 						{ type: "text" as const, text: JSON.stringify({ marks: result.marks, width: result.width, height: result.height }) },
 					],
-					details: { width: result.width, height: result.height, marks: result.marks },
+					details: { width: result.width, height: result.height, format: result.format, marks: result.marks },
 				};
 			} catch (err) {
 				return {
@@ -429,6 +439,24 @@ export default function (pi: ExtensionAPI): void {
 			params: Type.Optional(Type.Record(Type.String(), Type.Any())),
 		}),
 		execute: async (_id, params) => bridge("cdp", params as Record<string, unknown>),
+	});
+
+	// ─── Conversation maintenance ────────────────────────────────────────
+	pi.registerTool({
+		name: "browser_compact",
+		label: "Compact conversation",
+		description:
+			"Compact your own conversation history. Use when a long task has accumulated many " +
+			"screenshots / large tool returns — Pi summarizes the earlier exchanges and drops " +
+			"the bulky message bodies so the next upstream call stays under the model's per-" +
+			"request size limit. Auto-compaction is already enabled at session start, but " +
+			"call this manually when you're about to do a particularly heavy stretch (e.g. " +
+			"scrolling through many pages) and want to start clean. Optional " +
+			"`customInstructions` to bias what the summary preserves.",
+		parameters: Type.Object({
+			customInstructions: Type.Optional(Type.String()),
+		}),
+		execute: async (_id, params) => bridge("compact", params as Record<string, unknown>),
 	});
 
 	// ─── Workflow recording / replay ─────────────────────────────────────

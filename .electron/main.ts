@@ -83,6 +83,9 @@ let browserHarness: BrowserHarness | null = null;
 // distinct subprocesses so their conversations never co-mingle.
 // Keyed by BrowserWindow.webContents.id (the chrome's wcId).
 const piSessions = new Map<number, PiSession>();
+/** The Pi session whose tool calls are currently in flight. Used by the
+ *  bridge to route browser_compact back to the right subprocess. */
+let activePiSession: PiSession | null = null;
 let bridgeServer: HorizonBridgeServer | null = null;
 let bridgePort = 0;
 const llmsTxtResolver = new LlmsTxtResolver();
@@ -110,7 +113,13 @@ async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Pro
   const existing = piSessions.get(wcId);
   if (existing) return existing;
   if (!bridgeServer) {
-    bridgeServer = new HorizonBridgeServer(harness, helperRegistry, domainSkills, skillsLibrary, aiActionGuard, actionRecorder);
+    bridgeServer = new HorizonBridgeServer(
+      harness, helperRegistry, domainSkills, skillsLibrary, aiActionGuard, actionRecorder,
+      // Compact the most-recently-active Pi session. The agent only ever
+      // calls this from inside a turn it's running, so the active session
+      // is unambiguously its own.
+      (customInstructions) => activePiSession?.compact(customInstructions),
+    );
     bridgePort = await bridgeServer.listen();
   }
   const kind = aiSessionKindFor(ctx.tabManager);
@@ -343,6 +352,7 @@ function registerHandlers(): void {
       }
     }
 
+    activePiSession = piSession;
     void piSession.startTurn(augmentedPrompt);
     return { ok: true };
   });
@@ -469,6 +479,7 @@ function registerHandlers(): void {
       const label = a.path ? `field "${a.path}"` : a.placeholder ? `field "${a.placeholder}"` : 'a text field';
       message = `[ui] On surface "${a.surfaceId}", I set ${label} to: ${JSON.stringify(a.value)}`;
     }
+    activePiSession = piSession;
     void piSession.startTurn(message);
     return { ok: true };
   });

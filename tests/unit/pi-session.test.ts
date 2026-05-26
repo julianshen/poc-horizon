@@ -67,8 +67,23 @@ describe('PiSession', () => {
 
   it('starts a turn by sending {type:"prompt", message}', async () => {
     await session.startTurn('hello');
-    const sent = JSON.parse(lastProc!.writes[0]);
-    expect(sent).toMatchObject({ type: 'prompt', message: 'hello' });
+    // PiSession enables auto-compaction on spawn, so the prompt isn't
+    // necessarily writes[0] anymore. Find the prompt write specifically.
+    const prompt = lastProc!.writes.map((w) => JSON.parse(w)).find((m) => m.type === 'prompt');
+    expect(prompt).toMatchObject({ type: 'prompt', message: 'hello' });
+  });
+
+  it('enables Pi auto-compaction on spawn so large screenshot streams do not blow upstream size limits', async () => {
+    await session.startTurn('hello');
+    const autoComp = lastProc!.writes.map((w) => JSON.parse(w)).find((m) => m.type === 'set_auto_compaction');
+    expect(autoComp).toEqual({ type: 'set_auto_compaction', enabled: true });
+  });
+
+  it('compact() sends a {type:"compact"} message (optionally with customInstructions)', () => {
+    session.compact();
+    expect(lastProc!.writes.map((w) => JSON.parse(w))).toContainEqual({ type: 'compact' });
+    session.compact('focus on the cart state');
+    expect(lastProc!.writes.map((w) => JSON.parse(w))).toContainEqual({ type: 'compact', customInstructions: 'focus on the cart state' });
   });
 
   it('coalesces adjacent text_delta events into a single flush (60Hz)', async () => {

@@ -62,6 +62,23 @@ export class PiSession extends EventEmitter {
   /** Path of the Pi session file on disk, or null if not yet known. */
   get sessionPath(): string | null { return this.sessionFile; }
 
+  /**
+   * Ask Pi to compact the conversation history. Reduces upstream message
+   * size when accumulated tool results (especially screenshots) start to
+   * approach the model's per-request limit. Pi returns a {summary, ...}
+   * response which we ignore — it's already in Pi's own state.
+   */
+  compact(customInstructions?: string): void {
+    if (!this.proc) return;
+    this.send(customInstructions ? { type: 'compact', customInstructions } : { type: 'compact' });
+  }
+
+  /** Toggle Pi's automatic compaction-on-near-full-context behavior. */
+  setAutoCompaction(enabled: boolean): void {
+    if (!this.proc) return;
+    this.send({ type: 'set_auto_compaction', enabled });
+  }
+
   /** Spawn the subprocess. Throws if the binary isn't found. */
   start(): void {
     if (this.proc) return;
@@ -88,6 +105,10 @@ export class PiSession extends EventEmitter {
       this.proc = null;
     });
     this.proc = proc;
+    // Enable Pi's auto-compaction so we don't blow upstream message-size
+    // limits when screenshots accumulate. Fire-and-forget; if Pi rejects
+    // the command (older versions), the response handler swallows it.
+    this.setAutoCompaction(true);
   }
 
   async startTurn(prompt: string): Promise<void> {

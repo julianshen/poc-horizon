@@ -213,11 +213,49 @@ describe('BrowserHarness', () => {
     const r = await h.screenshotMarked();
     expect(r.base64).toBe('BASE64MARKED');
     expect(r.width).toBe(1200);
+    expect(r.format).toBe('jpeg');     // default for marked screenshots
     expect(r.marks).toEqual(fakeMarks);
     // Mount evaluate + capture + remove evaluate — 3 calls; last must be the remove (no overlay residue).
     const calls = sendCommand.mock.calls.map((c) => c[0]);
     expect(calls.filter((c) => c === 'Runtime.evaluate').length).toBe(2);
     expect(calls).toContain('Page.captureScreenshot');
+    // Default capture params should be JPEG + quality 70 (under the 2 MB upstream limit).
+    const captureCall = sendCommand.mock.calls.find((c) => c[0] === 'Page.captureScreenshot');
+    expect(captureCall?.[1]).toEqual({ format: 'jpeg', quality: 70 });
+  });
+
+  it('screenshotMarked with format: "png" preserves lossless capture', async () => {
+    const sendCommand = vi.fn(async (method: string) => {
+      if (method === 'Page.captureScreenshot') return { data: 'BASE64PNG' };
+      if (method === 'Page.getLayoutMetrics') return { visualViewport: { clientWidth: 800, clientHeight: 600 } };
+      if (method === 'Runtime.evaluate') return { result: { value: [] } };
+      return {};
+    });
+    const { wc } = fakeWc({
+      debugger: { isAttached: () => true, attach: vi.fn(), detach: vi.fn(), on: vi.fn(), off: vi.fn(), sendCommand },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const r = await h.screenshotMarked({ format: 'png' });
+    expect(r.format).toBe('png');
+    const captureCall = sendCommand.mock.calls.find((c) => c[0] === 'Page.captureScreenshot');
+    expect(captureCall?.[1]).toEqual({ format: 'png' });
+  });
+
+  it('screenshot accepts format + quality options', async () => {
+    const sendCommand = vi.fn(async (method: string) => {
+      if (method === 'Page.captureScreenshot') return { data: 'X' };
+      if (method === 'Page.getLayoutMetrics') return { visualViewport: { clientWidth: 100, clientHeight: 100 } };
+      return {};
+    });
+    const { wc } = fakeWc({
+      debugger: { isAttached: () => true, attach: vi.fn(), detach: vi.fn(), on: vi.fn(), off: vi.fn(), sendCommand },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    await h.screenshot({ format: 'jpeg', quality: 50 });
+    const captureCall = sendCommand.mock.calls.find((c) => c[0] === 'Page.captureScreenshot');
+    expect(captureCall?.[1]).toEqual({ format: 'jpeg', quality: 50 });
   });
 
   it('describeElementAt returns the element descriptor via evaluate', async () => {

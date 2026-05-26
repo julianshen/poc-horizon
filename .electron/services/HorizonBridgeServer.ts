@@ -41,6 +41,9 @@ export class HorizonBridgeServer {
     private readonly skillsLibrary?: SkillsLibrary,
     private readonly guard?: AiActionGuard,
     private readonly recorder?: ActionRecorder,
+    /** Called when the agent invokes browser_compact. Wired by main to
+     *  the currently-active PiSession. */
+    private readonly compactSession?: (customInstructions?: string) => void,
   ) {}
 
   /**
@@ -150,10 +153,16 @@ export class HorizonBridgeServer {
       case 'click':      await this.harness.click(args as never);                              return { ok: true };
       case 'type':       await this.harness.type(args as never);                               return { ok: true };
       case 'scroll':     await this.harness.scroll(args as never);                             return { ok: true };
-      case 'screenshot': return await this.harness.screenshot();
+      case 'screenshot': {
+        const format = args.format === 'jpeg' ? 'jpeg' : 'png';
+        const quality = typeof args.quality === 'number' ? args.quality : undefined;
+        return await this.harness.screenshot({ format, quality });
+      }
       case 'screenshotMarked': {
         const order = args.order === 'dom' ? 'dom' : 'reading';
-        return await this.harness.screenshotMarked({ order });
+        const format = args.format === 'png' ? 'png' : 'jpeg';
+        const quality = typeof args.quality === 'number' ? args.quality : undefined;
+        return await this.harness.screenshotMarked({ order, format, quality });
       }
       case 'evaluate':   return await this.harness.evaluate(String(args.expression));
       case 'getDom':     return await this.harness.getDom(Number(args.depth ?? 4));
@@ -266,6 +275,13 @@ export class HorizonBridgeServer {
         const name = String(args.name ?? '');
         if (!host || !name) throw new Error('domainSkillRemove: host + name required');
         return { ok: await this.domainSkills.remove(host, name) };
+      }
+      // ─── Conversation maintenance ───────────────────────────────
+      case 'compact': {
+        if (!this.compactSession) throw new Error('compact not wired to a Pi session');
+        const customInstructions = typeof args.customInstructions === 'string' ? args.customInstructions : undefined;
+        this.compactSession(customInstructions);
+        return { ok: true };
       }
       // ─── Workflow recording / replay ────────────────────────────
       case 'workflowRecordStart': {

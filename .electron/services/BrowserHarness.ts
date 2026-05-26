@@ -20,7 +20,13 @@ export interface TabManagerLike {
 export interface ClickArgs { x: number; y: number; button?: 'left' | 'right' | 'middle' }
 export interface TypeArgs { text: string; delayMs?: number }
 export interface ScrollArgs { x?: number; y?: number; deltaX?: number; deltaY?: number }
-export interface ScreenshotResult { format: 'png'; base64: string; width: number; height: number }
+export interface ScreenshotResult { format: 'png' | 'jpeg'; base64: string; width: number; height: number }
+export interface ScreenshotOptions {
+  /** PNG (lossless, larger) or JPEG (smaller, lossy). Defaults vary per call site. */
+  format?: 'png' | 'jpeg';
+  /** JPEG only; 1-100. Default 70. */
+  quality?: number;
+}
 export type EvaluateResult = { ok: true; value: unknown } | { ok: false; error: string };
 export interface Mark {
   id: number;
@@ -153,7 +159,7 @@ export class BrowserHarness {
    * The overlay is injected, captured, and removed in one Runtime.evaluate
    * call so we leave no DOM residue if the agent's next action races us.
    */
-  async screenshotMarked({ order = 'reading' }: { order?: 'reading' | 'dom' } = {}): Promise<ScreenshotResult & { marks: Mark[] }> {
+  async screenshotMarked({ order = 'reading', format = 'jpeg', quality = 70 }: { order?: 'reading' | 'dom' } & ScreenshotOptions = {}): Promise<ScreenshotResult & { marks: Mark[] }> {
     const wc = this.require();
     // Phase 1: mount the overlay + collect marks. Returns marks; we use them
     // *after* the screenshot so we can remove the overlay first.
@@ -166,8 +172,11 @@ export class BrowserHarness {
     })) as { exceptionDetails?: { text: string }; result: { value?: Mark[] } };
     if (mount.exceptionDetails) throw new Error(`screenshotMarked mount: ${mount.exceptionDetails.text}`);
     const marks: Mark[] = mount.result.value ?? [];
-    // Phase 2: capture.
-    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', { format: 'png' })) as { data: string };
+    // Phase 2: capture. JPEG default keeps marked screenshots small for
+    // the high-iteration agent loop (PNG screenshots accumulate to ~MBs
+    // per session and blow upstream API request limits).
+    const captureParams = format === 'jpeg' ? { format: 'jpeg', quality } : { format: 'png' };
+    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', captureParams)) as { data: string };
     const metrics = (await wc.debugger.sendCommand('Page.getLayoutMetrics')) as {
       visualViewport: { clientWidth: number; clientHeight: number };
     };
@@ -176,7 +185,7 @@ export class BrowserHarness {
       await wc.debugger.sendCommand('Runtime.evaluate', { expression: MARK_REMOVE_JS, returnByValue: true });
     } catch { /* */ }
     return {
-      format: 'png',
+      format,
       base64: data,
       width: Math.round(metrics.visualViewport.clientWidth),
       height: Math.round(metrics.visualViewport.clientHeight),
@@ -184,14 +193,15 @@ export class BrowserHarness {
     };
   }
 
-  async screenshot(): Promise<ScreenshotResult> {
+  async screenshot({ format = 'png', quality = 70 }: ScreenshotOptions = {}): Promise<ScreenshotResult> {
     const wc = this.require();
-    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', { format: 'png' })) as { data: string };
+    const captureParams = format === 'jpeg' ? { format: 'jpeg', quality } : { format: 'png' };
+    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', captureParams)) as { data: string };
     const metrics = (await wc.debugger.sendCommand('Page.getLayoutMetrics')) as {
       visualViewport: { clientWidth: number; clientHeight: number };
     };
     return {
-      format: 'png',
+      format,
       base64: data,
       width: Math.round(metrics.visualViewport.clientWidth),
       height: Math.round(metrics.visualViewport.clientHeight),

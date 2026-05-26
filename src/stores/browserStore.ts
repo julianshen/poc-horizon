@@ -10,6 +10,9 @@ interface BrowserState {
   showHistory: boolean;
   showDownloads: boolean;
   showFindBar: boolean;
+  showTranslationBar: boolean;
+  translationProgress: { translated: number; total: number } | null;
+  setTranslationProgress: (progress: { translated: number; total: number } | null) => void;
   showAI: boolean;
   showCmd: boolean;
   /** Queue of llms.txt navigation guides pushed by main when a new
@@ -46,7 +49,7 @@ interface BrowserState {
   reorderTab: (tabId: string, targetIndex: number) => void;
   upsertGroup: (group: TabGroup) => void;
   removeGroup: (groupId: string) => void;
-  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd') => void;
+  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd' | 'showTranslationBar') => void;
 }
 
 export const useBrowserStore = create<BrowserState>((set) => ({
@@ -58,6 +61,9 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   showHistory: false,
   showDownloads: false,
   showFindBar: false,
+  showTranslationBar: false,
+  translationProgress: null,
+  setTranslationProgress: (translationProgress) => set({ translationProgress }),
   showAI: false,
   showCmd: false,
   showAppMenu: false,

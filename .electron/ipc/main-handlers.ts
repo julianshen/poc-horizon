@@ -2,6 +2,8 @@ import { ipcMain, BrowserWindow, IpcMainInvokeEvent, session } from 'electron';
 import { IPC_CHANNELS } from './channels';
 import { applySpellcheckToSession } from '../services/spellcheck';
 import { TabManager } from '../services/TabManager';
+import { translatePage, restorePage } from '../services/pageTranslator';
+import { translateText } from '../services/LlmTranslator';
 import { SettingsManager } from '../services/SettingsManager';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
@@ -165,4 +167,42 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
   );
   handle('print:start', (event, { tabId }) => ctx(event).tabManager.print(tabId));
   handle('print:toPDF', (event, { tabId, outputPath }) => ctx(event).tabManager.printToPDF(tabId, outputPath));
+
+  handle('translate:page', async (event, { targetLang }) => {
+    const context = ctx(event);
+    const view = context.tabManager.getBrowserView(context.tabManager.getActiveTabId() ?? '');
+    if (!view) return { ok: false, error: 'no active tab' };
+
+    const onProgress = (translated: number, total: number) => {
+      if (!context.window.isDestroyed()) {
+        context.window.webContents.send('translate:progress', {
+          translated,
+          total,
+          done: false,
+        });
+      }
+    };
+
+    const result = await translatePage(view.webContents, targetLang, onProgress);
+    if (!context.window.isDestroyed()) {
+      context.window.webContents.send('translate:progress', {
+        translated: result.translated ?? 0,
+        total: result.total ?? 0,
+        done: true,
+      });
+    }
+    return result;
+  });
+
+  handle('translate:restore', async (event) => {
+    const context = ctx(event);
+    const view = context.tabManager.getBrowserView(context.tabManager.getActiveTabId() ?? '');
+    if (!view) return { restored: 0 };
+    return restorePage(view.webContents);
+  });
+
+  handle('translate:selection', async (_event, { text, targetLang }) => {
+    const res = await translateText(text, targetLang);
+    return res;
+  });
 }

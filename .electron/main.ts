@@ -531,8 +531,8 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   const localTabManager = new TabManager(
     win,
     incognito
-      ? { kind: 'incognito' }
-      : { kind: 'default', historyManager }
+      ? { kind: 'incognito', settingsManager }
+      : { kind: 'default', historyManager, settingsManager }
   );
   contexts.set(wcId, { tabManager: localTabManager, window: win });
 

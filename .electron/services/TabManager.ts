@@ -3,12 +3,13 @@ import { writeFile } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tab, TabGroup, TabGroupColor } from '../../src/types/browser';
 import type { HistoryManager } from './HistoryManager';
+import type { SettingsManager } from './SettingsManager';
 import { buildWebContextMenu } from './webContextMenu';
 import { translateText } from './LlmTranslator';
 
 export type TabManagerMode =
-  | { kind: 'default'; historyManager: HistoryManager }
-  | { kind: 'incognito' };
+  | { kind: 'default'; historyManager: HistoryManager; settingsManager?: SettingsManager }
+  | { kind: 'incognito'; settingsManager?: SettingsManager };
 
 const INCOGNITO_PARTITION = 'incognito';
 
@@ -259,10 +260,12 @@ export class TabManager {
         translateSelection: (selection) => {
           // Pop a small overlay near the selection that says "Translating…",
           // call the LLM in the background, then replace with the result.
-          // Live state is kept in window.__horizonTranslateOverlay so a
-          // second invocation can reuse / re-position the same box.
+          // Live state is kept directly in the DOM via the element ID
+          // horizon-translate-overlay so a second invocation can reuse /
+          // re-position the same box.
           void wc.executeJavaScript(SELECTION_TRANSLATE_OVERLAY_SHOW, true);
-          translateText(selection, 'English').then((translated) => {
+          const targetLang = this.mode.settingsManager?.get('translateTargetLang') ?? 'English';
+          translateText(selection, targetLang).then((translated) => {
             const payload = translated ?? '⚠ Translation failed';
             const safe = JSON.stringify(payload);
             void wc.executeJavaScript(`(function(){
@@ -271,7 +274,15 @@ export class TabManager {
               el.textContent = ${safe};
               el.dataset.state = 'done';
             })()`, true);
-          }).catch(() => { /* */ });
+          }).catch((err) => {
+            const safe = JSON.stringify(`⚠ Translation failed: ${(err as Error).message}`);
+            void wc.executeJavaScript(`(function(){
+              const el = document.getElementById('horizon-translate-overlay');
+              if (!el) return;
+              el.textContent = ${safe};
+              el.dataset.state = 'done';
+            })()`, true).catch(() => {});
+          });
         },
       });
       menu.popup({ window: this.window });

@@ -14,6 +14,18 @@ vi.mock('electron', () => ({
   BrowserWindow: class {},
 }));
 
+vi.mock('../../.electron/services/pageTranslator', () => ({
+  translatePage: vi.fn(),
+  restorePage: vi.fn(),
+}));
+
+vi.mock('../../.electron/services/LlmTranslator', () => ({
+  translateText: vi.fn(),
+}));
+
+import { translatePage, restorePage } from '../../.electron/services/pageTranslator';
+import { translateText } from '../../.electron/services/LlmTranslator';
+
 const { registerIpcHandlers } = await import('../../.electron/ipc/main-handlers');
 const { IPC_CHANNELS } = await import('../../.electron/ipc/channels');
 
@@ -27,6 +39,7 @@ function makeFakeServices() {
 
   const tabManager = {
     createTab: vi.fn().mockReturnValue({ id: 't1' }),
+    getActiveTabId: vi.fn().mockReturnValue('t1'),
     closeTab: vi.fn(),
     activateTab: vi.fn(),
     navigate: vi.fn(),
@@ -52,6 +65,7 @@ function makeFakeServices() {
     maximize: vi.fn(),
     unmaximize: vi.fn(),
     isMaximized: vi.fn().mockReturnValue(false),
+    isDestroyed: vi.fn().mockReturnValue(false),
     close: vi.fn(),
     webContents: { send: wcSend },
   };
@@ -443,6 +457,29 @@ describe('IPC handlers', () => {
       invoke(IPC_CHANNELS.APP_QUIT);
       expect(exitSpy).toHaveBeenCalledWith(0);
       exitSpy.mockRestore();
+    });
+  });
+
+  describe('translation', () => {
+    it('translate:page calls translatePage and returns result', async () => {
+      vi.mocked(translatePage).mockResolvedValueOnce({ ok: true, translated: 3, total: 3 });
+      const res = await invoke(IPC_CHANNELS.TRANSLATE_PAGE, { targetLang: 'Spanish' });
+      expect(translatePage).toHaveBeenCalled();
+      expect(res).toEqual({ ok: true, translated: 3, total: 3 });
+    });
+
+    it('translate:restore calls restorePage and returns result', async () => {
+      vi.mocked(restorePage).mockResolvedValueOnce({ restored: 3 });
+      const res = await invoke(IPC_CHANNELS.TRANSLATE_RESTORE);
+      expect(restorePage).toHaveBeenCalled();
+      expect(res).toEqual({ restored: 3 });
+    });
+
+    it('translate:selection calls translateText and returns result', async () => {
+      vi.mocked(translateText).mockResolvedValueOnce('Hola');
+      const res = await invoke(IPC_CHANNELS.TRANSLATE_SELECTION, { text: 'Hello', targetLang: 'Spanish' });
+      expect(translateText).toHaveBeenCalledWith('Hello', 'Spanish');
+      expect(res).toBe('Hola');
     });
   });
 });

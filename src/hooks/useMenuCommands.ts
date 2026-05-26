@@ -16,6 +16,17 @@ export function useMenuCommands(): void {
         case 'find:open':
           toggleOverlay('showFindBar');
           break;
+        case 'translate:open':
+          if (!useBrowserStore.getState().showTranslationBar) {
+            toggleOverlay('showTranslationBar');
+          }
+          break;
+        case 'translate:restore':
+          if (useBrowserStore.getState().showTranslationBar) {
+            toggleOverlay('showTranslationBar');
+          }
+          void window.horizonAPI.invoke('translate:restore');
+          break;
         case 'panel:history':
           toggleOverlay('showHistory');
           break;

@@ -14,13 +14,13 @@
 - [x] Test: `restorePage` returns `{ restored: 0 }` when `executeJavaScript` throws
 
 ## Phase 2: Fix hardcoded language & read settings
-- [ ] Fix: `appMenu.ts` — remove hardcoded 'English', send `menu:command` instead
-- [ ] Fix: `TabManager.ts` — read `translateTargetLang` from settings, fix error handling
-- [ ] Fix: `useMenuCommands.ts` — add `translate:open` and `translate:restore` cases
-- [ ] Fix: misleading comment in `TabManager.ts` line 262
+- [x] Fix: `appMenu.ts` — remove hardcoded 'English', send `menu:command` instead
+- [x] Fix: `TabManager.ts` — read `translateTargetLang` from settings, fix error handling
+- [x] Fix: `useMenuCommands.ts` — add `translate:open` and `translate:restore` cases
+- [x] Fix: misleading comment in `TabManager.ts` line 262
 
 ## Phase 3: TranslationBar UI component
-- [ ] Add `showTranslationBar` + `translationProgress` to `browserStore.ts`
+- [x] Add `showTranslationBar` + `translationProgress` to `browserStore.ts`
 - [ ] Create `TranslationBar.tsx` component with language picker, progress, restore
 - [ ] Wire `TranslationBar` into parent layout
 - [ ] Add unit tests for `TranslationBar.tsx`

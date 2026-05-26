@@ -156,18 +156,173 @@ export class BrowserHarness {
   /**
    * Send an arbitrary Chrome DevTools Protocol command to the attached
    * webContents. Power-user escape hatch when the high-level primitives
-   * (click/type/scroll/screenshot/evaluate/getDom) don't cover the
-   * operation — e.g. Network.setUserAgentOverride, Page.captureSnapshot,
-   * Runtime.compileScript, Emulation.setDeviceMetricsOverride, etc.
-   *
-   * Reference: https://chromedevtools.github.io/devtools-protocol/
-   *
-   * Returns whatever the CDP method returns (already JSON-serialisable
-   * since CDP itself is JSON-RPC over the wire). On error, throws —
-   * the bridge layer converts to a structured error response.
+   * don't cover the operation. See https://chromedevtools.github.io/devtools-protocol/
    */
   async cdp(method: string, params?: Record<string, unknown>): Promise<unknown> {
     const wc = this.require();
     return await wc.debugger.sendCommand(method, params ?? {});
+  }
+
+  /**
+   * Capture the page's accessibility tree — the same semantic
+   * structure screen readers use (headings, links, buttons, ARIA
+   * roles + names). Far cheaper than getDom for "find the Submit
+   * button" tasks and more meaningful for LLM perception than raw DOM.
+   *
+   * `interestingOnly: true` (CDP default) filters out non-interactive
+   * decorative nodes — what the agent actually needs.
+   */
+  async getAxTree(): Promise<unknown> {
+    return await this.cdp('Accessibility.getFullAXTree', {});
+  }
+
+  /**
+   * Wait for one of several conditions to be met, polling the page
+   * with a JS predicate every ~100ms. Returns when the condition
+   * holds or times out. Replaces the agent's instinct to "sleep then
+   * retry" with a declarative waiter the page can satisfy as soon as
+   * it's ready (often 10-100× faster than a fixed sleep).
+   *
+   * Conditions:
+   *   { selector: 'button.submit' }      — element exists + visible
+   *   { selectorGone: '.spinner' }        — element no longer in DOM
+   *   { networkIdle: 500 }                — no in-flight requests for N ms
+   *   { url: /\/checkout\// }             — current URL matches
+   *   { predicate: 'document.title === "Done"' } — arbitrary JS expression truthy
+   */
+  async waitFor(args: {
+    selector?: string;
+    selectorGone?: string;
+    networkIdleMs?: number;
+    urlMatch?: string;
+    predicate?: string;
+    timeoutMs?: number;
+  }): Promise<{ ok: boolean; reason: string }> {
+    const wc = this.require();
+    const timeoutMs = args.timeoutMs ?? 10_000;
+    const deadline = Date.now() + timeoutMs;
+    const sel = args.selector;
+    const selGone = args.selectorGone;
+    const urlRe = args.urlMatch;
+    const pred = args.predicate;
+    const idle = args.networkIdleMs;
+
+    // networkIdle uses Network.* events — enable the domain once.
+    let lastRequestAt = Date.now();
+    let idleHandler: ((event: Electron.Event, method: string) => void) | null = null;
+    if (idle) {
+      await wc.debugger.sendCommand('Network.enable', {}).catch(() => {});
+      idleHandler = (_e: Electron.Event, method: string): void => {
+        if (method === 'Network.requestWillBeSent' || method === 'Network.responseReceived') {
+          lastRequestAt = Date.now();
+        }
+      };
+      wc.debugger.on('message', idleHandler);
+    }
+    const cleanup = (): void => { if (idleHandler) wc.debugger.off('message', idleHandler); };
+
+    try {
+      while (Date.now() < deadline) {
+        if (sel) {
+          const r = await this.evaluate(
+            `(()=>{const e=document.querySelector(${JSON.stringify(sel)});return !!(e && e.offsetParent !== null);})()`
+          );
+          if (r.ok && r.value === true) return { ok: true, reason: 'selector' };
+        }
+        if (selGone) {
+          const r = await this.evaluate(`!document.querySelector(${JSON.stringify(selGone)})`);
+          if (r.ok && r.value === true) return { ok: true, reason: 'selectorGone' };
+        }
+        if (urlRe) {
+          const re = new RegExp(urlRe);
+          if (re.test(wc.getURL())) return { ok: true, reason: 'urlMatch' };
+        }
+        if (pred) {
+          const r = await this.evaluate(`!!(${pred})`);
+          if (r.ok && r.value === true) return { ok: true, reason: 'predicate' };
+        }
+        if (idle && Date.now() - lastRequestAt >= idle) {
+          return { ok: true, reason: 'networkIdle' };
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return { ok: false, reason: 'timeout' };
+    } finally {
+      cleanup();
+    }
+  }
+
+  /**
+   * Detect and remove modal/overlay/dialog elements that intercept
+   * clicks. Targets the common pattern: fixed-position elements with
+   * high z-index covering most of the viewport. Returns the count of
+   * removed elements so the agent knows whether to retry the action.
+   *
+   * Heuristics:
+   *  - position: fixed | sticky | absolute (covering viewport)
+   *  - z-index >= 100 OR contains role="dialog" / aria-modal="true"
+   *  - covers >25% of viewport area
+   *  - body/html `overflow: hidden` styles also stripped (modal scroll lock)
+   */
+  async dismissOverlays(): Promise<{ removed: number; nodes: string[] }> {
+    const r = await this.evaluate(`(() => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const removed = [];
+      const candidates = Array.from(document.querySelectorAll('*'));
+      for (const el of candidates) {
+        const cs = window.getComputedStyle(el);
+        const pos = cs.position;
+        const ariaModal = el.getAttribute('aria-modal') === 'true';
+        const role = el.getAttribute('role');
+        const isModalRole = role === 'dialog' || role === 'alertdialog';
+        const zi = parseInt(cs.zIndex, 10) || 0;
+        if (!ariaModal && !isModalRole && zi < 100) continue;
+        if (pos !== 'fixed' && pos !== 'sticky' && pos !== 'absolute') continue;
+        const r = el.getBoundingClientRect();
+        const area = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)) *
+                     Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+        if (area < vw * vh * 0.25) continue;
+        const tag = el.tagName.toLowerCase();
+        const id = el.id ? ('#' + el.id) : '';
+        const cls = (el.className && typeof el.className === 'string')
+          ? '.' + el.className.split(/\\s+/).slice(0,2).join('.') : '';
+        removed.push(tag + id + cls);
+        el.remove();
+      }
+      // Strip body/html scroll locks so the user (and agent) can scroll again.
+      for (const el of [document.body, document.documentElement]) {
+        if (el && window.getComputedStyle(el).overflow === 'hidden') {
+          el.style.overflow = 'auto';
+        }
+      }
+      return { removed: removed.length, nodes: removed };
+    })()`);
+    if (!r.ok) return { removed: 0, nodes: [] };
+    return r.value as { removed: number; nodes: string[] };
+  }
+
+  /**
+   * Describe the element that would receive a click at (x, y). Used
+   * as fallback error context when click() does the right thing
+   * physically but the page intercepted it (modal, transparent
+   * overlay, click-jacking layer). Returns the tag, id, classes,
+   * bounding rect, and aria-role of the element at the point.
+   */
+  async describeElementAt(x: number, y: number): Promise<unknown> {
+    const r = await this.evaluate(`(() => {
+      const el = document.elementFromPoint(${x}, ${y});
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        tag: el.tagName.toLowerCase(),
+        id: el.id || null,
+        classes: (typeof el.className === 'string' ? el.className : '').split(/\\s+/).filter(Boolean),
+        role: el.getAttribute('role') || null,
+        ariaLabel: el.getAttribute('aria-label') || null,
+        text: (el.textContent || '').slice(0, 80).trim(),
+        rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+      };
+    })()`);
+    return r.ok ? r.value : null;
   }
 }

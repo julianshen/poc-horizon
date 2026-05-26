@@ -16,6 +16,10 @@ function fakeHarness() {
     getUrl: vi.fn(async () => 'https://x'),
     getTitle: vi.fn(async () => 'Title'),
     cdp: vi.fn(async (method: string, params: Record<string, unknown>) => ({ echoed: { method, params } })),
+    getAxTree: vi.fn(async () => ({ nodes: [{ nodeId: '1', role: { value: 'button' } }] })),
+    waitFor: vi.fn(async () => ({ ok: true, reason: 'selector' })),
+    dismissOverlays: vi.fn(async () => ({ removed: 2, nodes: ['div#banner', 'div.modal'] })),
+    describeElementAt: vi.fn(async (x: number, y: number) => ({ tag: 'button', rect: { x, y, width: 80, height: 24 } })),
   } as unknown as BrowserHarness;
 }
 
@@ -104,6 +108,23 @@ describe('HorizonBridgeServer', () => {
       result: { echoed: { method: 'Browser.getVersion', params: { foo: 1 } } },
     });
     expect(harness.cdp).toHaveBeenCalledWith('Browser.getVersion', { foo: 1 });
+    sock.destroy();
+  });
+
+  it('routes axtree / waitFor / dismissOverlays / describeAt tool calls', async () => {
+    const sock = await connectClient(port);
+    const a = await sendRecv(sock, { id: 'a', tool: 'axtree', args: {} });
+    expect(a).toMatchObject({ id: 'a', ok: true });
+    expect((a.result as { nodes: unknown[] }).nodes).toHaveLength(1);
+
+    const b = await sendRecv(sock, { id: 'b', tool: 'waitFor', args: { selector: 'button' } });
+    expect(b).toMatchObject({ id: 'b', ok: true, result: { ok: true, reason: 'selector' } });
+
+    const c = await sendRecv(sock, { id: 'c', tool: 'dismissOverlays', args: {} });
+    expect(c).toMatchObject({ id: 'c', ok: true, result: { removed: 2 } });
+
+    const d = await sendRecv(sock, { id: 'd', tool: 'describeAt', args: { x: 100, y: 50 } });
+    expect(d).toMatchObject({ id: 'd', ok: true, result: { tag: 'button' } });
     sock.destroy();
   });
 

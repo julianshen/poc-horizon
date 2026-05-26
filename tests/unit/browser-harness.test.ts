@@ -121,6 +121,40 @@ describe('BrowserHarness', () => {
     void calls;
   });
 
+  it('getAxTree() dispatches Accessibility.getFullAXTree', async () => {
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        sendCommand: vi.fn(async () => ({ nodes: [{ nodeId: '1', role: { value: 'button' } }] })),
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const t = await h.getAxTree();
+    expect(t).toEqual({ nodes: [{ nodeId: '1', role: { value: 'button' } }] });
+    const cap = (wc.debugger.sendCommand as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(cap[0][0]).toBe('Accessibility.getFullAXTree');
+  });
+
+  it('describeElementAt returns the element descriptor via evaluate', async () => {
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        sendCommand: vi.fn(async () => ({
+          result: { value: { tag: 'button', id: 'go', classes: ['cta'], rect: { x: 1, y: 2, width: 80, height: 24 } } },
+        })),
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const d = await h.describeElementAt(50, 100);
+    expect(d).toMatchObject({ tag: 'button', id: 'go' });
+  });
+
   it('cdp() works with no params (defaults to empty object)', async () => {
     const { wc } = fakeWc({
       debugger: {

@@ -111,6 +111,10 @@ export class HorizonBridgeServer {
         const params = (args.params ?? {}) as Record<string, unknown>;
         return await this.harness.cdp(method, params);
       }
+      case 'axtree':           return await this.harness.getAxTree();
+      case 'waitFor':          return await this.harness.waitFor(args as never);
+      case 'dismissOverlays':  return await this.harness.dismissOverlays();
+      case 'describeAt':       return await this.harness.describeElementAt(Number(args.x), Number(args.y));
       case 'reader_extract': {
         const url = await this.harness.getUrl();
         const html = await this.harness.getHtml();

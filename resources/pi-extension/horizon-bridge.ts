@@ -202,6 +202,76 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool({
+		name: "browser_axtree",
+		label: "Accessibility tree",
+		description:
+			"Get the page's accessibility tree — the semantic structure screen readers use " +
+			"(headings, links, buttons, ARIA roles + names). PREFER over browser_getDom for " +
+			"'find the X button' / 'list the links' / 'what are the form labels' tasks: " +
+			"much cheaper in tokens and far easier for an LLM to reason over than raw HTML. " +
+			"Returns the CDP Accessibility.getFullAXTree response.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("axtree", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_wait_for",
+		label: "Wait for condition",
+		description:
+			"Wait for a page condition to become true rather than sleeping a fixed time. " +
+			"Use AFTER any action that triggers async work (click that submits a form, " +
+			"navigate, type in a search box). One or more conditions can be combined; the " +
+			"call returns as soon as ANY of them holds.\n\n" +
+			"Conditions:\n" +
+			"  selector: 'button.submit'  — element exists AND is visible\n" +
+			"  selectorGone: '.spinner'   — element no longer in DOM\n" +
+			"  networkIdleMs: 500         — no in-flight requests for N ms\n" +
+			"  urlMatch: '/checkout/'     — current URL matches regex\n" +
+			"  predicate: 'document.title === \"Done\"' — arbitrary JS truthy\n" +
+			"  timeoutMs: 10000           — total wait budget (default 10s)\n\n" +
+			"Returns {ok: true, reason: 'selector'|'urlMatch'|...} on match or " +
+			"{ok: false, reason: 'timeout'}. Use this instead of repeated browser_evaluate " +
+			"in a loop — it's the difference between 100ms and 3000ms response times.",
+		parameters: Type.Object({
+			selector: Type.Optional(Type.String()),
+			selectorGone: Type.Optional(Type.String()),
+			networkIdleMs: Type.Optional(Type.Number()),
+			urlMatch: Type.Optional(Type.String()),
+			predicate: Type.Optional(Type.String()),
+			timeoutMs: Type.Optional(Type.Number()),
+		}),
+		execute: async (_id, params) => bridge("waitFor", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_dismiss_overlays",
+		label: "Dismiss overlays",
+		description:
+			"Detect and remove modal/overlay/dialog elements that intercept clicks. " +
+			"Call this when a click 'should have worked' but the page didn't respond — " +
+			"common cause is a cookie banner, newsletter popup, login modal, or " +
+			"chat-widget bubble sitting over the target. Heuristics: fixed/sticky/absolute " +
+			"position, z-index >= 100 or aria-modal/role=dialog, covering >25% of the " +
+			"viewport. Also strips overflow:hidden scroll locks on body/html. " +
+			"Returns {removed: N, nodes: ['div#cookie-banner', ...]} so you can " +
+			"see what was zapped and decide whether to re-attempt the original action.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("dismissOverlays", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_describe_at",
+		label: "Describe element at (x, y)",
+		description:
+			"Describe the element that elementFromPoint(x, y) returns. Use when a click " +
+			"at coordinates seems to do nothing — this tells you what's ACTUALLY at the " +
+			"point so you can detect overlays / wrong target / click-jacking layers. " +
+			"Returns {tag, id, classes, role, ariaLabel, text, rect}.",
+		parameters: Type.Object({ x: Type.Number(), y: Type.Number() }),
+		execute: async (_id, params) => bridge("describeAt", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
 		name: "browser_cdp",
 		label: "Raw CDP",
 		description:

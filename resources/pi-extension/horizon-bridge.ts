@@ -404,6 +404,93 @@ export default function (pi: ExtensionAPI): void {
 		execute: async () => bridge("reader_extract", {}),
 	});
 
+	// ─── Skills library (bundled, read-only) ─────────────────────────────
+	pi.registerTool({
+		name: "browser_skill_preamble",
+		label: "Read SKILL.md",
+		description:
+			"Read the top-level browser SKILL.md — the playbook for using these tools. " +
+			"Call this once at the start of a browser-automation task to load the patterns " +
+			"and footguns. Returns the markdown body as a single string.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("skillPreamble", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_skill_list_interactions",
+		label: "List interaction skills",
+		description:
+			"List the available interaction-skill files — short markdown notes on reusable " +
+			"web mechanics (scrolling, dropdowns, iframes, shadow-dom, dialogs, uploads, " +
+			"downloads, infinite-scroll, login-walls, captcha, network-spying, helpers, forms). " +
+			"Read one with browser_skill_read_interaction when you hit that specific mechanic.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("skillListInteractions", {}),
+	});
+
+	pi.registerTool({
+		name: "browser_skill_read_interaction",
+		label: "Read interaction skill",
+		description:
+			"Read a specific interaction-skill markdown file by name (e.g. 'iframes.md', " +
+			"'dropdowns.md'). Use when you're stuck on a particular web mechanic. Returns the " +
+			"file body as a single string. Throws if the name doesn't match a bundled skill.",
+		parameters: Type.Object({ name: Type.String() }),
+		execute: async (_id, params) => bridge("skillReadInteraction", params as Record<string, unknown>),
+	});
+
+	// ─── Domain skills (per-site playbooks, user-writable) ──────────────
+	pi.registerTool({
+		name: "browser_domain_skill_list",
+		label: "List domain skills",
+		description:
+			"List the per-site notes you (the agent) have previously saved for a host. " +
+			"Host should be a bare domain like 'amazon.com' (the bridge normalizes 'www.'). " +
+			"browser_navigate also includes this list as `domainSkillsAvailable` in its response " +
+			"when notes exist — read those files before inventing a fresh approach.",
+		parameters: Type.Object({ host: Type.String() }),
+		execute: async (_id, params) => bridge("domainSkillList", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_domain_skill_read",
+		label: "Read domain skill",
+		description:
+			"Read a saved per-site note. Returns {name, host, body, bytes, updatedAt}. Throws " +
+			"if not found.",
+		parameters: Type.Object({ host: Type.String(), name: Type.String() }),
+		execute: async (_id, params) => bridge("domainSkillRead", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_domain_skill_save",
+		label: "Save domain skill",
+		description:
+			"Persist a per-site playbook to disk. Use when you discover a quirk specific to " +
+			"this site that would help future-you (or another agent) avoid the same dead-end: " +
+			"selector that survives a redesign, captcha trigger condition, hidden export URL, " +
+			"non-obvious login flow. Keep entries short (<500 words), one quirk per file. " +
+			"`name` must end in `.md` and use kebab-case. Overwrites by name. " +
+			"Don't save anything that's discoverable from the page itself — only the lessons " +
+			"that took effort to learn.",
+		parameters: Type.Object({
+			host: Type.String(),
+			name: Type.String(),
+			body: Type.String(),
+		}),
+		execute: async (_id, params) => bridge("domainSkillSave", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_domain_skill_remove",
+		label: "Remove domain skill",
+		description:
+			"Delete a saved domain skill by host + name. Use when the note is stale (the " +
+			"site changed and the playbook no longer applies) and you can't usefully refine it.",
+		parameters: Type.Object({ host: Type.String(), name: Type.String() }),
+		execute: async (_id, params) => bridge("domainSkillRemove", params as Record<string, unknown>),
+	});
+
 	// ─── A2UI: declarative UI inside the AI panel ────────────────────────
 	pi.registerTool({
 		name: "render_ui",

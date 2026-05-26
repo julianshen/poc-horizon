@@ -149,6 +149,71 @@ describe('HorizonBridgeServer', () => {
     srv2.close();
   });
 
+  it('navigate response includes domainSkillsAvailable when notes exist for the host', async () => {
+    // Stub domainSkills so we don't touch disk in this test.
+    const ds = {
+      list: vi.fn(async (host: string) => host === 'shop.example' ? ['login.md', 'checkout.md'] : []),
+      read: vi.fn(), save: vi.fn(), remove: vi.fn(), listHosts: vi.fn(),
+    };
+    const srv2 = new HorizonBridgeServer(harness, undefined, ds as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const withNotes = await sendRecv(sock, { id: 'n1', tool: 'navigate', args: { url: 'https://shop.example/products' } });
+    expect(withNotes).toMatchObject({ id: 'n1', ok: true, result: { ok: true, host: 'shop.example', domainSkillsAvailable: ['login.md', 'checkout.md'] } });
+    const noNotes = await sendRecv(sock, { id: 'n2', tool: 'navigate', args: { url: 'https://unknown.test/' } });
+    expect(noNotes).toEqual({ id: 'n2', ok: true, result: { ok: true } });
+    // Non-http URLs don't get queried at all.
+    const fileUrl = await sendRecv(sock, { id: 'n3', tool: 'navigate', args: { url: 'horizon://newtab' } });
+    expect(fileUrl).toEqual({ id: 'n3', ok: true, result: { ok: true } });
+    expect(ds.list).toHaveBeenCalledTimes(2);
+    sock.destroy(); srv2.close();
+  });
+
+  it('routes skill library + domain skill tools', async () => {
+    const lib = {
+      preamble: vi.fn(async () => '# horizon-browser\n...'),
+      listInteractions: vi.fn(async () => ['dropdowns.md', 'iframes.md']),
+      readInteraction: vi.fn(async (n: string) => n === 'iframes.md' ? '# Iframes\n...' : null),
+    };
+    const ds = {
+      list: vi.fn(async () => ['a.md']),
+      read: vi.fn(async () => ({ name: 'a.md', host: 'site.com', body: 'note', bytes: 4, updatedAt: 0 })),
+      save: vi.fn(async () => ({ name: 'a.md', host: 'site.com', body: 'note', bytes: 4, updatedAt: 0 })),
+      remove: vi.fn(async () => true),
+      listHosts: vi.fn(),
+    };
+    const srv3 = new HorizonBridgeServer(harness, undefined, ds as never, lib as never);
+    const p3 = await srv3.listen();
+    const sock = await connectClient(p3);
+    const pre = await sendRecv(sock, { id: 'p', tool: 'skillPreamble', args: {} });
+    expect(pre).toMatchObject({ id: 'p', ok: true });
+    expect(String(pre.result)).toContain('horizon-browser');
+
+    const list = await sendRecv(sock, { id: 'l', tool: 'skillListInteractions', args: {} });
+    expect((list.result as unknown[]).length).toBe(2);
+
+    const read = await sendRecv(sock, { id: 'r', tool: 'skillReadInteraction', args: { name: 'iframes.md' } });
+    expect(String(read.result)).toContain('Iframes');
+
+    const unknown = await sendRecv(sock, { id: 'u', tool: 'skillReadInteraction', args: { name: 'nope.md' } });
+    expect(unknown).toMatchObject({ ok: false });
+
+    const ls = await sendRecv(sock, { id: 'dl', tool: 'domainSkillList', args: { host: 'site.com' } });
+    expect(ls.result).toEqual(['a.md']);
+
+    const sv = await sendRecv(sock, { id: 'sv', tool: 'domainSkillSave', args: { host: 'site.com', name: 'a.md', body: 'note' } });
+    expect(sv).toMatchObject({ ok: true });
+    expect(ds.save).toHaveBeenCalledOnce();
+
+    const rd = await sendRecv(sock, { id: 'rd', tool: 'domainSkillRead', args: { host: 'site.com', name: 'a.md' } });
+    expect(rd).toMatchObject({ ok: true, result: { name: 'a.md' } });
+
+    const rm = await sendRecv(sock, { id: 'rm', tool: 'domainSkillRemove', args: { host: 'site.com', name: 'a.md' } });
+    expect(rm).toMatchObject({ ok: true, result: { ok: true } });
+
+    sock.destroy(); srv3.close();
+  });
+
   it('routes cdpSubscribe / cdpCollect / cdpUnsubscribe to BrowserHarness', async () => {
     const sock = await connectClient(port);
     const s = await sendRecv(sock, { id: 's1', tool: 'cdpSubscribe', args: { method: 'Network.responseReceived' } });

@@ -1,6 +1,8 @@
 import { createServer, Server, Socket } from 'net';
 import type { BrowserHarness } from './BrowserHarness';
 import type { HelperRegistry } from './HelperRegistry';
+import type { DomainSkills } from './DomainSkills';
+import type { SkillsLibrary } from './SkillsLibrary';
 import { readerExtract } from './readerExtract';
 
 interface ToolRequest {
@@ -33,7 +35,26 @@ export class HorizonBridgeServer {
   constructor(
     private readonly harness: BrowserHarness,
     private readonly helpers?: HelperRegistry,
+    private readonly domainSkills?: DomainSkills,
+    private readonly skillsLibrary?: SkillsLibrary,
   ) {}
+
+  /**
+   * Pull the registrable host out of a URL. http(s) only — chrome://,
+   * file://, data: URLs return null because per-site notes don't make
+   * sense for them. Mirrors DomainSkills.normalizeHost.
+   */
+  private hostFromUrl(url: string): string | null {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+      let h = u.hostname.toLowerCase();
+      if (h.startsWith('www.')) h = h.slice(4);
+      return h || null;
+    } catch {
+      return null;
+    }
+  }
 
   /** Listen on a random loopback port. Resolves with the bound port. */
   async listen(): Promise<number> {
@@ -100,7 +121,19 @@ export class HorizonBridgeServer {
 
   private async run(tool: string, args: Record<string, unknown>): Promise<unknown> {
     switch (tool) {
-      case 'navigate':   await this.harness.navigate(String(args.url));                       return { ok: true };
+      case 'navigate': {
+        const url = String(args.url);
+        await this.harness.navigate(url);
+        // Auto-hint: if the agent has saved per-site notes for this host,
+        // surface their filenames so it can decide whether to read them.
+        // Names only — keeps the navigate response cheap.
+        const host = this.hostFromUrl(url);
+        if (host && this.domainSkills) {
+          const available = await this.domainSkills.list(host);
+          if (available.length > 0) return { ok: true, host, domainSkillsAvailable: available };
+        }
+        return { ok: true };
+      }
       case 'click':      await this.harness.click(args as never);                              return { ok: true };
       case 'type':       await this.harness.type(args as never);                               return { ok: true };
       case 'scroll':     await this.harness.scroll(args as never);                             return { ok: true };
@@ -157,6 +190,54 @@ export class HorizonBridgeServer {
         const method = typeof args.method === 'string' ? args.method : undefined;
         const max = typeof args.max === 'number' ? args.max : undefined;
         return this.harness.collectEvents(method, max);
+      }
+      // ─── Skills library (bundled, read-only) ────────────────────
+      case 'skillPreamble': {
+        if (!this.skillsLibrary) throw new Error('skills library not enabled');
+        return await this.skillsLibrary.preamble();
+      }
+      case 'skillListInteractions': {
+        if (!this.skillsLibrary) throw new Error('skills library not enabled');
+        return await this.skillsLibrary.listInteractions();
+      }
+      case 'skillReadInteraction': {
+        if (!this.skillsLibrary) throw new Error('skills library not enabled');
+        const name = String(args.name ?? '');
+        if (!name) throw new Error('skillReadInteraction: name required');
+        const body = await this.skillsLibrary.readInteraction(name);
+        if (body === null) throw new Error(`unknown interaction skill: ${name}`);
+        return body;
+      }
+      // ─── Domain skills (per-site, user-writable) ────────────────
+      case 'domainSkillList': {
+        if (!this.domainSkills) throw new Error('domain skills not enabled');
+        const host = String(args.host ?? '');
+        if (!host) throw new Error('domainSkillList: host required');
+        return await this.domainSkills.list(host);
+      }
+      case 'domainSkillRead': {
+        if (!this.domainSkills) throw new Error('domain skills not enabled');
+        const host = String(args.host ?? '');
+        const name = String(args.name ?? '');
+        if (!host || !name) throw new Error('domainSkillRead: host + name required');
+        const skill = await this.domainSkills.read(host, name);
+        if (!skill) throw new Error(`not found: ${host}/${name}`);
+        return skill;
+      }
+      case 'domainSkillSave': {
+        if (!this.domainSkills) throw new Error('domain skills not enabled');
+        const host = String(args.host ?? '');
+        const name = String(args.name ?? '');
+        const body = String(args.body ?? '');
+        if (!host || !name || !body) throw new Error('domainSkillSave: host + name + body required');
+        return await this.domainSkills.save(host, name, body);
+      }
+      case 'domainSkillRemove': {
+        if (!this.domainSkills) throw new Error('domain skills not enabled');
+        const host = String(args.host ?? '');
+        const name = String(args.name ?? '');
+        if (!host || !name) throw new Error('domainSkillRemove: host + name required');
+        return { ok: await this.domainSkills.remove(host, name) };
       }
       case 'reader_extract': {
         const url = await this.harness.getUrl();

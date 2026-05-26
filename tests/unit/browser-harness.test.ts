@@ -255,6 +255,58 @@ describe('BrowserHarness', () => {
     expect(cap[0][1]).toEqual({});
   });
 
+  it('openTab + listTabs + switchTab + closeTabById drive the bound TabManager', () => {
+    const tabs: Array<{ id: string; url: string; title: string; isActive: boolean }> = [];
+    let activeId: string | null = null;
+    const views = new Map<string, { webContents: unknown }>();
+    const tm = {
+      createTab: vi.fn((url?: string) => {
+        const id = `t${tabs.length + 1}`;
+        tabs.push({ id, url: url ?? 'horizon://newtab', title: '', isActive: false });
+        views.set(id, { webContents: fakeWc().wc });
+        return { id };
+      }),
+      closeTab: vi.fn((id: string) => {
+        const i = tabs.findIndex((t) => t.id === id);
+        if (i >= 0) tabs.splice(i, 1);
+      }),
+      activateTab: vi.fn((id: string) => {
+        activeId = id;
+        for (const t of tabs) t.isActive = t.id === id;
+      }),
+      getAllTabs: vi.fn(() => tabs.slice()),
+      getActiveTabId: vi.fn(() => activeId),
+      getBrowserView: vi.fn((id: string) => views.get(id) as { webContents: import('electron').WebContents } | undefined),
+    };
+    const { wc } = fakeWc();
+    const h = new BrowserHarness();
+    h.attach(wc, tm);
+    const opened = h.openTab('https://a.test');
+    expect(opened.id).toBe('t1');
+    expect(opened.isActive).toBe(true);
+    expect(tm.createTab).toHaveBeenCalledWith('https://a.test');
+    expect(tm.activateTab).toHaveBeenCalledWith('t1');
+
+    const opened2 = h.openTab('https://b.test');
+    expect(opened2.id).toBe('t2');
+    expect(h.listTabs()).toHaveLength(2);
+
+    const switched = h.switchTab('t1');
+    expect(switched.id).toBe('t1');
+    expect(switched.isActive).toBe(true);
+
+    expect(h.closeTabById('t2')).toEqual({ closed: true });
+    expect(h.listTabs()).toHaveLength(1);
+  });
+
+  it('multi-tab methods throw when no TabManager is bound', () => {
+    const { wc } = fakeWc();
+    const h = new BrowserHarness();
+    h.attach(wc);   // no tm
+    expect(() => h.openTab('https://x')).toThrow(/no TabManager/);
+    expect(() => h.listTabs()).toThrow(/no TabManager/);
+  });
+
   it('require() throws when not attached', async () => {
     const h = new BrowserHarness();
     await expect(h.navigate('https://x')).rejects.toThrow(/not attached/);

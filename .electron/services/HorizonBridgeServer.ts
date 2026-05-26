@@ -158,6 +158,10 @@ export class HorizonBridgeServer {
         return await this.harness.cdp(method, params);
       }
       case 'axtree':           return await this.harness.getAxTree();
+      case 'tabOpen':          return this.harness.openTab(typeof args.url === 'string' ? args.url : undefined);
+      case 'tabSwitch':        return this.harness.switchTab(String(args.id));
+      case 'tabClose':         return this.harness.closeTabById(String(args.id));
+      case 'tabList':          return this.harness.listTabs();
       case 'waitFor':          return await this.harness.waitFor(args as never);
       case 'dismissOverlays':  return await this.harness.dismissOverlays();
       case 'describeAt':       return await this.harness.describeElementAt(Number(args.x), Number(args.y));

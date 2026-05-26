@@ -82,6 +82,21 @@ browser_cdp_collect({ method: "Network.responseReceived" })  // drains the buffe
 
 Subscriptions persist across turns; you don't have to re-subscribe every call. Unsubscribe explicitly when you're done.
 
+### Open tabs when you need to drill in without losing your place
+
+Search-then-deep-dive: keep the SERP open in tab A, click the first result, decide it's not it, want to try the second?
+
+```
+browser_tab_open({ url: "https://search.example/q?serp=..." })   // tab A
+// ... examine results ...
+browser_tab_open({ url: resultLink })                            // tab B
+// ... drill in ...
+browser_tab_switch({ id: tabAId })                               // back to SERP
+browser_tab_close({ id: tabBId })                                // tidy
+```
+
+`browser_tab_list()` shows everything that's open. Don't open more than a handful — each tab uses a renderer process and memory.
+
 ## Stuck on a specific mechanic?
 
 Read the matching file in `interaction-skills/`:

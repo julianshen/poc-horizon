@@ -1,5 +1,18 @@
 import { WebContents } from 'electron';
 
+/** Minimal TabManager surface used by BrowserHarness for multi-tab
+ *  orchestration. Typed locally so BrowserHarness stays decoupled from
+ *  the full TabManager class (which imports Electron BrowserView, etc).
+ *  Real TabManager implements this implicitly. */
+export interface TabManagerLike {
+  createTab(url?: string): { id: string };
+  closeTab(id: string): void;
+  activateTab(id: string): void;
+  getAllTabs(): Array<{ id: string; url: string; title: string; isActive: boolean }>;
+  getActiveTabId(): string | null;
+  getBrowserView(id: string): { webContents: WebContents } | undefined;
+}
+
 /**
  * Result types for harness primitives. JSON-serialisable so the agent
  * subprocess can consume them without special decoders.
@@ -49,8 +62,15 @@ export class BrowserHarness {
   private cdpListener: ((event: Electron.Event, method: string, params: unknown) => void) | null = null;
   private static EVENT_BUF_CAP = 200;
 
-  /** Attach the debugger to the given webContents. Idempotent per tab. */
-  attach(wc: WebContents): void {
+  /** When set, multi-tab tools (openTab / switchTab / closeTab / listTabs)
+   *  drive this TabManager. Bound by the caller via `attach(wc, tm)`. */
+  private tm: TabManagerLike | null = null;
+
+  /** Attach the debugger to the given webContents. Idempotent per tab.
+   *  Optional `tm` binds a TabManager so the agent can open / switch /
+   *  close tabs in addition to driving the current one. */
+  attach(wc: WebContents, tm?: TabManagerLike): void {
+    if (tm !== undefined) this.tm = tm;
     if (this.attachedTo === wc) return;
     if (this.attachedTo) this.detach();
     if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
@@ -440,6 +460,50 @@ export class BrowserHarness {
       this.eventBuf.set(m, []);
     }
     return all;
+  }
+
+  // ─── Multi-tab orchestration ────────────────────────────────────────
+
+  private requireTm(): TabManagerLike {
+    if (!this.tm) throw new Error('BrowserHarness: no TabManager bound. Multi-tab ops require attach(wc, tm).');
+    return this.tm;
+  }
+
+  /** Open a new tab, switch the harness's debugger to it, return the descriptor. */
+  openTab(url?: string): { id: string; url: string; title: string; isActive: boolean } {
+    const tm = this.requireTm();
+    const tab = tm.createTab(url);
+    tm.activateTab(tab.id);
+    const view = tm.getBrowserView(tab.id);
+    if (view) this.attach(view.webContents);
+    const full = tm.getAllTabs().find((t) => t.id === tab.id);
+    return full ?? { id: tab.id, url: url ?? '', title: '', isActive: true };
+  }
+
+  /** Switch the active tab + re-attach the debugger to its webContents. */
+  switchTab(id: string): { id: string; url: string; title: string; isActive: boolean } {
+    const tm = this.requireTm();
+    const tab = tm.getAllTabs().find((t) => t.id === id);
+    if (!tab) throw new Error(`switchTab: unknown tab ${id}`);
+    tm.activateTab(id);
+    const view = tm.getBrowserView(id);
+    if (view) this.attach(view.webContents);
+    return { ...tab, isActive: true };
+  }
+
+  closeTabById(id: string): { closed: boolean } {
+    const tm = this.requireTm();
+    const before = tm.getAllTabs().length;
+    tm.closeTab(id);
+    const after = tm.getAllTabs().length;
+    // If the closed tab was the one we were attached to, the next-active
+    // tab's wc isn't ours yet — caller should call switchTab if it wants
+    // to keep going. listTabs() will report whichever became active.
+    return { closed: after < before };
+  }
+
+  listTabs(): Array<{ id: string; url: string; title: string; isActive: boolean }> {
+    return this.requireTm().getAllTabs();
   }
 
   /**

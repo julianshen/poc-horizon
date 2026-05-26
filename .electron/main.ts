@@ -292,7 +292,7 @@ function registerHandlers(): void {
 
     if (!browserHarness) browserHarness = new BrowserHarness();
     try {
-      browserHarness.attach(view.webContents);
+      browserHarness.attach(view.webContents, ctx.tabManager);
     } catch (err) {
       return { ok: false, error: `Could not attach debugger: ${(err as Error).message}` };
     }

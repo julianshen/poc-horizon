@@ -25,6 +25,10 @@ function fakeHarness() {
     unsubscribeEvent: vi.fn(() => ({ ok: true, cleared: 1 })),
     collectEvents: vi.fn(() => [{ at: 0, method: 'Network.responseReceived', params: { url: 'x' } }]),
     callHelper: vi.fn(async () => ({ ok: true, value: 42 })),
+    openTab: vi.fn(() => ({ id: 't1', url: 'https://x', title: 'X', isActive: true })),
+    switchTab: vi.fn((id: string) => ({ id, url: 'https://x', title: 'X', isActive: true })),
+    closeTabById: vi.fn(() => ({ closed: true })),
+    listTabs: vi.fn(() => [{ id: 't1', url: 'https://x', title: 'X', isActive: true }]),
   } as unknown as BrowserHarness;
 }
 
@@ -113,6 +117,23 @@ describe('HorizonBridgeServer', () => {
     const sock = await connectClient(port);
     const resp = await sendRecv(sock, { id: 'e', tool: 'navigate', args: { url: 'x' } });
     expect(resp).toMatchObject({ id: 'e', ok: false, error: 'boom' });
+    sock.destroy();
+  });
+
+  it('routes multi-tab tools through BrowserHarness', async () => {
+    const sock = await connectClient(port);
+    const open = await sendRecv(sock, { id: 'to', tool: 'tabOpen', args: { url: 'https://x' } });
+    expect(open).toMatchObject({ id: 'to', ok: true, result: { id: 't1' } });
+    expect(harness.openTab).toHaveBeenCalledWith('https://x');
+
+    const sw = await sendRecv(sock, { id: 'tw', tool: 'tabSwitch', args: { id: 't1' } });
+    expect(sw).toMatchObject({ ok: true, result: { id: 't1', isActive: true } });
+
+    const ls = await sendRecv(sock, { id: 'tl', tool: 'tabList', args: {} });
+    expect((ls.result as unknown[]).length).toBe(1);
+
+    const cl = await sendRecv(sock, { id: 'tc', tool: 'tabClose', args: { id: 't1' } });
+    expect(cl).toMatchObject({ ok: true, result: { closed: true } });
     sock.destroy();
   });
 

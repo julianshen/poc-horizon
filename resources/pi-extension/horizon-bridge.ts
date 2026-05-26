@@ -422,6 +422,50 @@ export default function (pi: ExtensionAPI): void {
 		execute: async (_id, params) => bridge("cdp", params as Record<string, unknown>),
 	});
 
+	// ─── Multi-tab orchestration ────────────────────────────────────────
+	pi.registerTool({
+		name: "browser_tab_open",
+		label: "Open new tab",
+		description:
+			"Open a new tab in the current window and switch to it (the agent's " +
+			"subsequent tool calls will target the new tab). Optional `url` — omitted = newtab page. " +
+			"Returns {id, url, title, isActive}. Use when you need to drill into a result while " +
+			"keeping the current page available (browser_tab_switch back to it later).",
+		parameters: Type.Object({ url: Type.Optional(Type.String()) }),
+		execute: async (_id, params) => bridge("tabOpen", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_tab_switch",
+		label: "Switch tab",
+		description:
+			"Switch to the tab with the given id. Subsequent tool calls target it. " +
+			"Use after browser_tab_list when you have multiple tabs open and want to act on a " +
+			"specific one. Returns the tab descriptor.",
+		parameters: Type.Object({ id: Type.String() }),
+		execute: async (_id, params) => bridge("tabSwitch", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_tab_close",
+		label: "Close tab",
+		description:
+			"Close the tab with the given id. After closing the previously-active tab, " +
+			"call browser_tab_list to see which tab became active next.",
+		parameters: Type.Object({ id: Type.String() }),
+		execute: async (_id, params) => bridge("tabClose", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
+		name: "browser_tab_list",
+		label: "List tabs",
+		description:
+			"List all tabs in the current window: [{id, url, title, isActive}]. Use to see " +
+			"what's open and to find a tab id for browser_tab_switch.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("tabList", {}),
+	});
+
 	pi.registerTool({
 		name: "reader_extract",
 		label: "Reader mode",

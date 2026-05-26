@@ -202,6 +202,26 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool({
+		name: "browser_cdp",
+		label: "Raw CDP",
+		description:
+			"Send an arbitrary Chrome DevTools Protocol command to the active tab. " +
+			"Power-user escape hatch when the high-level browser_* tools don't cover the " +
+			"operation. Pass {method, params} where method is the CDP method name " +
+			"(e.g. 'Network.enable', 'Page.captureSnapshot', 'Emulation.setDeviceMetricsOverride', " +
+			"'Runtime.compileScript', 'Accessibility.getFullAXTree') and params is the " +
+			"method-specific parameter object. Returns the CDP method's response object verbatim. " +
+			"See https://chromedevtools.github.io/devtools-protocol/ for the full method catalog. " +
+			"Prefer the higher-level browser_* tools when they fit — they're cheaper in tokens " +
+			"and less error-prone. Use browser_cdp when you need a method we haven't wrapped.",
+		parameters: Type.Object({
+			method: Type.String(),
+			params: Type.Optional(Type.Record(Type.String(), Type.Any())),
+		}),
+		execute: async (_id, params) => bridge("cdp", params as Record<string, unknown>),
+	});
+
+	pi.registerTool({
 		name: "reader_extract",
 		label: "Reader mode",
 		description:

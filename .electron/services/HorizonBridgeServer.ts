@@ -105,6 +105,12 @@ export class HorizonBridgeServer {
       case 'getDom':     return await this.harness.getDom(Number(args.depth ?? 4));
       case 'getUrl':     return await this.harness.getUrl();
       case 'getTitle':   return await this.harness.getTitle();
+      case 'cdp': {
+        const method = String(args.method ?? '');
+        if (!method) throw new Error('cdp: method is required');
+        const params = (args.params ?? {}) as Record<string, unknown>;
+        return await this.harness.cdp(method, params);
+      }
       case 'reader_extract': {
         const url = await this.harness.getUrl();
         const html = await this.harness.getHtml();

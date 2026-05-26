@@ -15,6 +15,7 @@ function fakeHarness() {
     getDom: vi.fn(async () => ({ nodeId: 1 })),
     getUrl: vi.fn(async () => 'https://x'),
     getTitle: vi.fn(async () => 'Title'),
+    cdp: vi.fn(async (method: string, params: Record<string, unknown>) => ({ echoed: { method, params } })),
   } as unknown as BrowserHarness;
 }
 
@@ -87,6 +88,30 @@ describe('HorizonBridgeServer', () => {
     const sock = await connectClient(port);
     const resp = await sendRecv(sock, { id: 'e', tool: 'navigate', args: { url: 'x' } });
     expect(resp).toMatchObject({ id: 'e', ok: false, error: 'boom' });
+    sock.destroy();
+  });
+
+  it('forwards cdp tool calls to harness.cdp with method + params', async () => {
+    const sock = await connectClient(port);
+    const resp = await sendRecv(sock, {
+      id: 'c1',
+      tool: 'cdp',
+      args: { method: 'Browser.getVersion', params: { foo: 1 } },
+    });
+    expect(resp).toMatchObject({
+      id: 'c1',
+      ok: true,
+      result: { echoed: { method: 'Browser.getVersion', params: { foo: 1 } } },
+    });
+    expect(harness.cdp).toHaveBeenCalledWith('Browser.getVersion', { foo: 1 });
+    sock.destroy();
+  });
+
+  it('rejects cdp call when method is empty', async () => {
+    const sock = await connectClient(port);
+    const resp = await sendRecv(sock, { id: 'c2', tool: 'cdp', args: { params: {} } });
+    expect(resp).toMatchObject({ id: 'c2', ok: false });
+    expect(String(resp.error)).toContain('method');
     sock.destroy();
   });
 

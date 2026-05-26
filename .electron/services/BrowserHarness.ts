@@ -152,4 +152,22 @@ export class BrowserHarness {
     if (!r.ok) throw new Error(r.error);
     return String(r.value ?? '');
   }
+
+  /**
+   * Send an arbitrary Chrome DevTools Protocol command to the attached
+   * webContents. Power-user escape hatch when the high-level primitives
+   * (click/type/scroll/screenshot/evaluate/getDom) don't cover the
+   * operation — e.g. Network.setUserAgentOverride, Page.captureSnapshot,
+   * Runtime.compileScript, Emulation.setDeviceMetricsOverride, etc.
+   *
+   * Reference: https://chromedevtools.github.io/devtools-protocol/
+   *
+   * Returns whatever the CDP method returns (already JSON-serialisable
+   * since CDP itself is JSON-RPC over the wire). On error, throws —
+   * the bridge layer converts to a structured error response.
+   */
+  async cdp(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    const wc = this.require();
+    return await wc.debugger.sendCommand(method, params ?? {});
+  }
 }

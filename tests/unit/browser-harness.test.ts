@@ -100,6 +100,43 @@ describe('BrowserHarness', () => {
     expect(r).toEqual({ ok: false, error: 'ReferenceError: foo is not defined' });
   });
 
+  it('cdp() forwards method + params to webContents.debugger.sendCommand and returns the result', async () => {
+    const { wc, calls } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        sendCommand: vi.fn(async () => ({ userAgent: 'horizon/1.0' })),
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const r = await h.cdp('Browser.getVersion', {});
+    expect(r).toEqual({ userAgent: 'horizon/1.0' });
+    // ts-ignore via Bash check below — the fake's sendCommand is captured by vi.fn.
+    // Confirm method + params arrived.
+    const cap = (wc.debugger.sendCommand as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(cap[0][0]).toBe('Browser.getVersion');
+    expect(cap[0][1]).toEqual({});
+    void calls;
+  });
+
+  it('cdp() works with no params (defaults to empty object)', async () => {
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        sendCommand: vi.fn(async () => ({ ok: true })),
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    await h.cdp('Network.enable');
+    const cap = (wc.debugger.sendCommand as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(cap[0][1]).toEqual({});
+  });
+
   it('require() throws when not attached', async () => {
     const h = new BrowserHarness();
     await expect(h.navigate('https://x')).rejects.toThrow(/not attached/);

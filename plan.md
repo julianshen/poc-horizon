@@ -21,9 +21,9 @@
 
 ## Phase 3: TranslationBar UI component
 - [x] Add `showTranslationBar` + `translationProgress` to `browserStore.ts`
-- [ ] Create `TranslationBar.tsx` component with language picker, progress, restore
-- [ ] Wire `TranslationBar` into parent layout
-- [ ] Add unit tests for `TranslationBar.tsx`
+- [x] Create `TranslationBar.tsx` component with language picker, progress, restore
+- [x] Wire `TranslationBar` into parent layout
+- [x] Add unit tests for `TranslationBar.tsx`
 
 ## Phase 4: Cancellation support
 - [ ] Add `AbortSignal` to `pageTranslator.ts` `translatePage()`

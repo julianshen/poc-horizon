@@ -5,6 +5,7 @@ import { TabBar } from './components/chrome/TabBar';
 import { BookmarksBar } from './components/chrome/BookmarksBar';
 import { BrowserContentArea } from './components/chrome/BrowserContentArea';
 import { FindInPage } from './components/overlays/FindInPage';
+import { TranslationBar } from './components/overlays/TranslationBar';
 import { PageErrorOverlay } from './components/overlays/PageErrorOverlay';
 import { DownloadsShelf } from './components/overlays/DownloadsShelf';
 import { HistoryPanel } from './components/overlays/HistoryPanel';
@@ -66,6 +67,7 @@ const App: React.FC = () => {
         {showAI && <AIPanel />}
       </div>
       <FindInPage />
+      <TranslationBar />
       <DownloadsShelf />
       <HistoryPanel />
       <BookmarksPanel />

@@ -37,6 +37,7 @@ export default defineConfig({
         'src/components/chrome/TabContextMenu.tsx',
         'src/components/chrome/BrowserContentArea.tsx',
         'src/components/overlays/FindInPage.tsx',
+        'src/components/overlays/TranslationBar.tsx',
         'src/components/overlays/PageErrorOverlay.tsx',
         'src/components/overlays/AIPanel.tsx',
         'src/components/overlays/BookmarksPanel.tsx',

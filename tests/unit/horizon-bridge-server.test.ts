@@ -5,8 +5,13 @@ import { HorizonBridgeServer } from '@electron/services/HorizonBridgeServer';
 import type { BrowserHarness } from '@electron/services/BrowserHarness';
 
 function fakeHarness() {
+  // Track the most recently-navigated URL so getUrl() reflects it.
+  // Mirrors real-browser behavior: post-navigate, getUrl returns the
+  // committed URL (after any redirects). Tests that need to simulate
+  // a redirect override harness.getUrl per-case.
+  let currentUrl = 'https://x';
   return {
-    navigate: vi.fn(async () => {}),
+    navigate: vi.fn(async (url: string) => { currentUrl = url; }),
     click: vi.fn(async () => {}),
     type: vi.fn(async () => {}),
     scroll: vi.fn(async () => {}),
@@ -14,7 +19,7 @@ function fakeHarness() {
     screenshotMarked: vi.fn(async () => ({ format: 'png', base64: 'M', width: 100, height: 200, marks: [{ id: 1, x: 10, y: 10, w: 50, h: 20, tag: 'button', role: null, label: 'Go', href: null }] })),
     evaluate: vi.fn(async (e: string) => ({ ok: true, value: e })),
     getDom: vi.fn(async () => ({ nodeId: 1 })),
-    getUrl: vi.fn(async () => 'https://x'),
+    getUrl: vi.fn(async () => currentUrl),
     getTitle: vi.fn(async () => 'Title'),
     cdp: vi.fn(async (method: string, params: Record<string, unknown>) => ({ echoed: { method, params } })),
     getAxTree: vi.fn(async () => ({ nodes: [{ nodeId: '1', role: { value: 'button' } }] })),
@@ -227,6 +232,94 @@ describe('HorizonBridgeServer', () => {
     expect(rm).toMatchObject({ id: 'h4', ok: true });
     sock.destroy();
     srv2.close();
+  });
+
+  it('navigate response includes agentPolicy {level, site} when /agent.json exists', async () => {
+    const resolver = {
+      resolve: vi.fn(async () => ({
+        version: '1.0', site: 'Shop', summary: 'demo store', capabilities: { read: { allowed: true } },
+      })),
+      cached: vi.fn(),
+      clear: vi.fn(),
+    };
+    // (AgentPolicyResolver.originOf is a static method called by the route; it works on real URLs.)
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const resp = await sendRecv(sock, { id: 'n', tool: 'navigate', args: { url: 'https://shop.test/page' } });
+    expect(resp).toMatchObject({
+      ok: true,
+      result: { ok: true, agentPolicy: { level: 1, site: 'Shop', summary: 'demo store' } },
+    });
+    sock.destroy(); srv2.close();
+  });
+
+  it('navigate resolves policy against the FINAL URL (post-redirect), not the requested one', async () => {
+    // Simulate a 302: harness.navigate is called with /checkout but getUrl
+    // reports the final origin.
+    (harness.navigate as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => { /* nav */ });
+    (harness.getUrl as ReturnType<typeof vi.fn>).mockResolvedValueOnce('https://payments.thirdparty.test/');
+    const resolver = {
+      resolve: vi.fn(async (url: string) => url.includes('payments.thirdparty.test')
+        ? { version: '1.0', site: 'Pay Inc', capabilities: { read: { allowed: true } } }
+        : null),
+      cached: vi.fn(), clear: vi.fn(),
+    };
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const resp = await sendRecv(sock, { id: 'r', tool: 'navigate', args: { url: 'https://shop.test/checkout' } });
+    // Policy on the post-redirect origin should be resolved + surfaced.
+    expect(resp).toMatchObject({ ok: true, result: { agentPolicy: { site: 'Pay Inc' } } });
+    expect(resolver.resolve).toHaveBeenCalledWith('https://payments.thirdparty.test/');
+    sock.destroy(); srv2.close();
+  });
+
+  it('navigate clears the previous origin\'s site policy before resolving the new one', async () => {
+    const setSitePolicy = vi.fn();
+    const guard = { evaluate: vi.fn(() => ({ kind: 'allow' })), setSitePolicy, request: vi.fn(), needsApproval: vi.fn() };
+    const resolver = { resolve: vi.fn(async () => null), cached: vi.fn(), clear: vi.fn() };
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, guard as never, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    await sendRecv(sock, { id: 'n', tool: 'navigate', args: { url: 'https://x.test' } });
+    // First call must be null — the previous policy is cleared BEFORE
+    // the new one is fetched. Without this, a fast tool call after
+    // navigate would evaluate against the stale previous policy.
+    expect(setSitePolicy.mock.calls[0]).toEqual([null]);
+    sock.destroy(); srv2.close();
+  });
+
+  it('getAgentPolicy also refreshes the guard so subsequent tool calls see the policy', async () => {
+    const setSitePolicy = vi.fn();
+    const guard = { evaluate: vi.fn(() => ({ kind: 'allow' })), setSitePolicy, request: vi.fn(), needsApproval: vi.fn() };
+    const policy = { version: '1.0', site: 'X', capabilities: {} };
+    const resolver = { resolve: vi.fn(async () => policy), cached: vi.fn(), clear: vi.fn() };
+    (harness.getUrl as ReturnType<typeof vi.fn>).mockResolvedValueOnce('https://x.test/');
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, guard as never, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    await sendRecv(sock, { id: 'g', tool: 'getAgentPolicy', args: {} });
+    expect(setSitePolicy).toHaveBeenCalledWith(policy);
+    sock.destroy(); srv2.close();
+  });
+
+  it('getAgentPolicy returns conformance level + origin + the resolved policy', async () => {
+    const policy = {
+      version: '1.0', site: 'X', capabilities: { read: { allowed: true } },
+      actions: [{ name: 'a', endpoint: 'GET /a', auth: 'none' }],
+    };
+    const resolver = { resolve: vi.fn(async () => policy), cached: vi.fn(), clear: vi.fn() };
+    (harness.getUrl as ReturnType<typeof vi.fn>).mockResolvedValueOnce('https://x.test/');
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const resp = await sendRecv(sock, { id: 'g', tool: 'getAgentPolicy', args: {} });
+    expect(resp).toMatchObject({
+      id: 'g', ok: true,
+      result: { level: 2, origin: 'https://x.test', policy: { site: 'X' } },
+    });
+    sock.destroy(); srv2.close();
   });
 
   it('navigate response includes domainSkillsAvailable when notes exist for the host', async () => {

@@ -83,6 +83,34 @@ describe('AiActionGuard', () => {
     vi.useRealTimers();
   });
 
+  it('evaluate() returns deny when the site policy prohibits dismiss_overlays under dark_pattern_acceptance', () => {
+    const g = new AiActionGuard(() => 'never');
+    g.setSitePolicy({
+      version: '1.0', site: 'X', capabilities: {},
+      prohibited: [{ trigger: 'dark_pattern_acceptance' }],
+    });
+    const decision = g.evaluate('dismissOverlays', {});
+    expect(decision.kind).toBe('deny');
+    if (decision.kind === 'deny') expect(decision.reason).toContain('dark_pattern_acceptance');
+  });
+
+  it('evaluate() returns prompt when site requires_human matches even if user policy is "never"', () => {
+    const g = new AiActionGuard(() => 'never');
+    g.setSitePolicy({
+      version: '1.0', site: 'X', capabilities: {},
+      requires_human: [{ trigger: 'payment' }],
+    });
+    expect(g.evaluate('navigate', { url: 'https://shop.test/checkout/payment' }).kind).toBe('prompt');
+    // A non-payment-shaped action is still allowed under policy=never.
+    expect(g.evaluate('navigate', { url: 'https://shop.test/products/foo' }).kind).toBe('allow');
+  });
+
+  it('evaluate() with no site policy still honors the user policy', () => {
+    const g = new AiActionGuard(() => 'risky');
+    expect(g.evaluate('click', { x: 1, y: 1 }).kind).toBe('prompt');
+    expect(g.evaluate('screenshot', {}).kind).toBe('allow');
+  });
+
   it('policy is read at request time, not construction time', () => {
     let policy: ActionPolicy = 'never';
     const g = new AiActionGuard(() => policy);

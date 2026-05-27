@@ -441,6 +441,27 @@ export default function (pi: ExtensionAPI): void {
 		execute: async (_id, params) => bridge("cdp", params as Record<string, unknown>),
 	});
 
+	// ─── Agent Policy v1 (spec § 4) ──────────────────────────────────────
+	pi.registerTool({
+		name: "browser_get_agent_policy",
+		label: "Read agent policy",
+		description:
+			"Fetch the active page's Agent Policy (/agent.json) per the v1 spec at " +
+			"silverhorizon.dev/schemas/agent-policy/v1/. Returns " +
+			"{level: 0|1|2|3, origin, policy?}. The conformance level tells you how much " +
+			"contract the site has declared:\n" +
+			"  0 — no policy (apply your own restrictive defaults)\n" +
+			"  1 — basic: version + site + capabilities\n" +
+			"  2 — structured actions declared\n" +
+			"  3 — full contract: objectives + requires_human + consent populated\n\n" +
+			"When level >= 1, READ the policy's `prohibited` and `requires_human` fields " +
+			"and adjust your plan: don't attempt prohibited actions, route requires_human " +
+			"actions through user confirmation. browser_navigate also surfaces level + site " +
+			"in its response so you see this on every page transition.",
+		parameters: Type.Object({}),
+		execute: async () => bridge("getAgentPolicy", {}),
+	});
+
 	// ─── Conversation maintenance ────────────────────────────────────────
 	pi.registerTool({
 		name: "browser_compact",

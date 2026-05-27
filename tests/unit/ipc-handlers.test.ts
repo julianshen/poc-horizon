@@ -4,6 +4,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // `registerIpcHandlers` module imports `electron`, so we mock the
 // module before importing the SUT.
 const handlers = new Map<string, (event: unknown, payload: unknown) => unknown>();
+// vi.mock() factories run hoisted before module init. vi.hoisted()
+// lifts these spy declarations to the same phase so the factory sees
+// initialized names instead of TDZ.
+const {
+  defaultSetProxy, defaultResolveProxy,
+  incognitoSetProxy, incognitoResolveProxy,
+} = vi.hoisted(() => ({
+  defaultSetProxy: vi.fn().mockResolvedValue(undefined),
+  defaultResolveProxy: vi.fn().mockResolvedValue('DIRECT'),
+  incognitoSetProxy: vi.fn().mockResolvedValue(undefined),
+  incognitoResolveProxy: vi.fn().mockResolvedValue('DIRECT'),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -12,6 +24,16 @@ vi.mock('electron', () => ({
     },
   },
   BrowserWindow: class {},
+  session: {
+    defaultSession: {
+      setProxy: defaultSetProxy,
+      resolveProxy: defaultResolveProxy,
+    },
+    fromPartition: vi.fn().mockReturnValue({
+      setProxy: incognitoSetProxy,
+      resolveProxy: incognitoResolveProxy,
+    }),
+  },
 }));
 
 vi.mock('../../.electron/services/pageTranslator', () => ({
@@ -134,6 +156,8 @@ let s: Services;
 
 beforeEach(() => {
   handlers.clear();
+  defaultSetProxy.mockClear();
+  incognitoSetProxy.mockClear();
   s = makeFakeServices();
   registerIpcHandlers(
     {
@@ -528,6 +552,88 @@ describe('IPC handlers', () => {
       await inFlight;
       expect(observedSignal?.aborted).toBe(true);
       expect(res).toEqual({ restored: 5 });
+    });
+  });
+
+  describe('settings', () => {
+    /**
+     * Real integration: tie set + get to a shared state object so the
+     * handler's "set FIRST, get to read final values" ordering is
+     * actually exercised. The previous version mocked get
+     * independently of set, which made the test pass even if set
+     * never ran or read the wrong value.
+     */
+    function wireStatefulSettings(initial: Record<string, unknown>): void {
+      const store: Record<string, unknown> = { ...initial };
+      s.settingsManager.get.mockImplementation((key: string) => store[key]);
+      s.settingsManager.set.mockImplementation((key: string, value: unknown) => {
+        store[key] = value;
+      });
+    }
+
+    it('settings:set for proxyType reads back the just-set value and applies to both sessions', async () => {
+      wireStatefulSettings({
+        proxyType: 'manual',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: '<local>',
+      });
+      // The handler awaits applyProxySettingsToCoreSessions before
+      // emitting SETTINGS_CHANGED — so awaiting invoke() awaits the
+      // proxy apply too.
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' });
+      const expected = {
+        mode: 'fixed_servers',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: '<local>',
+      };
+      expect(defaultSetProxy).toHaveBeenCalledWith(expected);
+      expect(incognitoSetProxy).toHaveBeenCalledWith(expected);
+    });
+
+    it('settings:set for proxyRules with a newly-set value flows through to setProxy', async () => {
+      // Start from a clean store and only set the rules — exercises the
+      // get-after-set path: the handler must observe the new rules.
+      wireStatefulSettings({ proxyType: 'manual', proxyRules: undefined, proxyBypassRules: undefined });
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyRules', value: 'http=10.0.0.1:3128' });
+      expect(defaultSetProxy).toHaveBeenCalledWith({
+        mode: 'fixed_servers',
+        proxyRules: 'http=10.0.0.1:3128',
+        proxyBypassRules: undefined,
+      });
+    });
+
+    it('settings:set for proxyBypassRules re-applies updated bypass rules to both sessions', async () => {
+      // Start with a manual config that's missing bypass rules; setting
+      // them must trigger a re-apply with the new value flowing through.
+      wireStatefulSettings({
+        proxyType: 'manual',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: undefined,
+      });
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyBypassRules', value: '<local>' });
+      const expected = {
+        mode: 'fixed_servers',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: '<local>',
+      };
+      expect(defaultSetProxy).toHaveBeenCalledWith(expected);
+      expect(incognitoSetProxy).toHaveBeenCalledWith(expected);
+    });
+
+    it('settings:set for an unrelated key does NOT reapply the proxy', async () => {
+      wireStatefulSettings({ proxyType: 'system' });
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'theme', value: 'dark' });
+      expect(defaultSetProxy).not.toHaveBeenCalled();
+      expect(incognitoSetProxy).not.toHaveBeenCalled();
+    });
+
+    it('settings:set survives a setProxy rejection without throwing or leaking unhandled', async () => {
+      wireStatefulSettings({ proxyType: 'manual', proxyRules: 'malformed', proxyBypassRules: undefined });
+      defaultSetProxy.mockRejectedValueOnce(new Error('CHROMIUM_INVALID_PROXY_CONFIG'));
+      // Handler catches internally — awaiting the invocation should
+      // resolve without throwing.
+      await expect(invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' }))
+        .resolves.toBeUndefined();
     });
   });
 });

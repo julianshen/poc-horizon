@@ -5,6 +5,7 @@ import { TabManager } from '../services/TabManager';
 import { translatePage, restorePage } from '../services/pageTranslator';
 import { translateText } from '../services/LlmTranslator';
 import { SettingsManager } from '../services/SettingsManager';
+import { applyProxySettingsToCoreSessions, getIncognitoSession } from '../services/proxy';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
 import { DownloadManager } from '../services/DownloadManager';
@@ -103,13 +104,30 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     settingsManager.get(key as Parameters<typeof settingsManager.get>[0])
   );
   handle('settings:getAll', () => settingsManager.getAll());
-  handle('settings:set', (event, { key, value }) => {
+  handle('settings:set', async (event, { key, value }) => {
     settingsManager.set(key as Parameters<typeof settingsManager.set>[0], value as never);
     // Re-apply spellchecker languages when the user changes them.
     if (key === 'spellcheckLanguages' && Array.isArray(value)) {
       const langs = value as string[];
       applySpellcheckToSession(session.defaultSession, langs);
-      applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+      applySpellcheckToSession(getIncognitoSession(), langs);
+    }
+    if (key === 'proxyType' || key === 'proxyRules' || key === 'proxyBypassRules') {
+      // set() above is synchronous (writeFileSync); the subsequent
+      // get() calls see the just-set value. await so the renderer
+      // gets the SETTINGS_CHANGED event AFTER setProxy completes —
+      // otherwise a renderer that probes the new proxy state in
+      // response to the event would race the apply. Catch setProxy
+      // rejection (malformed config) and log; never silently fail.
+      try {
+        await applyProxySettingsToCoreSessions({
+          proxyType: settingsManager.get('proxyType'),
+          proxyRules: settingsManager.get('proxyRules'),
+          proxyBypassRules: settingsManager.get('proxyBypassRules'),
+        });
+      } catch (err) {
+        console.error('[ipc] settings:set proxy reapply failed:', (err as Error).message);
+      }
     }
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
   });

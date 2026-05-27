@@ -481,5 +481,53 @@ describe('IPC handlers', () => {
       expect(translateText).toHaveBeenCalledWith('Hello', 'Spanish');
       expect(res).toBe('Hola');
     });
+
+    it('translate:page stamps every progress event with the source tabId', async () => {
+      vi.mocked(translatePage).mockImplementationOnce(async (_wc, _lang, onProgress) => {
+        onProgress?.(5, 10);
+        return { ok: true, translated: 10, total: 10 };
+      });
+      s.wcSend.mockClear();
+      await invoke(IPC_CHANNELS.TRANSLATE_PAGE, { targetLang: 'Spanish' });
+      const sends = s.wcSend.mock.calls.filter((c) => c[0] === 'translate:progress');
+      expect(sends.length).toBeGreaterThan(0);
+      for (const [, payload] of sends) {
+        expect(payload).toHaveProperty('tabId');
+        expect(typeof (payload as { tabId: string }).tabId).toBe('string');
+      }
+    });
+
+    it('translate:cancel aborts the in-flight controller for the active tab', async () => {
+      let observedSignal: AbortSignal | undefined;
+      vi.mocked(translatePage).mockImplementationOnce(async (_wc, _lang, _p, signal) => {
+        observedSignal = signal;
+        // Pretend to do work for a tick so cancel can fire in parallel.
+        await new Promise((r) => setTimeout(r, 5));
+        return { ok: false, error: 'aborted' };
+      });
+      const inFlight = invoke(IPC_CHANNELS.TRANSLATE_PAGE, { targetLang: 'Spanish' });
+      // Give the page handler a tick to set up its controller before cancelling.
+      await new Promise((r) => setTimeout(r, 1));
+      await invoke('translate:cancel' as never);
+      await inFlight;
+      expect(observedSignal?.aborted).toBe(true);
+    });
+
+    it('translate:restore aborts the in-flight controller for the same tab before restoring', async () => {
+      // Start a translation we never let resolve, so the controller is live.
+      let observedSignal: AbortSignal | undefined;
+      vi.mocked(translatePage).mockImplementationOnce(async (_wc, _lang, _p, signal) => {
+        observedSignal = signal;
+        await new Promise((r) => setTimeout(r, 30));
+        return { ok: false, error: 'aborted' };
+      });
+      vi.mocked(restorePage).mockResolvedValueOnce({ restored: 5 });
+      const inFlight = invoke(IPC_CHANNELS.TRANSLATE_PAGE, { targetLang: 'Spanish' });
+      await new Promise((r) => setTimeout(r, 1));
+      const res = await invoke(IPC_CHANNELS.TRANSLATE_RESTORE);
+      await inFlight;
+      expect(observedSignal?.aborted).toBe(true);
+      expect(res).toEqual({ restored: 5 });
+    });
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { setupRendererTest } from '../helpers/fakeHorizonAPI';
 import { useMenuCommands } from '@/hooks/useMenuCommands';
@@ -44,6 +44,32 @@ describe('useMenuCommands', () => {
 
   it('bookmark:add is a no-op for horizon:// URLs', () => {
     useBrowserStore.setState({ activeTabId: 't1', tabs: [tab({ url: 'horizon://newtab' })] });
+    renderHook(() => useMenuCommands());
+    api().emit('menu:command', { command: 'bookmark:add' });
+    expect(api().invokes.some((i) => i.channel === 'bookmark:add')).toBe(false);
+  });
+
+  it('translate:open opens the TranslationBar if it is closed (idempotent if already open)', () => {
+    renderHook(() => useMenuCommands());
+    api().emit('menu:command', { command: 'translate:open' });
+    expect(useBrowserStore.getState().showTranslationBar).toBe(true);
+    // Second emit should NOT toggle it off.
+    api().emit('menu:command', { command: 'translate:open' });
+    expect(useBrowserStore.getState().showTranslationBar).toBe(true);
+  });
+
+  it('translate:restore opens the bar, dispatches horizon:translate-restore, AND invokes the IPC', () => {
+    renderHook(() => useMenuCommands());
+    const listener = vi.fn();
+    window.addEventListener('horizon:translate-restore', listener);
+    api().emit('menu:command', { command: 'translate:restore' });
+    expect(useBrowserStore.getState().showTranslationBar).toBe(true);
+    expect(listener).toHaveBeenCalledOnce();
+    expect(api().invokes).toContainEqual({ channel: 'translate:restore', payload: undefined });
+    window.removeEventListener('horizon:translate-restore', listener);
+  });
+
+  it('bookmark:add is a no-op when there is no active tab', () => {
     renderHook(() => useMenuCommands());
     api().emit('menu:command', { command: 'bookmark:add' });
     expect(api().invokes.some((i) => i.channel === 'bookmark:add')).toBe(false);

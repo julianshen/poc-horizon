@@ -329,6 +329,45 @@ describe("BrowserHarness", () => {
     expect(captureCall?.[1]).toEqual({ format: "png" });
   });
 
+  it("screenshotMarked supports scale option and uses CDP clip with scale", async () => {
+    const sendCommand = vi.fn(async (method: string) => {
+      if (method === "Page.captureScreenshot") return { data: "BASE64MARKED" };
+      if (method === "Page.getLayoutMetrics")
+        return { visualViewport: { clientWidth: 800, clientHeight: 600 } };
+      if (method === "Runtime.evaluate") return { result: { value: [] } };
+      return {};
+    });
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        sendCommand,
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    const r = await h.screenshotMarked({ scale: 0.5 });
+    expect(r.base64).toBe("BASE64MARKED");
+    const captureCall = sendCommand.mock.calls.find(
+      (c) => c[0] === "Page.captureScreenshot",
+    );
+    expect(captureCall?.[1]).toEqual({
+      format: "jpeg",
+      quality: 70,
+      clip: {
+        x: 0,
+        y: 0,
+        width: 800,
+        height: 600,
+        scale: 0.5,
+      },
+    });
+  });
+
+
   it("screenshot accepts format + quality options", async () => {
     const sendCommand = vi.fn(async (method: string) => {
       if (method === "Page.captureScreenshot") return { data: "X" };

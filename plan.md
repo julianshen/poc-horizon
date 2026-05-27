@@ -5,7 +5,7 @@ Refer to `plan.archived.md` for completed phases.
 ## Phase 7: Reduce image sizes sent to LLM
 
 - [x] Test: `screenshot` supports `scale` option and uses CDP `clip` with scale
-- [ ] Test: `screenshotMarked` supports `scale` option and uses CDP `clip` with scale
+- [x] Test: `screenshotMarked` supports `scale` option and uses CDP `clip` with scale
 - [ ] Test: `screenshot` defaults to `"jpeg"` format with a default `quality`
 - [ ] Test: `HorizonBridgeServer` routes `scale` parameter for both screenshot tools
 - [ ] Fix: Update `BrowserHarness.ts` to implement downscaling via CDP `clip.scale`

@@ -219,6 +219,7 @@ export class BrowserHarness {
     order = "reading",
     format = "jpeg",
     quality = 70,
+    scale,
   }: { order?: "reading" | "dom" } & ScreenshotOptions = {}): Promise<
     ScreenshotResult & { marks: Mark[] }
   > {
@@ -235,20 +236,29 @@ export class BrowserHarness {
     if (mount.exceptionDetails)
       throw new Error(`screenshotMarked mount: ${mount.exceptionDetails.text}`);
     const marks: Mark[] = mount.result.value ?? [];
-    // Phase 2: capture. JPEG default keeps marked screenshots small for
-    // the high-iteration agent loop (PNG screenshots accumulate to ~MBs
-    // per session and blow upstream API request limits).
-    const captureParams =
-      format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
-    const { data } = (await wc.debugger.sendCommand(
-      "Page.captureScreenshot",
-      captureParams,
-    )) as { data: string };
     const metrics = (await wc.debugger.sendCommand(
       "Page.getLayoutMetrics",
     )) as {
       visualViewport: { clientWidth: number; clientHeight: number };
     };
+    // Phase 2: capture. JPEG default keeps marked screenshots small for
+    // the high-iteration agent loop (PNG screenshots accumulate to ~MBs
+    // per session and blow upstream API request limits).
+    const captureParams: Record<string, unknown> =
+      format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
+    if (scale !== undefined) {
+      captureParams.clip = {
+        x: 0,
+        y: 0,
+        width: Math.round(metrics.visualViewport.clientWidth),
+        height: Math.round(metrics.visualViewport.clientHeight),
+        scale,
+      };
+    }
+    const { data } = (await wc.debugger.sendCommand(
+      "Page.captureScreenshot",
+      captureParams,
+    )) as { data: string };
     // Phase 3: remove the overlay. Best-effort — page may already be navigating.
     try {
       await wc.debugger.sendCommand("Runtime.evaluate", {

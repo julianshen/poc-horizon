@@ -20,23 +20,32 @@ export const TranslationBar: React.FC = () => {
     showTranslationBar,
     translationProgress,
     setTranslationProgress,
+    translationStatesByTab,
+    setTranslationStateForTab,
     toggleOverlay,
   } = useBrowserStore();
   const activeTabId = useBrowserStore((s) => s.activeTabId);
 
   const [targetLang, setTargetLang] = useState('English');
-  const [status, setStatus] = useState<'idle' | 'translating' | 'done' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
 
-  // Monotonic request id. Bumped on every translate / cancel / restore /
-  // close. Stale promise resolutions check this before applying state —
-  // if the seq they captured no longer matches, their tab/operation is
-  // gone and the resolution must be ignored. Otherwise quickly clicking
-  // "Translate" twice leaves the first promise alive to overwrite UI.
-  const requestSeq = useRef(0);
-  // Which tab the last user-initiated translation was for. Used to decide
-  // whether the current bar state is "ours" when the active tab changes.
-  const lastTranslatedTabId = useRef<string | null>(null);
+  // Per-tab status lives in the store — that's how a translation that
+  // completes while the user is on a different tab survives the tab
+  // switch. The bar's visible status is whatever the active tab's
+  // store entry says (absent → idle).
+  const tabState = activeTabId ? translationStatesByTab[activeTabId] : undefined;
+  const status: 'idle' | 'translating' | 'done' | 'error' = tabState?.status ?? 'idle';
+  const errorMsg = tabState?.errorMsg ?? '';
+
+  // Monotonic request id keyed by tabId. Bumped on every translate /
+  // restore / cancel / close so stale promise resolutions check seq
+  // before applying state — superseded operations drop instead of
+  // overwriting the current tab state.
+  const requestSeq = useRef<Record<string, number>>({});
+  const bumpSeq = useCallback((tabId: string): number => {
+    const n = (requestSeq.current[tabId] ?? 0) + 1;
+    requestSeq.current[tabId] = n;
+    return n;
+  }, []);
 
   // Fetch initial setting
   useEffect(() => {
@@ -50,31 +59,29 @@ export const TranslationBar: React.FC = () => {
       .catch(() => {});
   }, [showTranslationBar]);
 
-  // Switching tabs while a translation is in flight on a different tab:
-  // the bar's local state belongs to the old tab. Reset to idle so the
-  // user sees a clean control surface on the new tab; the old tab keeps
-  // translating in the background (its progress events get filtered out
-  // below).
-  useEffect(() => {
-    if (lastTranslatedTabId.current && activeTabId !== lastTranslatedTabId.current) {
-      setStatus('idle');
-      setErrorMsg('');
-      setTranslationProgress(null);
-    }
-  }, [activeTabId, setTranslationProgress]);
-
-  // Subscribe to progress events — filter to the currently-displayed tab.
+  // Progress events update the per-tab store entry REGARDLESS of which
+  // tab is currently active. Switching tabs after a background
+  // translation finishes preserves the 'done' state so the user sees
+  // "Show Original" when they return.
+  // The visible progress bar still tracks the active tab only.
   useEffect(() => {
     if (!showTranslationBar) return;
     const unsub = window.horizonAPI.on('translate:progress', (progress: { tabId: string; translated: number; total: number; done: boolean }) => {
-      if (progress.tabId !== activeTabId) return;
-      setTranslationProgress({ translated: progress.translated, total: progress.total });
       if (progress.done) {
-        setStatus('done');
+        setTranslationStateForTab(progress.tabId, { status: 'done' });
+      }
+      if (progress.tabId === activeTabId) {
+        setTranslationProgress({ translated: progress.translated, total: progress.total });
       }
     });
     return unsub;
-  }, [showTranslationBar, activeTabId, setTranslationProgress]);
+  }, [showTranslationBar, activeTabId, setTranslationProgress, setTranslationStateForTab]);
+
+  // When the active tab changes, sync the visible progress bar to the
+  // new tab (the per-tab status itself is already in the store).
+  useEffect(() => {
+    setTranslationProgress(null);
+  }, [activeTabId, setTranslationProgress]);
 
   const handleLanguageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = e.target.value;
@@ -83,57 +90,69 @@ export const TranslationBar: React.FC = () => {
   }, []);
 
   const handleTranslate = useCallback(async () => {
-    const seq = ++requestSeq.current;
-    lastTranslatedTabId.current = activeTabId ?? null;
-    setStatus('translating');
-    setErrorMsg('');
+    if (!activeTabId) return;
+    const seq = bumpSeq(activeTabId);
+    const tabId = activeTabId;
+    setTranslationStateForTab(tabId, { status: 'translating' });
     setTranslationProgress({ translated: 0, total: 100 });
     try {
       const res = (await window.horizonAPI.invoke('translate:page', { targetLang })) as { ok: boolean; error?: string };
-      if (seq !== requestSeq.current) return;  // superseded by a newer click
+      if (seq !== requestSeq.current[tabId]) return;
       if (res && !res.ok) {
-        setStatus('error');
-        setErrorMsg(res.error || 'Translation failed');
+        setTranslationStateForTab(tabId, { status: 'error', errorMsg: res.error || 'Translation failed' });
       }
     } catch (err) {
-      if (seq !== requestSeq.current) return;
-      setStatus('error');
-      setErrorMsg((err as Error).message || 'Translation failed');
+      if (seq !== requestSeq.current[tabId]) return;
+      setTranslationStateForTab(tabId, { status: 'error', errorMsg: (err as Error).message || 'Translation failed' });
     }
-  }, [targetLang, activeTabId, setTranslationProgress]);
+  }, [targetLang, activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
   const handleRestore = useCallback(async () => {
-    requestSeq.current++;
-    setStatus('idle');
-    setErrorMsg('');
+    if (!activeTabId) return;
+    bumpSeq(activeTabId);
+    setTranslationStateForTab(activeTabId, null);
     setTranslationProgress(null);
     try {
       await window.horizonAPI.invoke('translate:restore');
     } catch (err) {
-      setStatus('error');
-      setErrorMsg((err as Error).message || 'Restore failed');
+      setTranslationStateForTab(activeTabId, { status: 'error', errorMsg: (err as Error).message || 'Restore failed' });
     }
-  }, [setTranslationProgress]);
+  }, [activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
   const handleCancel = useCallback(async () => {
-    requestSeq.current++;
-    setStatus('idle');
+    if (!activeTabId) return;
+    bumpSeq(activeTabId);
+    setTranslationStateForTab(activeTabId, null);
     setTranslationProgress(null);
     try {
       await window.horizonAPI.invoke('translate:cancel');
     } catch (err) {
-      setStatus('error');
-      setErrorMsg((err as Error).message || 'Cancellation failed');
+      setTranslationStateForTab(activeTabId, { status: 'error', errorMsg: (err as Error).message || 'Cancellation failed' });
     }
-  }, [setTranslationProgress]);
+  }, [activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
   const close = useCallback(() => {
-    requestSeq.current++;
+    if (activeTabId) bumpSeq(activeTabId);
     toggleOverlay('showTranslationBar');
-    setStatus('idle');
-    setErrorMsg('');
     setTranslationProgress(null);
-  }, [toggleOverlay, setTranslationProgress]);
+    // Leave translationStatesByTab intact — a hidden bar doesn't
+    // forget; reopening on a translated tab still shows "Show Original".
+  }, [activeTabId, bumpSeq, toggleOverlay, setTranslationProgress]);
+
+  // Menu-driven Restore (useMenuCommands) dispatches this event so the
+  // bar's status resets in lockstep with the IPC. Without it, the menu
+  // path bypasses handleRestore and the bar shows "Show Original" even
+  // though the page has been restored.
+  useEffect(() => {
+    const onMenuRestore = () => {
+      if (!activeTabId) return;
+      bumpSeq(activeTabId);
+      setTranslationStateForTab(activeTabId, null);
+      setTranslationProgress(null);
+    };
+    window.addEventListener('horizon:translate-restore', onMenuRestore);
+    return () => window.removeEventListener('horizon:translate-restore', onMenuRestore);
+  }, [activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
   // Window-level Escape listener — the onKeyDown on the bar's container
   // never fires reliably because the container isn't focused.

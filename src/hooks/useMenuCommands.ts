@@ -27,6 +27,11 @@ export function useMenuCommands(): void {
           if (!useBrowserStore.getState().showTranslationBar) {
             toggleOverlay('showTranslationBar');
           }
+          // Tell TranslationBar to clear its per-tab status so the bar
+          // doesn't keep showing "Show Original" after restore. The IPC
+          // is invoked from inside the bar's listener to keep a single
+          // restore path (no double-dispatch).
+          window.dispatchEvent(new Event('horizon:translate-restore'));
           void window.horizonAPI.invoke('translate:restore');
           break;
         case 'panel:history':

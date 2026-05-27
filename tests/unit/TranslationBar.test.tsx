@@ -206,6 +206,51 @@ describe('TranslationBar', () => {
     expect(useBrowserStore.getState().showTranslationBar).toBe(false);
   });
 
+  it('preserves done status for a background translation when user switches tabs and back', async () => {
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'settings:get' && payload?.key === 'translateTargetLang') return Promise.resolve('English');
+      return Promise.resolve(undefined);
+    });
+    render(<TranslationBar />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    // User switches to tab2 (no translation there)
+    act(() => { useBrowserStore.setState({ activeTabId: 'tab2' }); });
+    // Background: tab1's translation finishes
+    act(() => api().emit('translate:progress', { tabId: 'tab1', translated: 10, total: 10, done: true }));
+    // Tab2 stays idle — its bar still shows Translate
+    expect(screen.getByRole('button', { name: 'Translate' })).toBeTruthy();
+    // User returns to tab1
+    act(() => { useBrowserStore.setState({ activeTabId: 'tab1' }); });
+    // Now sees "Show Original" — completion survived the trip
+    expect(screen.getByRole('button', { name: 'Show Original' })).toBeTruthy();
+  });
+
+  it('horizon:translate-restore event resets the bar status (menu-driven restore)', async () => {
+    useBrowserStore.setState({
+      ...initialState,
+      showTranslationBar: true,
+      activeTabId: 'tab1',
+      translationStatesByTab: { tab1: { status: 'done' } },
+    });
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'settings:get' && payload?.key === 'translateTargetLang') return Promise.resolve('English');
+      return Promise.resolve(undefined);
+    });
+    render(<TranslationBar />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Pre-condition: bar shows "Show Original" because of prior 'done' state.
+    expect(screen.getByRole('button', { name: 'Show Original' })).toBeTruthy();
+    // Menu fires the custom event (useMenuCommands path).
+    act(() => { window.dispatchEvent(new Event('horizon:translate-restore')); });
+    // Bar drops back to idle — "Translate" returns.
+    expect(screen.getByRole('button', { name: 'Translate' })).toBeTruthy();
+    expect(useBrowserStore.getState().translationStatesByTab.tab1).toBeUndefined();
+  });
+
   it('Close button hides TranslationBar via toggleOverlay', async () => {
     useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     

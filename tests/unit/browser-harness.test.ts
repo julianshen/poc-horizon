@@ -369,7 +369,6 @@ describe("BrowserHarness", () => {
     });
   });
 
-
   it("screenshot accepts format + quality options", async () => {
     const sendCommand = vi.fn(async (method: string) => {
       if (method === "Page.captureScreenshot") return { data: "X" };
@@ -431,7 +430,6 @@ describe("BrowserHarness", () => {
       },
     });
   });
-
 
   it("describeElementAt returns the element descriptor via evaluate", async () => {
     const { wc } = fakeWc({

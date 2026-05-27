@@ -338,6 +338,38 @@ describe("HorizonBridgeServer", () => {
     expect(resp).toMatchObject({ id: "sm", ok: true });
     expect((resp.result as { marks: unknown[] }).marks).toHaveLength(1);
     expect(harness.screenshotMarked).toHaveBeenCalledOnce();
+  });
+
+  it("routes screenshot and screenshotMarked with scale and default values through bridge server", async () => {
+    const sock = await connectClient(port);
+
+    // 1. Plain screenshot
+    const resp1 = await sendRecv(sock, {
+      id: "s1",
+      tool: "screenshot",
+      args: { scale: 0.6, quality: 60, format: "jpeg" },
+    });
+    expect(resp1).toMatchObject({ id: "s1", ok: true });
+    expect(harness.screenshot).toHaveBeenCalledWith({
+      format: "jpeg",
+      quality: 60,
+      scale: 0.6,
+    });
+
+    // 2. Marked screenshot
+    const resp2 = await sendRecv(sock, {
+      id: "s2",
+      tool: "screenshotMarked",
+      args: { scale: 0.4, order: "dom" },
+    });
+    expect(resp2).toMatchObject({ id: "s2", ok: true });
+    expect(harness.screenshotMarked).toHaveBeenCalledWith({
+      order: "dom",
+      format: "jpeg", // default format for marked
+      quality: undefined,
+      scale: 0.4,
+    });
+
     sock.destroy();
   });
 

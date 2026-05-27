@@ -219,14 +219,21 @@ export class HorizonBridgeServer {
         const format = args.format === "jpeg" ? "jpeg" : "png";
         const quality =
           typeof args.quality === "number" ? args.quality : undefined;
-        return await this.harness.screenshot({ format, quality });
+        const scale = typeof args.scale === "number" ? args.scale : 0.5;
+        return await this.harness.screenshot({ format, quality, scale });
       }
       case "screenshotMarked": {
         const order = args.order === "dom" ? "dom" : "reading";
         const format = args.format === "png" ? "png" : "jpeg";
         const quality =
           typeof args.quality === "number" ? args.quality : undefined;
-        return await this.harness.screenshotMarked({ order, format, quality });
+        const scale = typeof args.scale === "number" ? args.scale : 0.5;
+        return await this.harness.screenshotMarked({
+          order,
+          format,
+          quality,
+          scale,
+        });
       }
       case "evaluate":
         return await this.harness.evaluate(String(args.expression));

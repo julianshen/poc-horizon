@@ -7,6 +7,6 @@ Refer to `plan.archived.md` for completed phases.
 - [x] Test: `screenshot` supports `scale` option and uses CDP `clip` with scale
 - [x] Test: `screenshotMarked` supports `scale` option and uses CDP `clip` with scale
 - [x] Test: `screenshot` defaults to `"jpeg"` format with a default `quality`
-- [ ] Test: `HorizonBridgeServer` routes `scale` parameter for both screenshot tools
-- [ ] Fix: Update `BrowserHarness.ts` to implement downscaling via CDP `clip.scale`
-- [ ] Fix: Update `HorizonBridgeServer.ts` to accept `scale` and set a default scale (e.g. `0.5`)
+- [x] Test: `HorizonBridgeServer` routes `scale` parameter for both screenshot tools
+- [x] Fix: Update `BrowserHarness.ts` to implement downscaling via CDP `clip.scale`
+- [x] Fix: Update `HorizonBridgeServer.ts` to accept `scale` and set a default scale (e.g. `0.5`)

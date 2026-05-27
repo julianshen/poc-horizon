@@ -1,4 +1,4 @@
-import type { Session } from 'electron';
+import { session, type Session } from 'electron';
 import type { Settings } from '../../src/types/browser';
 
 export interface ProxyConfig {
@@ -35,4 +35,16 @@ export async function applyProxySettingsToSession(
   const config = proxyConfigFromSettings(settings);
   await targetSession.setProxy(config);
   return config;
+}
+
+/**
+ * Apply proxy settings to both regular and incognito core sessions.
+ */
+export async function applyProxySettingsToCoreSessions(
+  settings: Pick<Settings, 'proxyType' | 'proxyRules' | 'proxyBypassRules'>
+): Promise<void> {
+  await Promise.all([
+    applyProxySettingsToSession(session.defaultSession, settings),
+    applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), settings),
+  ]);
 }

@@ -5,7 +5,7 @@ import { TabManager } from '../services/TabManager';
 import { translatePage, restorePage } from '../services/pageTranslator';
 import { translateText } from '../services/LlmTranslator';
 import { SettingsManager } from '../services/SettingsManager';
-import { applyProxySettingsToSession } from '../services/proxy';
+import { applyProxySettingsToCoreSessions } from '../services/proxy';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
 import { DownloadManager } from '../services/DownloadManager';
@@ -116,10 +116,7 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
       const proxyType = settingsManager.get('proxyType');
       const proxyRules = settingsManager.get('proxyRules');
       const proxyBypassRules = settingsManager.get('proxyBypassRules');
-      void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules, proxyBypassRules });
-      void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules, proxyBypassRules });
-      void session.defaultSession.resolveProxy('https://example.com').catch(() => undefined);
-      void session.fromPartition('incognito', { cache: false }).resolveProxy('https://example.com').catch(() => undefined);
+      void applyProxySettingsToCoreSessions({ proxyType, proxyRules, proxyBypassRules });
     }
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
   });

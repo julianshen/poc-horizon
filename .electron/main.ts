@@ -19,7 +19,7 @@ import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 import { TabSessionStore } from './services/TabSessionStore';
 import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
 import { applySpellcheckToSession } from './services/spellcheck';
-import { applyProxySettingsToSession } from './services/proxy';
+import { applyProxySettingsToCoreSessions } from './services/proxy';
 import { installAppMenu } from './services/appMenu';
 import { BrowserHarness } from './services/BrowserHarness';
 import { PiSession } from './services/PiSession';
@@ -676,8 +676,7 @@ app.whenReady().then(() => {
   const proxyType = settingsManager.get('proxyType');
   const proxyRules = settingsManager.get('proxyRules');
   const proxyBypassRules = settingsManager.get('proxyBypassRules');
-  void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules, proxyBypassRules });
-  void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules, proxyBypassRules });
+  void applyProxySettingsToCoreSessions({ proxyType, proxyRules, proxyBypassRules });
   // Install the native application menu (macOS top-of-screen bar / Win
   // & Linux in-window menubar). Without this, Electron's default menu
   // is barely useful — no New Tab, no Reload, no Find, no DevTools.

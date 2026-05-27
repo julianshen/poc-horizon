@@ -1,5 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { applyProxySettingsToSession, proxyConfigFromSettings } from '../../.electron/services/proxy';
+const defaultSetProxy = vi.fn().mockResolvedValue(undefined);
+const incognitoSetProxy = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('electron', () => ({
+  session: {
+    defaultSession: { setProxy: defaultSetProxy },
+    fromPartition: vi.fn().mockReturnValue({ setProxy: incognitoSetProxy }),
+  },
+}));
+
+import {
+  applyProxySettingsToCoreSessions,
+  applyProxySettingsToSession,
+  proxyConfigFromSettings,
+} from '../../.electron/services/proxy';
 
 describe('proxyConfigFromSettings', () => {
   it('maps system proxy type to system mode', () => {
@@ -40,5 +54,29 @@ describe('applyProxySettingsToSession', () => {
 
     expect(setProxy).toHaveBeenCalledWith({ mode: 'direct' });
     expect(config).toEqual({ mode: 'direct' });
+  });
+});
+
+describe('applyProxySettingsToCoreSessions', () => {
+  it('updates both default and incognito sessions', async () => {
+    defaultSetProxy.mockClear();
+    incognitoSetProxy.mockClear();
+
+    await applyProxySettingsToCoreSessions({
+      proxyType: 'manual',
+      proxyRules: 'http=127.0.0.1:8080',
+      proxyBypassRules: '<local>',
+    });
+
+    expect(defaultSetProxy).toHaveBeenCalledWith({
+      mode: 'fixed_servers',
+      proxyRules: 'http=127.0.0.1:8080',
+      proxyBypassRules: '<local>',
+    });
+    expect(incognitoSetProxy).toHaveBeenCalledWith({
+      mode: 'fixed_servers',
+      proxyRules: 'http=127.0.0.1:8080',
+      proxyBypassRules: '<local>',
+    });
   });
 });

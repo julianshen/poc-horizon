@@ -5,9 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // module before importing the SUT.
 const handlers = new Map<string, (event: unknown, payload: unknown) => unknown>();
 const defaultSetProxy = vi.fn().mockResolvedValue(undefined);
-const defaultResolveProxy = vi.fn().mockResolvedValue('DIRECT');
 const incognitoSetProxy = vi.fn().mockResolvedValue(undefined);
-const incognitoResolveProxy = vi.fn().mockResolvedValue('DIRECT');
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -19,11 +17,9 @@ vi.mock('electron', () => ({
   session: {
     defaultSession: {
       setProxy: defaultSetProxy,
-      resolveProxy: defaultResolveProxy,
     },
     fromPartition: vi.fn().mockReturnValue({
       setProxy: incognitoSetProxy,
-      resolveProxy: incognitoResolveProxy,
     }),
   },
 }));
@@ -149,9 +145,7 @@ let s: Services;
 beforeEach(() => {
   handlers.clear();
   defaultSetProxy.mockClear();
-  defaultResolveProxy.mockClear();
   incognitoSetProxy.mockClear();
-  incognitoResolveProxy.mockClear();
   s = makeFakeServices();
   registerIpcHandlers(
     {
@@ -570,8 +564,6 @@ describe('IPC handlers', () => {
         proxyRules: 'http=127.0.0.1:8080',
         proxyBypassRules: '<local>',
       });
-      expect(defaultResolveProxy).toHaveBeenCalledWith('https://example.com');
-      expect(incognitoResolveProxy).toHaveBeenCalledWith('https://example.com');
     });
   });
 });

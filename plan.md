@@ -17,3 +17,8 @@ Refer to `plan.archived.md` for completed phases.
 - [x] Test: `Prompt augmentation under AI_START truncates site-skills to safe character limits`
 - [x] Fix: Update `piSkillWriter.ts` to truncate inputs
 - [x] Fix: Update `.electron/main.ts` `AI_START` to truncate prompt-injected site skills
+
+## Phase 9: Refactor skill writer to not use full reference document in the generated skill
+
+- [x] Test: `writePiSkill` does not include `llmsFullTxt` inside the generated skill `SKILL.md`
+- [x] Fix: Update `piSkillWriter.ts` to exclude `llmsFullTxt` from the rendered skill body

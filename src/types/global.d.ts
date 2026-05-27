@@ -1,4 +1,4 @@
-import type { HorizonAPI } from '../../.electron/preload';
+import type { HorizonAPI } from "../../.electron/preload";
 
 declare global {
   interface Window {

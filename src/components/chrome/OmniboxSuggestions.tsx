@@ -1,5 +1,5 @@
-import React from 'react';
-import type { HistoryEntry } from '../../types/browser';
+import React from "react";
+import type { HistoryEntry } from "../../types/browser";
 
 interface Props {
   suggestions: HistoryEntry[];
@@ -20,12 +20,12 @@ export const OmniboxSuggestions: React.FC<Props> = ({
     <div
       className="absolute left-0 right-0 top-full mt-2 z-40 overflow-hidden fade-in"
       style={{
-        background: 'var(--surface-overlay)',
-        backdropFilter: 'saturate(180%) blur(20px)',
-        WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        border: '1px solid var(--chrome-border)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg)',
+        background: "var(--surface-overlay)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+        border: "1px solid var(--chrome-border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-lg)",
       }}
       role="listbox"
     >
@@ -44,9 +44,9 @@ export const OmniboxSuggestions: React.FC<Props> = ({
             onMouseEnter={() => onHover(i)}
             className="w-full flex items-center gap-3 px-3 py-2 text-left"
             style={{
-              background: isActive ? 'var(--accent-light)' : 'transparent',
-              color: 'var(--chrome-fg)',
-              transition: 'background var(--transition-fast)',
+              background: isActive ? "var(--accent-light)" : "transparent",
+              color: "var(--chrome-fg)",
+              transition: "background var(--transition-fast)",
             }}
           >
             <svg
@@ -64,12 +64,14 @@ export const OmniboxSuggestions: React.FC<Props> = ({
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span className="truncate text-sm font-medium">{s.title || s.url}</span>
+            <span className="truncate text-sm font-medium">
+              {s.title || s.url}
+            </span>
             <span
               className="ml-auto truncate text-xs"
-              style={{ color: 'var(--chrome-fg-muted)', maxWidth: '40%' }}
+              style={{ color: "var(--chrome-fg-muted)", maxWidth: "40%" }}
             >
-              {s.url.replace(/^https?:\/\//, '')}
+              {s.url.replace(/^https?:\/\//, "")}
             </span>
           </button>
         );

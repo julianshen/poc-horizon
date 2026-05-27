@@ -2,7 +2,7 @@
 
 Two strategies depending on what you need.
 
-## You want the *file*
+## You want the _file_
 
 Don't click "Download" — many sites trigger a navigation to a blob URL or send a `Content-Disposition: attachment` response. Instead, find the underlying URL and fetch it directly:
 
@@ -22,7 +22,7 @@ browser_cdp_collect({ method: "Network.responseReceived" })
 browser_cdp({ method: "Network.getResponseBody", params: { requestId: "..." } })
 ```
 
-## You want the user to *get* the file
+## You want the user to _get_ the file
 
 Just click. Horizon's `DownloadManager` handles the prompt and writes to the OS download dir. No special handling needed.
 

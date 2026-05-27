@@ -1,5 +1,5 @@
-import type { WebContents } from 'electron';
-import { translateBatch } from './LlmTranslator';
+import type { WebContents } from "electron";
+import { translateBatch } from "./LlmTranslator";
 
 /** Extract translatable text nodes from the active page into an indexed list. */
 const EXTRACT_SCRIPT = `(function() {
@@ -38,7 +38,9 @@ const EXTRACT_SCRIPT = `(function() {
 })()`;
 
 /** Apply translations back to the page using the stored node references. */
-const APPLY_SCRIPT = (translations: { id: number; text: string }[]) => `(function() {
+const APPLY_SCRIPT = (
+  translations: { id: number; text: string }[],
+) => `(function() {
   const store = window.__horizonTranslate;
   if (!store) return { applied: 0 };
   const list = ${JSON.stringify(translations)};
@@ -89,16 +91,19 @@ export async function translatePage(
   signal?: AbortSignal,
 ): Promise<TranslateResult> {
   if (signal?.aborted) {
-    return { ok: false, error: 'translation aborted' };
+    return { ok: false, error: "translation aborted" };
   }
   let nodes: Array<{ id: number; text: string }>;
   try {
-    nodes = (await wc.executeJavaScript(EXTRACT_SCRIPT, true)) as Array<{ id: number; text: string }>;
+    nodes = (await wc.executeJavaScript(EXTRACT_SCRIPT, true)) as Array<{
+      id: number;
+      text: string;
+    }>;
   } catch (err) {
     return { ok: false, error: `extract failed: ${(err as Error).message}` };
   }
   if (!Array.isArray(nodes) || nodes.length === 0) {
-    return { ok: false, error: 'no translatable text found' };
+    return { ok: false, error: "no translatable text found" };
   }
 
   const BATCH_CHAR_CAP = 4000;
@@ -121,7 +126,11 @@ export async function translatePage(
     if (signal?.aborted) {
       break;
     }
-    const translated = await translateBatch(batch.map((n) => n.text), targetLang, { signal });
+    const translated = await translateBatch(
+      batch.map((n) => n.text),
+      targetLang,
+      { signal },
+    );
     if (signal?.aborted) {
       break;
     }
@@ -132,9 +141,13 @@ export async function translatePage(
     }
     if (out.length > 0) {
       try {
-        const r = (await wc.executeJavaScript(APPLY_SCRIPT(out), true)) as { applied: number };
+        const r = (await wc.executeJavaScript(APPLY_SCRIPT(out), true)) as {
+          applied: number;
+        };
         totalApplied += r.applied ?? 0;
-      } catch { /* tab closed mid-flight — abort */ break; }
+      } catch {
+        /* tab closed mid-flight — abort */ break;
+      }
     }
     onProgress?.(totalApplied, nodes.length);
   }
@@ -142,9 +155,13 @@ export async function translatePage(
 }
 
 /** Roll back a translated page to its original text content. */
-export async function restorePage(wc: WebContents): Promise<{ restored: number }> {
+export async function restorePage(
+  wc: WebContents,
+): Promise<{ restored: number }> {
   try {
-    return (await wc.executeJavaScript(RESTORE_SCRIPT, true)) as { restored: number };
+    return (await wc.executeJavaScript(RESTORE_SCRIPT, true)) as {
+      restored: number;
+    };
   } catch {
     return { restored: 0 };
   }

@@ -1,5 +1,5 @@
-import React, { useLayoutEffect, useRef } from 'react';
-import { useBrowserStore } from '../../stores/browserStore';
+import React, { useLayoutEffect, useRef } from "react";
+import { useBrowserStore } from "../../stores/browserStore";
 
 /**
  * Visual placeholder for the active tab's BrowserView. The actual web
@@ -28,7 +28,7 @@ export const BrowserContentArea: React.FC = () => {
       s.showDownloads ||
       s.showFindBar ||
       s.showAppMenu ||
-      s.showTabContextMenu
+      s.showTabContextMenu,
   );
 
   useLayoutEffect(() => {
@@ -38,11 +38,16 @@ export const BrowserContentArea: React.FC = () => {
     let rafId = 0;
     const report = (): void => {
       if (obscured) {
-        window.horizonAPI.invoke('ui:contentBounds', { x: 0, y: 0, width: 0, height: 0 });
+        window.horizonAPI.invoke("ui:contentBounds", {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        });
         return;
       }
       const r = el.getBoundingClientRect();
-      window.horizonAPI.invoke('ui:contentBounds', {
+      window.horizonAPI.invoke("ui:contentBounds", {
         x: r.left,
         y: r.top,
         width: r.width,
@@ -58,17 +63,23 @@ export const BrowserContentArea: React.FC = () => {
 
     const ro = new ResizeObserver(schedule);
     ro.observe(el);
-    window.addEventListener('resize', schedule);
+    window.addEventListener("resize", schedule);
 
     return () => {
       cancelAnimationFrame(rafId);
       ro.disconnect();
-      window.removeEventListener('resize', schedule);
+      window.removeEventListener("resize", schedule);
     };
   }, [showAI, obscured]);
 
   // absolute inset-0 fills the parent regardless of its flex direction —
   // the parent (`relative overflow-hidden` card in App.tsx) doesn't set a
   // flex direction, so `flex-1` alone collapses the height to 0.
-  return <div ref={ref} className="absolute inset-0" style={{ background: '#ffffff' }} />;
+  return (
+    <div
+      ref={ref}
+      className="absolute inset-0"
+      style={{ background: "#ffffff" }}
+    />
+  );
 };

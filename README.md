@@ -17,35 +17,37 @@ Everything the agent does is observable through the AI side panel; everything ri
 ## Feature catalogue
 
 ### Browser core
+
 Tabs (with pin/mute/groups/right-click menus), Omnibox with suggestions + ⌘K Command Palette, navigation history, bookmarks, downloads with shelf, password store backed by Electron `safeStorage`, autofill, per-tab incognito windows, Find-in-page, side panels for History / Bookmarks / Settings / Workflows. Reader mode via Mozilla Readability. /llms.txt auto-discovery and context injection. Page translation (full page + selection) via headless Pi.
 
 ### AI agent layer
+
 27 tools the agent calls through a local JSON-line bridge:
 
-| Category | Tools |
-|---|---|
-| Perception | `screenshot` · `screenshot_marked` (Set-of-Marks, reading-order) · `axtree` · `get_dom` · `describe_at` · `reader_extract` |
-| Input | `navigate` · `click` · `type` · `scroll` |
-| Coordination | `wait_for` · `dismiss_overlays` |
-| Tabs | `tab_open` · `tab_switch` · `tab_close` · `tab_list` |
-| JS helpers | `save_helper` · `call_helper` · `list_helpers` · `remove_helper` |
-| CDP | `cdp` (raw) · `cdp_subscribe` · `cdp_collect` · `cdp_unsubscribe` |
-| Skills library | `skill_preamble` · `skill_list_interactions` · `skill_read_interaction` |
-| Domain skills | `domain_skill_list` · `_read` · `_save` · `_remove` · `_search` |
-| Workflows | `workflow_record_start` · `_stop` · `_run` · `_list` · `_delete` |
-| Agent policy | `get_agent_policy` (v1 spec compliance) |
-| Reflection | `get_url` · `get_title` |
-| UI | `render_ui` (A2UI declarative panels) |
+| Category       | Tools                                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Perception     | `screenshot` · `screenshot_marked` (Set-of-Marks, reading-order) · `axtree` · `get_dom` · `describe_at` · `reader_extract` |
+| Input          | `navigate` · `click` · `type` · `scroll`                                                                                   |
+| Coordination   | `wait_for` · `dismiss_overlays`                                                                                            |
+| Tabs           | `tab_open` · `tab_switch` · `tab_close` · `tab_list`                                                                       |
+| JS helpers     | `save_helper` · `call_helper` · `list_helpers` · `remove_helper`                                                           |
+| CDP            | `cdp` (raw) · `cdp_subscribe` · `cdp_collect` · `cdp_unsubscribe`                                                          |
+| Skills library | `skill_preamble` · `skill_list_interactions` · `skill_read_interaction`                                                    |
+| Domain skills  | `domain_skill_list` · `_read` · `_save` · `_remove` · `_search`                                                            |
+| Workflows      | `workflow_record_start` · `_stop` · `_run` · `_list` · `_delete`                                                           |
+| Agent policy   | `get_agent_policy` (v1 spec compliance)                                                                                    |
+| Reflection     | `get_url` · `get_title`                                                                                                    |
+| UI             | `render_ui` (A2UI declarative panels)                                                                                      |
 
 ### Knowledge layer
 
 Three layers, deliberately separate:
 
-| Layer | Where it lives | Editor |
-|---|---|---|
-| `SKILL.md` — top-level playbook | bundled in `resources/pi-extension/skills/` | dev / shipped |
-| `interaction-skills/*.md` — 13 reusable web mechanics | bundled | dev / shipped |
-| `domain-skills/<host>/*.md` — per-site playbooks | `userData/domain-skills/` | agent itself |
+| Layer                                                 | Where it lives                              | Editor        |
+| ----------------------------------------------------- | ------------------------------------------- | ------------- |
+| `SKILL.md` — top-level playbook                       | bundled in `resources/pi-extension/skills/` | dev / shipped |
+| `interaction-skills/*.md` — 13 reusable web mechanics | bundled                                     | dev / shipped |
+| `domain-skills/<host>/*.md` — per-site playbooks      | `userData/domain-skills/`                   | agent itself  |
 
 On every `browser_navigate`, the response includes `domainSkillsAvailable: ["..."]` for the host so the agent can read its prior notes before re-deriving an approach. `domain_skill_search` cross-cuts hosts when the agent thinks "I've handled this kind of problem before, just not on this site."
 
@@ -53,7 +55,7 @@ On every `browser_navigate`, the response includes `domainSkillsAvailable: ["...
 
 - **JS helper registry** (`userData/js-helpers.json`) — named JS expressions the agent saves once and calls thereafter. Persistent across restarts. Site-specific extractors live here.
 - **Action workflows** (`userData/action-workflows.json`) — recorded tool-call sequences for deterministic replay. The agent runs a multi-step task once with the LLM in the loop, then `workflow_run` it cheaply afterwards.
-- **CDP event subscription** — hook into events (`Network.responseReceived`, `Page.frameNavigated`, …), buffer them across turns, drain on demand. Lets the agent observe what a click *actually* did, not just what the page now looks like.
+- **CDP event subscription** — hook into events (`Network.responseReceived`, `Page.frameNavigated`, …), buffer them across turns, drain on demand. Lets the agent observe what a click _actually_ did, not just what the page now looks like.
 
 ### Agent Policy v1 (site-declared contract)
 

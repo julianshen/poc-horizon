@@ -1,4 +1,10 @@
-import { Menu, MenuItemConstructorOptions, WebContents, clipboard, shell } from 'electron';
+import {
+  Menu,
+  MenuItemConstructorOptions,
+  WebContents,
+  clipboard,
+  shell,
+} from "electron";
 
 interface BuildArgs {
   wc: WebContents;
@@ -17,10 +23,12 @@ interface BuildArgs {
  */
 export function buildWebContextMenu(
   params: Electron.ContextMenuParams,
-  { wc, openInNewTab, askAI, translateSelection }: BuildArgs
+  { wc, openInNewTab, askAI, translateSelection }: BuildArgs,
 ): Menu {
   const template: MenuItemConstructorOptions[] = [];
-  const sep = (): void => { template.push({ type: 'separator' }); };
+  const sep = (): void => {
+    template.push({ type: "separator" });
+  };
 
   // Spelling suggestions (only present when the click is on a misspelled
   // word inside an editable field; dictionarySuggestions is populated by
@@ -34,7 +42,8 @@ export function buildWebContextMenu(
     }
     template.push({
       label: `Add "${params.misspelledWord}" to dictionary`,
-      click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord),
+      click: () =>
+        wc.session.addWordToSpellCheckerDictionary(params.misspelledWord),
     });
     sep();
   }
@@ -42,10 +51,21 @@ export function buildWebContextMenu(
   // Link context.
   if (params.linkURL) {
     template.push(
-      { label: 'Open Link in New Tab', click: () => openInNewTab(params.linkURL) },
-      { label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) },
-      { label: 'Open Link in Default Browser', click: () => { void shell.openExternal(params.linkURL); } },
-      { label: 'Share Link', click: () => shareUrl(wc, params.linkURL) },
+      {
+        label: "Open Link in New Tab",
+        click: () => openInNewTab(params.linkURL),
+      },
+      {
+        label: "Copy Link Address",
+        click: () => clipboard.writeText(params.linkURL),
+      },
+      {
+        label: "Open Link in Default Browser",
+        click: () => {
+          void shell.openExternal(params.linkURL);
+        },
+      },
+      { label: "Share Link", click: () => shareUrl(wc, params.linkURL) },
     );
     sep();
   }
@@ -53,9 +73,9 @@ export function buildWebContextMenu(
   // Video context — Picture-in-Picture on the clicked video element.
   // Chromium exposes HTMLVideoElement.requestPictureInPicture() natively
   // in Electron; we just have to invoke it on the right element.
-  if (params.mediaType === 'video') {
+  if (params.mediaType === "video") {
     template.push({
-      label: 'Picture in Picture',
+      label: "Picture in Picture",
       click: () => {
         // Find the video at the click coordinates and call requestPictureInPicture.
         // elementFromPoint is fast and avoids needing a DOM-element token from main.
@@ -72,9 +92,15 @@ export function buildWebContextMenu(
   // Image context.
   if (params.hasImageContents && params.srcURL) {
     template.push(
-      { label: 'Open Image in New Tab', click: () => openInNewTab(params.srcURL) },
-      { label: 'Copy Image', click: () => wc.copyImageAt(params.x, params.y) },
-      { label: 'Copy Image Address', click: () => clipboard.writeText(params.srcURL) },
+      {
+        label: "Open Image in New Tab",
+        click: () => openInNewTab(params.srcURL),
+      },
+      { label: "Copy Image", click: () => wc.copyImageAt(params.x, params.y) },
+      {
+        label: "Copy Image Address",
+        click: () => clipboard.writeText(params.srcURL),
+      },
     );
     sep();
   }
@@ -82,18 +108,22 @@ export function buildWebContextMenu(
   // Editable field — full edit actions even when no selection (for paste).
   if (params.isEditable) {
     template.push(
-      { label: 'Undo', role: 'undo', enabled: params.editFlags.canUndo },
-      { label: 'Redo', role: 'redo', enabled: params.editFlags.canRedo },
-      { type: 'separator' },
-      { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
-      { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
-      { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
-      { label: 'Select All', role: 'selectAll', enabled: params.editFlags.canSelectAll },
+      { label: "Undo", role: "undo", enabled: params.editFlags.canUndo },
+      { label: "Redo", role: "redo", enabled: params.editFlags.canRedo },
+      { type: "separator" },
+      { label: "Cut", role: "cut", enabled: params.editFlags.canCut },
+      { label: "Copy", role: "copy", enabled: params.editFlags.canCopy },
+      { label: "Paste", role: "paste", enabled: params.editFlags.canPaste },
+      {
+        label: "Select All",
+        role: "selectAll",
+        enabled: params.editFlags.canSelectAll,
+      },
     );
     sep();
   } else if (params.selectionText) {
     // Non-editable but has selection — copy + AI affordances.
-    template.push({ label: 'Copy', role: 'copy' });
+    template.push({ label: "Copy", role: "copy" });
     if (askAI) {
       template.push({
         label: `Ask Horizon about "${trim(params.selectionText, 28)}"`,
@@ -108,24 +138,45 @@ export function buildWebContextMenu(
     }
     template.push({
       label: `Search the web for "${trim(params.selectionText, 28)}"`,
-      click: () => openInNewTab(`https://duckduckgo.com/?q=${encodeURIComponent(params.selectionText)}`),
+      click: () =>
+        openInNewTab(
+          `https://duckduckgo.com/?q=${encodeURIComponent(params.selectionText)}`,
+        ),
     });
     sep();
   }
 
   // Page navigation + sharing — always available.
   template.push(
-    { label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
-    { label: 'Forward', enabled: wc.navigationHistory.canGoForward(), click: () => wc.navigationHistory.goForward() },
-    { label: 'Reload', click: () => wc.reload() },
-    { label: 'Share Page', click: () => shareUrl(wc, wc.getURL()) },
-    { type: 'separator' },
-    { label: 'View Page Source', click: () => openInNewTab(`view-source:${wc.getURL()}`) },
-    { label: 'Inspect Element', click: () => wc.inspectElement(params.x, params.y) },
+    {
+      label: "Back",
+      enabled: wc.navigationHistory.canGoBack(),
+      click: () => wc.navigationHistory.goBack(),
+    },
+    {
+      label: "Forward",
+      enabled: wc.navigationHistory.canGoForward(),
+      click: () => wc.navigationHistory.goForward(),
+    },
+    { label: "Reload", click: () => wc.reload() },
+    { label: "Share Page", click: () => shareUrl(wc, wc.getURL()) },
+    { type: "separator" },
+    {
+      label: "View Page Source",
+      click: () => openInNewTab(`view-source:${wc.getURL()}`),
+    },
+    {
+      label: "Inspect Element",
+      click: () => wc.inspectElement(params.x, params.y),
+    },
   );
 
   // Drop trailing separator if any.
-  while (template.length > 0 && template[template.length - 1].type === 'separator') template.pop();
+  while (
+    template.length > 0 &&
+    template[template.length - 1].type === "separator"
+  )
+    template.pop();
 
   return Menu.buildFromTemplate(template);
 }
@@ -147,6 +198,6 @@ function shareUrl(wc: WebContents, url: string): void {
          if (navigator.share) { await navigator.share({ url }); return; }
        } catch (_) {}
        try { await navigator.clipboard.writeText(url); } catch (_) {}
-     })();`
+     })();`,
   );
 }

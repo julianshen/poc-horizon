@@ -1,5 +1,5 @@
-import fs from 'fs';
-import type { DownloadItem } from '../../src/types/browser';
+import fs from "fs";
+import type { DownloadItem } from "../../src/types/browser";
 
 export type DownloadListener = (items: DownloadItem[]) => void;
 
@@ -13,7 +13,7 @@ export class DownloadStore {
 
   private load(): void {
     try {
-      const data = fs.readFileSync(this.downloadsPath, 'utf-8');
+      const data = fs.readFileSync(this.downloadsPath, "utf-8");
       const items: DownloadItem[] = JSON.parse(data);
       items.forEach((item) => this.items.set(item.id, item));
     } catch {
@@ -24,7 +24,7 @@ export class DownloadStore {
   private save(): void {
     fs.writeFileSync(
       this.downloadsPath,
-      JSON.stringify(Array.from(this.items.values()), null, 2)
+      JSON.stringify(Array.from(this.items.values()), null, 2),
     );
   }
 
@@ -45,14 +45,14 @@ export class DownloadStore {
   // A reload sees the last finalize() state ("progressing"); an in-flight
   // download interrupted by a crash should resume as "interrupted" via
   // the Electron download handle, not the JSON snapshot.
-  setState(id: string, state: DownloadItem['state']): void {
+  setState(id: string, state: DownloadItem["state"]): void {
     const item = this.items.get(id);
     if (!item) return;
     item.state = state;
     this.notify();
   }
 
-  finalize(id: string, state: DownloadItem['state'], endTime: number): void {
+  finalize(id: string, state: DownloadItem["state"], endTime: number): void {
     const item = this.items.get(id);
     if (!item) return;
     item.state = state;
@@ -63,7 +63,7 @@ export class DownloadStore {
 
   clearCompleted(): void {
     for (const [id, item] of this.items) {
-      if (item.state === 'completed' || item.state === 'cancelled') {
+      if (item.state === "completed" || item.state === "cancelled") {
         this.items.delete(id);
       }
     }

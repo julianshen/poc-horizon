@@ -1,7 +1,7 @@
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
-import type { BrowserHarness } from './BrowserHarness';
-import type { AgentEvent } from '../../src/types/ai';
+import { spawn, ChildProcess } from "child_process";
+import { EventEmitter } from "events";
+import type { BrowserHarness } from "./BrowserHarness";
+import type { AgentEvent } from "../../src/types/ai";
 
 interface PiOptions {
   binary: string;
@@ -40,27 +40,31 @@ interface PiOptions {
  */
 export class PiSession extends EventEmitter {
   private proc: ChildProcess | null = null;
-  private buf = '';
+  private buf = "";
   private running = false;
   /** Pi's session file path, captured from the first get_state response. */
   private sessionFile: string | null = null;
   /** Counter for request IDs we send to Pi (so we can correlate responses). */
   private reqId = 0;
   /** Buffer of streaming text deltas; flushed at ≤60Hz to the renderer. */
-  private deltaBuf = '';
+  private deltaBuf = "";
   private flushTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly opts: PiOptions,
-    private readonly harness: BrowserHarness,   // reserved for the extension bridge — read in next commit
+    private readonly harness: BrowserHarness, // reserved for the extension bridge — read in next commit
   ) {
     super();
     void this.harness;
   }
 
-  get isRunning(): boolean { return this.running; }
+  get isRunning(): boolean {
+    return this.running;
+  }
   /** Path of the Pi session file on disk, or null if not yet known. */
-  get sessionPath(): string | null { return this.sessionFile; }
+  get sessionPath(): string | null {
+    return this.sessionFile;
+  }
 
   /**
    * Ask Pi to compact the conversation history. Reduces upstream message
@@ -70,38 +74,48 @@ export class PiSession extends EventEmitter {
    */
   compact(customInstructions?: string): void {
     if (!this.proc) return;
-    this.send(customInstructions ? { type: 'compact', customInstructions } : { type: 'compact' });
+    this.send(
+      customInstructions
+        ? { type: "compact", customInstructions }
+        : { type: "compact" },
+    );
   }
 
   /** Toggle Pi's automatic compaction-on-near-full-context behavior. */
   setAutoCompaction(enabled: boolean): void {
     if (!this.proc) return;
-    this.send({ type: 'set_auto_compaction', enabled });
+    this.send({ type: "set_auto_compaction", enabled });
   }
 
   /** Spawn the subprocess. Throws if the binary isn't found. */
   start(): void {
     if (this.proc) return;
     const proc = spawn(this.opts.binary, this.opts.args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...(this.opts.env ?? {}) },
     });
-    proc.stdout!.setEncoding('utf8');
-    proc.stderr!.setEncoding('utf8');
-    proc.stdout!.on('data', (chunk: string) => this.onStdout(chunk));
-    proc.stderr!.on('data', (chunk: string) => {
-      this.emitEvent({ type: 'error', message: `[pi stderr] ${chunk.trim()}` });
+    proc.stdout!.setEncoding("utf8");
+    proc.stderr!.setEncoding("utf8");
+    proc.stdout!.on("data", (chunk: string) => this.onStdout(chunk));
+    proc.stderr!.on("data", (chunk: string) => {
+      this.emitEvent({ type: "error", message: `[pi stderr] ${chunk.trim()}` });
     });
-    proc.on('exit', (code) => {
+    proc.on("exit", (code) => {
       this.proc = null;
       if (this.running) {
-        this.emitEvent({ type: 'error', message: `Pi exited (code ${code ?? 'unknown'})` });
-        this.emitEvent({ type: 'turn_end', reason: 'cancelled' });
+        this.emitEvent({
+          type: "error",
+          message: `Pi exited (code ${code ?? "unknown"})`,
+        });
+        this.emitEvent({ type: "turn_end", reason: "cancelled" });
       }
       this.running = false;
     });
-    proc.on('error', (err) => {
-      this.emitEvent({ type: 'error', message: `Pi spawn failed: ${err.message}` });
+    proc.on("error", (err) => {
+      this.emitEvent({
+        type: "error",
+        message: `Pi spawn failed: ${err.message}`,
+      });
       this.proc = null;
     });
     this.proc = proc;
@@ -118,26 +132,37 @@ export class PiSession extends EventEmitter {
       // Pi will reject overlapping prompts without streamingBehavior; we
       // queue with 'steer' so a second prompt during streaming is delivered
       // after the current turn's tool calls.
-      this.send({ type: 'prompt', message: prompt, streamingBehavior: 'steer' });
+      this.send({
+        type: "prompt",
+        message: prompt,
+        streamingBehavior: "steer",
+      });
       return;
     }
     this.running = true;
-    this.send({ type: 'prompt', message: prompt });
+    this.send({ type: "prompt", message: prompt });
   }
 
   cancel(): void {
     if (!this.proc || !this.running) return;
-    this.send({ type: 'abort' });
+    this.send({ type: "abort" });
     this.flushDeltas();
-    this.emitEvent({ type: 'turn_end', reason: 'cancelled' });
+    this.emitEvent({ type: "turn_end", reason: "cancelled" });
     this.running = false;
   }
 
   dispose(): void {
-    if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = null; }
-    this.deltaBuf = '';
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.deltaBuf = "";
     if (!this.proc) return;
-    try { this.proc.kill(); } catch { /* */ }
+    try {
+      this.proc.kill();
+    } catch {
+      /* */
+    }
     this.proc = null;
   }
 
@@ -146,16 +171,19 @@ export class PiSession extends EventEmitter {
   private onStdout(chunk: string): void {
     this.buf += chunk;
     let nl: number;
-    while ((nl = this.buf.indexOf('\n')) !== -1) {
+    while ((nl = this.buf.indexOf("\n")) !== -1) {
       let line = this.buf.slice(0, nl);
       this.buf = this.buf.slice(nl + 1);
-      if (line.endsWith('\r')) line = line.slice(0, -1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
       if (line.length === 0) continue;
       try {
         const msg = JSON.parse(line) as Record<string, unknown>;
         this.dispatch(msg);
       } catch (err) {
-        this.emitEvent({ type: 'error', message: `Pi sent malformed JSON: ${(err as Error).message}` });
+        this.emitEvent({
+          type: "error",
+          message: `Pi sent malformed JSON: ${(err as Error).message}`,
+        });
       }
     }
   }
@@ -163,12 +191,19 @@ export class PiSession extends EventEmitter {
   private dispatch(msg: Record<string, unknown>): void {
     const t = msg.type as string;
     switch (t) {
-      case 'agent_start':
+      case "agent_start":
         return;
 
-      case 'message_update': {
-        const ev = msg.assistantMessageEvent as { type?: string; delta?: string; reason?: string; errorMessage?: string } | undefined;
-        if (ev?.type === 'text_delta' && typeof ev.delta === 'string') {
+      case "message_update": {
+        const ev = msg.assistantMessageEvent as
+          | {
+              type?: string;
+              delta?: string;
+              reason?: string;
+              errorMessage?: string;
+            }
+          | undefined;
+        if (ev?.type === "text_delta" && typeof ev.delta === "string") {
           // Pi burst-delivers responses (e.g. 200 deltas in 30ms when the
           // upstream LLM batches). Coalesce into ≤60Hz flushes so the
           // renderer doesn't drop frames re-parsing markdown on every chunk.
@@ -183,18 +218,21 @@ export class PiSession extends EventEmitter {
         // and then DOES NOT necessarily emit agent_end — the turn never
         // properly completed. We must clear `running` ourselves or the
         // UI shows "Thinking…" forever.
-        if (ev?.type === 'error') {
+        if (ev?.type === "error") {
           this.flushDeltas();
-          const reason = ev.reason ?? 'error';
-          const detail = ev.errorMessage ?? '(no detail)';
-          this.emitEvent({ type: 'error', message: `Agent error (${reason}): ${detail}` });
-          this.emitEvent({ type: 'turn_end', reason: 'error' });
+          const reason = ev.reason ?? "error";
+          const detail = ev.errorMessage ?? "(no detail)";
+          this.emitEvent({
+            type: "error",
+            message: `Agent error (${reason}): ${detail}`,
+          });
+          this.emitEvent({ type: "turn_end", reason: "error" });
           this.running = false;
         }
         return;
       }
 
-      case 'auto_retry_end': {
+      case "auto_retry_end": {
         // Pi retries transient errors (5xx, rate limit). If the retry
         // ultimately failed (`aborted: true`), the assistant message
         // never streams to completion — surface the final error and
@@ -203,24 +241,37 @@ export class PiSession extends EventEmitter {
         const finalError = msg.finalError as string | undefined;
         if (aborted && finalError) {
           this.flushDeltas();
-          this.emitEvent({ type: 'error', message: `Agent retry failed: ${finalError}` });
-          this.emitEvent({ type: 'turn_end', reason: 'error' });
+          this.emitEvent({
+            type: "error",
+            message: `Agent retry failed: ${finalError}`,
+          });
+          this.emitEvent({ type: "turn_end", reason: "error" });
           this.running = false;
         }
         return;
       }
 
-      case 'tool_execution_start': {
-        const id = String(msg.toolCallId ?? '');
-        const name = String(msg.toolName ?? '');
+      case "tool_execution_start": {
+        const id = String(msg.toolCallId ?? "");
+        const name = String(msg.toolName ?? "");
         const input = (msg.args ?? {}) as Record<string, unknown>;
-        this.emitEvent({ type: 'tool_use', id, name, input });
+        this.emitEvent({ type: "tool_use", id, name, input });
         return;
       }
 
-      case 'tool_execution_end': {
-        const id = String(msg.toolCallId ?? '');
-        const result = msg.result as { content?: Array<{ type?: string; text?: string; data?: string; mimeType?: string }>; details?: unknown } | undefined;
+      case "tool_execution_end": {
+        const id = String(msg.toolCallId ?? "");
+        const result = msg.result as
+          | {
+              content?: Array<{
+                type?: string;
+                text?: string;
+                data?: string;
+                mimeType?: string;
+              }>;
+              details?: unknown;
+            }
+          | undefined;
         const isError = Boolean(msg.isError);
         const blocks = result?.content ?? [];
         // Image content blocks (e.g. browser_screenshot) win — surface
@@ -228,30 +279,76 @@ export class PiSession extends EventEmitter {
         // can render inline. Otherwise concatenate any text blocks; if
         // both are absent fall back to the raw result (e.g. structured
         // details from a non-text tool).
-        const image = blocks.find((b) => b.type === 'image' && typeof b.data === 'string');
+        const image = blocks.find(
+          (b) => b.type === "image" && typeof b.data === "string",
+        );
         let output: unknown;
         if (image) {
-          const details = (result?.details ?? {}) as { width?: number; height?: number };
-          output = { format: 'png', base64: image.data, width: details.width ?? 0, height: details.height ?? 0 };
+          const details = (result?.details ?? {}) as {
+            width?: number;
+            height?: number;
+          };
+          output = {
+            format: "png",
+            base64: image.data,
+            width: details.width ?? 0,
+            height: details.height ?? 0,
+          };
         } else {
-          const text = blocks.map((c) => c.text ?? '').join('');
+          const text = blocks.map((c) => c.text ?? "").join("");
           output = text || result;
         }
-        this.emitEvent({ type: 'tool_result', id, output, isError });
+        this.emitEvent({ type: "tool_result", id, output, isError });
         return;
       }
 
-      case 'agent_end':
-      case 'turn_end': {
+      case "agent_end":
+      case "turn_end": {
+        // First check if this turn/agent run ended with an error inside the assistant message.
+        // LLM failures (e.g. context overflow, provider down) after command acceptance are
+        // stored as an errorMessage or stopReason='error' on the assistant message.
+        let errMsg: string | undefined;
+        if (
+          t === "turn_end" &&
+          msg.message &&
+          typeof msg.message === "object"
+        ) {
+          const m = msg.message as Record<string, unknown>;
+          if (m.errorMessage) errMsg = String(m.errorMessage);
+          else if (m.stopReason === "error")
+            errMsg = "An error occurred during generation";
+        } else if (
+          t === "agent_end" &&
+          Array.isArray(msg.messages) &&
+          msg.messages.length > 0
+        ) {
+          const m = msg.messages[msg.messages.length - 1];
+          if (m && typeof m === "object") {
+            if (m.errorMessage) errMsg = String(m.errorMessage);
+            else if (m.stopReason === "error")
+              errMsg = "An error occurred during generation";
+          }
+        }
+
+        if (errMsg) {
+          if (this.running) {
+            this.flushDeltas();
+            this.emitEvent({ type: "error", message: errMsg });
+            this.emitEvent({ type: "turn_end", reason: "error" });
+            this.running = false;
+          }
+          return;
+        }
+
         // Pi emits turn_end after each assistant turn (per tool-call round)
         // and agent_end when the whole prompt completes. We only emit the
         // renderer-visible turn_end on agent_end so the AI panel shows
         // "still working" through intermediate tool-call rounds.
-        if (t === 'agent_end') {
+        if (t === "agent_end") {
           // Flush any buffered text BEFORE turn_end so the renderer paints
           // the final chunk before clearing the loading flag.
           this.flushDeltas();
-          this.emitEvent({ type: 'turn_end', reason: 'stop' });
+          this.emitEvent({ type: "turn_end", reason: "stop" });
           this.running = false;
           // Capture the session file path once per process, after the
           // first turn completes (Pi has actually written something to
@@ -261,29 +358,39 @@ export class PiSession extends EventEmitter {
         return;
       }
 
-      case 'extension_ui_request': {
-        const method = String(msg.method ?? '');
-        const id = String(msg.id ?? '');
+      case "extension_ui_request": {
+        const method = String(msg.method ?? "");
+        const id = String(msg.id ?? "");
         // Dialogs would block Pi; auto-cancel them in v0 so the agent
         // keeps moving. Fire-and-forget methods (notify/setStatus/
         // setWidget/setTitle/set_editor_text) we just ignore.
-        if (['select', 'confirm', 'input', 'editor'].includes(method)) {
-          this.send({ type: 'extension_ui_response', id, cancelled: true });
+        if (["select", "confirm", "input", "editor"].includes(method)) {
+          this.send({ type: "extension_ui_response", id, cancelled: true });
         }
         return;
       }
 
-      case 'response': {
+      case "response": {
         if (msg.success === false) {
-          this.emitEvent({ type: 'error', message: `Pi command failed: ${String(msg.error ?? 'unknown')}` });
+          this.emitEvent({
+            type: "error",
+            message: `Pi command failed: ${String(msg.error ?? "unknown")}`,
+          });
+          if (
+            this.running &&
+            ["prompt", "steer", "follow_up"].includes(msg.command as string)
+          ) {
+            this.emitEvent({ type: "turn_end", reason: "error" });
+            this.running = false;
+          }
           return;
         }
         // get_state reply carries sessionFile — persist for later resume.
-        if (msg.command === 'get_state') {
+        if (msg.command === "get_state") {
           const data = msg.data as { sessionFile?: string } | undefined;
           if (data?.sessionFile && data.sessionFile !== this.sessionFile) {
             this.sessionFile = data.sessionFile;
-            this.emit('session', data.sessionFile);
+            this.emit("session", data.sessionFile);
           }
         }
         return;
@@ -296,24 +403,27 @@ export class PiSession extends EventEmitter {
   }
 
   private requestSessionFile(): void {
-    this.send({ id: `req-${++this.reqId}`, type: 'get_state' });
+    this.send({ id: `req-${++this.reqId}`, type: "get_state" });
   }
 
   /** Emit the buffered text deltas as a single AgentEvent. */
   private flushDeltas(): void {
-    if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = null; }
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
     if (this.deltaBuf.length === 0) return;
     const text = this.deltaBuf;
-    this.deltaBuf = '';
-    this.emitEvent({ type: 'text_delta', text });
+    this.deltaBuf = "";
+    this.emitEvent({ type: "text_delta", text });
   }
 
   private send(msg: object): void {
     if (!this.proc?.stdin) return;
-    this.proc.stdin.write(JSON.stringify(msg) + '\n');
+    this.proc.stdin.write(JSON.stringify(msg) + "\n");
   }
 
   private emitEvent(e: AgentEvent): void {
-    this.emit('event', e);
+    this.emit("event", e);
   }
 }

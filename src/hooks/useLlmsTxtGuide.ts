@@ -1,11 +1,14 @@
-import { useEffect } from 'react';
-import { useBrowserStore } from '../stores/browserStore';
+import { useEffect } from "react";
+import { useBrowserStore } from "../stores/browserStore";
 
 interface IncomingGuide {
   origin: string;
   title?: string;
   summary?: string;
-  sections: Array<{ name: string; links: Array<{ title: string; url: string; description?: string }> }>;
+  sections: Array<{
+    name: string;
+    links: Array<{ title: string; url: string; description?: string }>;
+  }>;
   hasFull: boolean;
   skillFile?: string;
 }
@@ -19,12 +22,15 @@ interface IncomingGuide {
  */
 export function useLlmsTxtGuide(): void {
   useEffect(() => {
-    const unsub = window.horizonAPI.on('ai:llmsTxtFound', (payload: unknown) => {
-      const g = payload as IncomingGuide;
-      const store = useBrowserStore.getState();
-      store.pushLlmsGuide(g);
-      if (!store.showAI) store.toggleAI();
-    });
+    const unsub = window.horizonAPI.on(
+      "ai:llmsTxtFound",
+      (payload: unknown) => {
+        const g = payload as IncomingGuide;
+        const store = useBrowserStore.getState();
+        store.pushLlmsGuide(g);
+        if (!store.showAI) store.toggleAI();
+      },
+    );
     return unsub;
   }, []);
 }

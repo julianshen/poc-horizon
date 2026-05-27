@@ -30,7 +30,7 @@ browser_type({ text: "new value" })
 
 ## Validation gotchas
 
-Most forms run validation on `blur`, not on every keystroke. After typing the last field, click somewhere neutral (or press Tab) before submitting — otherwise the "this is required" error shows up *after* you click Submit, and your click hit a disabled button:
+Most forms run validation on `blur`, not on every keystroke. After typing the last field, click somewhere neutral (or press Tab) before submitting — otherwise the "this is required" error shows up _after_ you click Submit, and your click hit a disabled button:
 
 ```
 browser_cdp({ method: "Input.dispatchKeyEvent", params: { type: "rawKeyDown", key: "Tab" } })

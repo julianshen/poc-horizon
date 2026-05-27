@@ -1,4 +1,4 @@
-import { promises as fs, existsSync, readFileSync } from 'fs';
+import { promises as fs, existsSync, readFileSync } from "fs";
 
 export interface JsHelper {
   /** Unique name; agent calls `browser_call_helper({name})`. */
@@ -27,25 +27,29 @@ export class HelperRegistry {
   list(): JsHelper[] {
     if (!existsSync(this.filePath)) return [];
     try {
-      const data = JSON.parse(readFileSync(this.filePath, 'utf8'));
+      const data = JSON.parse(readFileSync(this.filePath, "utf8"));
       return Array.isArray(data) ? (data as JsHelper[]) : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
 
   get(name: string): JsHelper | undefined {
     return this.list().find((h) => h.name === name);
   }
 
-  async save(input: Omit<JsHelper, 'createdAt'>): Promise<JsHelper> {
+  async save(input: Omit<JsHelper, "createdAt">): Promise<JsHelper> {
     const helper: JsHelper = { ...input, createdAt: Date.now() };
-    const next = this.list().filter((h) => h.name !== helper.name).concat(helper);
-    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), 'utf8');
+    const next = this.list()
+      .filter((h) => h.name !== helper.name)
+      .concat(helper);
+    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), "utf8");
     return helper;
   }
 
   async remove(name: string): Promise<void> {
     const next = this.list().filter((h) => h.name !== name);
-    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), 'utf8');
+    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), "utf8");
   }
 
   /** Build a JS snippet that defines every helper on the page's
@@ -53,9 +57,9 @@ export class HelperRegistry {
    *  existing helper with the same name is intentional. */
   inlineInjection(): string {
     const helpers = this.list();
-    const body = helpers.map((h) =>
-      `__h[${JSON.stringify(h.name)}] = (${h.expression});`
-    ).join('\n');
+    const body = helpers
+      .map((h) => `__h[${JSON.stringify(h.name)}] = (${h.expression});`)
+      .join("\n");
     return `(function(){
       if (!window.__horizon) window.__horizon = {};
       if (!window.__horizon.helpers) window.__horizon.helpers = {};

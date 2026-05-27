@@ -1,4 +1,4 @@
-import { Session } from 'electron';
+import { Session } from "electron";
 
 /**
  * Apply user spellchecker settings to a given session.
@@ -14,7 +14,7 @@ import { Session } from 'electron';
  */
 export function applySpellcheckToSession(
   session: Session,
-  languages: string[]
+  languages: string[],
 ): void {
   const available = new Set(session.availableSpellCheckerLanguages);
   const filtered = languages.filter((l) => available.has(l));

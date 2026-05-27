@@ -7,7 +7,11 @@
  * extensions are preserved on the object as-is.
  */
 
-export type ConsentLevel = 'auto' | 'ask_once_per_session' | 'ask_each_time' | 'always_human';
+export type ConsentLevel =
+  | "auto"
+  | "ask_once_per_session"
+  | "ask_each_time"
+  | "always_human";
 
 export interface AgentCapability {
   allowed?: boolean;
@@ -30,9 +34,9 @@ export interface AgentObjective {
 
 export interface AgentAction {
   name: string;
-  endpoint: string;                     // "METHOD path"
+  endpoint: string; // "METHOD path"
   args_schema?: Record<string, unknown>;
-  auth: 'none' | 'cookie' | 'bearer' | string;   // header:<name>
+  auth: "none" | "cookie" | "bearer" | string; // header:<name>
   rate_limit?: string;
   idempotent?: boolean;
 }
@@ -77,7 +81,9 @@ export interface AgentPolicy {
 /** Spec § 1 conformance levels. */
 export type ConformanceLevel = 0 | 1 | 2 | 3;
 
-export function computeConformanceLevel(policy: AgentPolicy | null): ConformanceLevel {
+export function computeConformanceLevel(
+  policy: AgentPolicy | null,
+): ConformanceLevel {
   if (!policy) return 0;
   // L1: valid with version/site/capabilities (we already validated by parsing)
   let level: ConformanceLevel = 1;
@@ -86,9 +92,12 @@ export function computeConformanceLevel(policy: AgentPolicy | null): Conformance
   // L3: full contract — objectives + requires_human + consent all populated
   if (
     level === 2 &&
-    Array.isArray(policy.objectives) && policy.objectives.length > 0 &&
-    Array.isArray(policy.requires_human) && policy.requires_human.length > 0 &&
-    policy.consent && Object.keys(policy.consent).length > 0
+    Array.isArray(policy.objectives) &&
+    policy.objectives.length > 0 &&
+    Array.isArray(policy.requires_human) &&
+    policy.requires_human.length > 0 &&
+    policy.consent &&
+    Object.keys(policy.consent).length > 0
   ) {
     level = 3;
   }
@@ -106,12 +115,12 @@ export function computeConformanceLevel(policy: AgentPolicy | null): Conformance
  * unknown fields by design.
  */
 export function parseAgentPolicy(raw: unknown): AgentPolicy | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== "object") return null;
   const o = raw as Partial<AgentPolicy>;
-  if (typeof o.version !== 'string') return null;
-  if (!/^1\.[0-9]+(\.[0-9]+)?$/.test(o.version)) return null;     // v1.x only
-  if (typeof o.site !== 'string' || o.site.length === 0) return null;
-  if (!o.capabilities || typeof o.capabilities !== 'object') return null;
+  if (typeof o.version !== "string") return null;
+  if (!/^1\.[0-9]+(\.[0-9]+)?$/.test(o.version)) return null; // v1.x only
+  if (typeof o.site !== "string" || o.site.length === 0) return null;
+  if (!o.capabilities || typeof o.capabilities !== "object") return null;
   // Sanitize array-shaped fields. A site that publishes
   // `requires_human: {trigger:'payment'}` (object instead of array)
   // would later crash our `.map`/`for..of` iterations. Drop malformed
@@ -119,47 +128,64 @@ export function parseAgentPolicy(raw: unknown): AgentPolicy | null {
   // defaults, not throw.
   const sanitizeGateArray = (v: unknown): AgentHumanGate[] | undefined => {
     if (!Array.isArray(v)) return undefined;
-    return v.filter((e): e is AgentHumanGate =>
-      e && typeof e === 'object' && typeof (e as AgentHumanGate).trigger === 'string'
+    return v.filter(
+      (e): e is AgentHumanGate =>
+        e &&
+        typeof e === "object" &&
+        typeof (e as AgentHumanGate).trigger === "string",
     );
   };
   const sanitized: AgentPolicy = {
     ...(o as AgentPolicy),
     requires_human: sanitizeGateArray(o.requires_human),
-    prohibited: sanitizeGateArray(o.prohibited) as AgentProhibition[] | undefined,
+    prohibited: sanitizeGateArray(o.prohibited) as
+      | AgentProhibition[]
+      | undefined,
     objectives: Array.isArray(o.objectives)
-      ? o.objectives.filter((e): e is AgentObjective => !!e && typeof e === 'object' && typeof (e as AgentObjective).id === 'string')
+      ? o.objectives.filter(
+          (e): e is AgentObjective =>
+            !!e &&
+            typeof e === "object" &&
+            typeof (e as AgentObjective).id === "string",
+        )
       : undefined,
     actions: Array.isArray(o.actions)
-      ? o.actions.filter((e): e is AgentAction =>
-          !!e && typeof e === 'object' &&
-          typeof (e as AgentAction).name === 'string' &&
-          typeof (e as AgentAction).endpoint === 'string')
+      ? o.actions.filter(
+          (e): e is AgentAction =>
+            !!e &&
+            typeof e === "object" &&
+            typeof (e as AgentAction).name === "string" &&
+            typeof (e as AgentAction).endpoint === "string",
+        )
       : undefined,
-    consent: o.consent && typeof o.consent === 'object' && !Array.isArray(o.consent)
-      ? o.consent : undefined,
+    consent:
+      o.consent && typeof o.consent === "object" && !Array.isArray(o.consent)
+        ? o.consent
+        : undefined,
   };
   return sanitized;
 }
 
 /** Reserved triggers from spec § 4.6. Agents MUST recognize these. */
 export const RESERVED_PROHIBITED_TRIGGERS = new Set<string>([
-  'auth_bypass',
-  'captcha_solving',
-  'scraping_pii',
-  'dark_pattern_acceptance',
+  "auth_bypass",
+  "captcha_solving",
+  "scraping_pii",
+  "dark_pattern_acceptance",
 ]);
 
 /** Reserved triggers from spec § 4.5. */
 export const RESERVED_HUMAN_TRIGGERS = new Set<string>([
-  'payment',
-  'data_export',
-  'auth_change',
+  "payment",
+  "data_export",
+  "auth_change",
   // irreversible:<action> — checked by prefix
 ]);
 
 export function isHumanGateTrigger(trigger: string): boolean {
-  return RESERVED_HUMAN_TRIGGERS.has(trigger) || trigger.startsWith('irreversible:');
+  return (
+    RESERVED_HUMAN_TRIGGERS.has(trigger) || trigger.startsWith("irreversible:")
+  );
 }
 
 /**
@@ -172,8 +198,12 @@ export function isHumanGateTrigger(trigger: string): boolean {
  * args reference payment-shaped strings".
  */
 const ACTION_TOOLS = new Set<string>([
-  'navigate', 'click', 'type', 'scroll',
-  'submit', 'callHelper',
+  "navigate",
+  "click",
+  "type",
+  "scroll",
+  "submit",
+  "callHelper",
 ]);
 
 /**
@@ -193,7 +223,8 @@ export function humanGateForTool(
   args: Record<string, unknown>,
   policy: AgentPolicy | null,
 ): string | null {
-  if (!policy?.requires_human || policy.requires_human.length === 0) return null;
+  if (!policy?.requires_human || policy.requires_human.length === 0)
+    return null;
   const triggers = new Set(policy.requires_human.map((g) => g.trigger));
 
   // Heuristics only apply to action tools — never to pure reads.
@@ -201,19 +232,33 @@ export function humanGateForTool(
 
   const hay = JSON.stringify(args).toLowerCase();
 
-  if (triggers.has('payment') && /\bcheckout\b|\bpayment\b|cart\/submit|pay-now|\bstripe\b|\bpaypal\b/.test(hay)) {
-    return 'payment';
+  if (
+    triggers.has("payment") &&
+    /\bcheckout\b|\bpayment\b|cart\/submit|pay-now|\bstripe\b|\bpaypal\b/.test(
+      hay,
+    )
+  ) {
+    return "payment";
   }
-  if (triggers.has('auth_change') && /\bpassword\b|\b2fa\b|\botp\b|account\/security|change-password/.test(hay)) {
-    return 'auth_change';
+  if (
+    triggers.has("auth_change") &&
+    /\bpassword\b|\b2fa\b|\botp\b|account\/security|change-password/.test(hay)
+  ) {
+    return "auth_change";
   }
-  if (triggers.has('data_export') && /\bexport\b|download.*data|account.*download|\bgdpr\b/.test(hay)) {
-    return 'data_export';
+  if (
+    triggers.has("data_export") &&
+    /\bexport\b|download.*data|account.*download|\bgdpr\b/.test(hay)
+  ) {
+    return "data_export";
   }
   // irreversible:<action> — any declared trigger of this shape applies
   // when the args mention a destructive verb. Conservative.
   for (const t of triggers) {
-    if (t.startsWith('irreversible:') && /\bdelete\b|\bremove\b|\bdestroy\b|\bclose-account\b|\bdrop\b/.test(hay)) {
+    if (
+      t.startsWith("irreversible:") &&
+      /\bdelete\b|\bremove\b|\bdestroy\b|\bclose-account\b|\bdrop\b/.test(hay)
+    ) {
       return t;
     }
   }
@@ -223,7 +268,7 @@ export function humanGateForTool(
   // any time the policy declares one of these AND the agent is about to
   // run an action tool, ask. Better a noisy prompt than a silent miss.
   for (const t of triggers) {
-    if (!RESERVED_HUMAN_TRIGGERS.has(t) && !t.startsWith('irreversible:')) {
+    if (!RESERVED_HUMAN_TRIGGERS.has(t) && !t.startsWith("irreversible:")) {
       return t;
     }
   }
@@ -247,24 +292,29 @@ export function prohibitionForTool(
   for (const p of policy.prohibited) {
     const t = p.trigger;
     // Known mappings.
-    if (t === 'dark_pattern_acceptance' && tool === 'dismissOverlays') return t;
+    if (t === "dark_pattern_acceptance" && tool === "dismissOverlays") return t;
     // captcha_solving — we never expose a captcha-solve tool, so this
     // is unreachable by construction. Documented in captcha.md
     // interaction skill.
-    if (t === 'captcha_solving') continue;
+    if (t === "captcha_solving") continue;
     // auth_bypass / scraping_pii — without per-element annotation we
     // can't precisely match, but we DO refuse to interact with an
     // action tool when a site declares either. Spec § 8 says agents
     // MUST honor prohibited triggers without retry; the safe default
     // is to deny rather than allow when uncertain.
-    if (t === 'auth_bypass' && ACTION_TOOLS.has(tool)) return t;
-    if (t === 'scraping_pii' && (tool === 'evaluate' || tool === 'getDom' || tool === 'callHelper')) return t;
+    if (t === "auth_bypass" && ACTION_TOOLS.has(tool)) return t;
+    if (
+      t === "scraping_pii" &&
+      (tool === "evaluate" || tool === "getDom" || tool === "callHelper")
+    )
+      return t;
     // Vendor-custom prohibited triggers. Spec § 4.6 doesn't have an
     // explicit "treat unknown as deny" — but the conformance § 8
     // language ("MUST honor prohibited triggers") strongly implies it.
     // For action tools, deny. Read tools pass through (the site can't
     // forbid us reading).
-    if (!RESERVED_PROHIBITED_TRIGGERS.has(t) && ACTION_TOOLS.has(tool)) return t;
+    if (!RESERVED_PROHIBITED_TRIGGERS.has(t) && ACTION_TOOLS.has(tool))
+      return t;
   }
   return null;
 }

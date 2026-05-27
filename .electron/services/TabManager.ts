@@ -1,17 +1,21 @@
-import { BrowserView, BrowserWindow } from 'electron';
-import { writeFile } from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid';
-import type { Tab, TabGroup, TabGroupColor } from '../../src/types/browser';
-import type { HistoryManager } from './HistoryManager';
-import type { SettingsManager } from './SettingsManager';
-import { buildWebContextMenu } from './webContextMenu';
-import { translateText } from './LlmTranslator';
+import { BrowserView, BrowserWindow } from "electron";
+import { writeFile } from "fs/promises";
+import { v4 as uuidv4 } from "uuid";
+import type { Tab, TabGroup, TabGroupColor } from "../../src/types/browser";
+import type { HistoryManager } from "./HistoryManager";
+import type { SettingsManager } from "./SettingsManager";
+import { buildWebContextMenu } from "./webContextMenu";
+import { translateText } from "./LlmTranslator";
 
 export type TabManagerMode =
-  | { kind: 'default'; historyManager: HistoryManager; settingsManager?: SettingsManager }
-  | { kind: 'incognito'; settingsManager?: SettingsManager };
+  | {
+      kind: "default";
+      historyManager: HistoryManager;
+      settingsManager?: SettingsManager;
+    }
+  | { kind: "incognito"; settingsManager?: SettingsManager };
 
-const INCOGNITO_PARTITION = 'incognito';
+const INCOGNITO_PARTITION = "incognito";
 
 /**
  * In-page overlay shown next to the user's text selection while a
@@ -77,7 +81,12 @@ export class TabManager {
   // Rect of the BrowserContentArea slot in the renderer DOM, reported by
   // the renderer via 'ui:contentBounds'. null until the renderer mounts and
   // measures itself for the first time.
-  private contentBounds: { x: number; y: number; width: number; height: number } | null = null;
+  private contentBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null = null;
 
   constructor(window: BrowserWindow, mode: TabManagerMode) {
     this.window = window;
@@ -86,7 +95,7 @@ export class TabManager {
 
   /** True when this manager's tabs live in the non-persistent partition. */
   isIncognito(): boolean {
-    return this.mode.kind === 'incognito';
+    return this.mode.kind === "incognito";
   }
 
   /**
@@ -94,13 +103,13 @@ export class TabManager {
    * HistoryManager isn't even held, so leakage is unrepresentable.
    */
   private recordHistory(url: string, title: string): void {
-    if (this.mode.kind === 'default') {
+    if (this.mode.kind === "default") {
       this.mode.historyManager.addEntry(url, title);
     }
   }
 
   private partition(): string | undefined {
-    return this.mode.kind === 'incognito' ? INCOGNITO_PARTITION : undefined;
+    return this.mode.kind === "incognito" ? INCOGNITO_PARTITION : undefined;
   }
 
   /** Subscribe to any change in the tab set (create/close/activate/update/reorder/pin/mute). */
@@ -118,7 +127,11 @@ export class TabManager {
 
   private emitNavigate(url: string, tabId: string): void {
     for (const fn of this.navigateListeners) {
-      try { fn(url, tabId); } catch { /* non-fatal */ }
+      try {
+        fn(url, tabId);
+      } catch {
+        /* non-fatal */
+      }
     }
   }
 
@@ -141,7 +154,7 @@ export class TabManager {
     this.emitChange();
   }
 
-  createTab(url = 'horizon://newtab'): Tab {
+  createTab(url = "horizon://newtab"): Tab {
     const id = uuidv4();
     const view = new BrowserView({
       webPreferences: {
@@ -157,7 +170,7 @@ export class TabManager {
       id,
       schemaVersion: 1,
       url,
-      title: 'New Tab',
+      title: "New Tab",
       isLoading: false,
       loadProgress: 0,
       canGoBack: false,
@@ -182,7 +195,7 @@ export class TabManager {
     view.webContents.loadURL(url);
 
     this.setupWebContentsEvents(id, view);
-    this.safeSend('tab:created', tab);
+    this.safeSend("tab:created", tab);
     this.activateTab(id);
 
     return tab;
@@ -191,16 +204,16 @@ export class TabManager {
   private setupWebContentsEvents(tabId: string, view: BrowserView): void {
     const wc = view.webContents;
 
-    wc.on('did-start-loading', () => {
+    wc.on("did-start-loading", () => {
       const entry = this.tabs.get(tabId);
       this.updateTab(tabId, { isLoading: true, loadProgress: 0 });
-      this.safeSend('load:started', { tabId, url: entry?.tab.url ?? '' });
+      this.safeSend("load:started", { tabId, url: entry?.tab.url ?? "" });
     });
 
-    wc.on('did-stop-loading', () => {
+    wc.on("did-stop-loading", () => {
       const entry = this.tabs.get(tabId);
       this.updateTab(tabId, { isLoading: false, loadProgress: 100 });
-      this.safeSend('load:finished', { tabId, url: entry?.tab.url ?? '' });
+      this.safeSend("load:finished", { tabId, url: entry?.tab.url ?? "" });
     });
 
     const broadcastNavState = (url: string): void => {
@@ -208,8 +221,8 @@ export class TabManager {
       const canGoBack = wc.navigationHistory.canGoBack();
       const canGoForward = wc.navigationHistory.canGoForward();
       this.updateTab(tabId, { url, canGoBack, canGoForward });
-      this.recordHistory(url, entry?.tab.title ?? '');
-      this.safeSend('navigation:state', {
+      this.recordHistory(url, entry?.tab.title ?? "");
+      this.safeSend("navigation:state", {
         tabId,
         canGoBack,
         canGoForward,
@@ -219,14 +232,14 @@ export class TabManager {
       this.emitNavigate(url, tabId);
     };
 
-    wc.on('did-navigate', (_event, url) => broadcastNavState(url));
+    wc.on("did-navigate", (_event, url) => broadcastNavState(url));
     // SPA navigations (history.pushState / replaceState) don't fire
     // 'did-navigate' — they fire 'did-navigate-in-page' instead. Without
     // this handler, modern client-routed apps (Gmail, GitHub PR pages,
     // React/Vue SPAs) would update the BrowserView but the Tab state
     // would stay stale, so Back/Forward buttons appear disabled even
     // though Electron's navigationHistory tracks the entries correctly.
-    wc.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+    wc.on("did-navigate-in-page", (_event, url, isMainFrame) => {
       if (isMainFrame) broadcastNavState(url);
     });
 
@@ -234,13 +247,13 @@ export class TabManager {
     // instead of letting Electron try to spawn a stray BrowserWindow.
     wc.setWindowOpenHandler(({ url }) => {
       this.createTab(url);
-      return { action: 'deny' };
+      return { action: "deny" };
     });
 
     // Web-content context menu: build a Chrome-parity native menu from the
     // ContextMenuParams Electron supplies (link / image / selection /
     // editable detection is all in `params.editFlags` + URL fields).
-    wc.on('context-menu', (_event, params) => {
+    wc.on("context-menu", (_event, params) => {
       const menu = buildWebContextMenu(params, {
         wc,
         openInNewTab: (url) => this.createTab(url),
@@ -250,7 +263,7 @@ export class TabManager {
         askAI: (selection) => {
           const chromeWc = this.window.webContents;
           if (chromeWc && !chromeWc.isDestroyed()) {
-            chromeWc.send('ai:askFromSelection', {
+            chromeWc.send("ai:askFromSelection", {
               selection,
               pageUrl: wc.getURL(),
               pageTitle: wc.getTitle(),
@@ -264,55 +277,78 @@ export class TabManager {
           // horizon-translate-overlay so a second invocation can reuse /
           // re-position the same box.
           void wc.executeJavaScript(SELECTION_TRANSLATE_OVERLAY_SHOW, true);
-          const targetLang = this.mode.settingsManager?.get('translateTargetLang') ?? 'English';
-          translateText(selection, targetLang).then((translated) => {
-            const payload = translated ?? '⚠ Translation failed';
-            const safe = JSON.stringify(payload);
-            void wc.executeJavaScript(`(function(){
+          const targetLang =
+            this.mode.settingsManager?.get("translateTargetLang") ?? "English";
+          translateText(selection, targetLang)
+            .then((translated) => {
+              const payload = translated ?? "⚠ Translation failed";
+              const safe = JSON.stringify(payload);
+              void wc.executeJavaScript(
+                `(function(){
               const el = document.getElementById('horizon-translate-overlay');
               if (!el) return;
               el.textContent = ${safe};
               el.dataset.state = 'done';
-            })()`, true);
-          }).catch((err) => {
-            const safe = JSON.stringify(`⚠ Translation failed: ${(err as Error).message}`);
-            void wc.executeJavaScript(`(function(){
+            })()`,
+                true,
+              );
+            })
+            .catch((err) => {
+              const safe = JSON.stringify(
+                `⚠ Translation failed: ${(err as Error).message}`,
+              );
+              void wc
+                .executeJavaScript(
+                  `(function(){
               const el = document.getElementById('horizon-translate-overlay');
               if (!el) return;
               el.textContent = ${safe};
               el.dataset.state = 'done';
-            })()`, true).catch(() => {});
-          });
+            })()`,
+                  true,
+                )
+                .catch(() => {});
+            });
         },
       });
       menu.popup({ window: this.window });
     });
 
-    wc.on('page-title-updated', (_event, title) => {
+    wc.on("page-title-updated", (_event, title) => {
       this.updateTab(tabId, { title });
       const entry = this.tabs.get(tabId);
       if (entry?.tab.url) this.recordHistory(entry.tab.url, title);
-      this.safeSend('page:title', { tabId, title });
+      this.safeSend("page:title", { tabId, title });
     });
 
-    wc.on('page-favicon-updated', (_event, favicons) => {
+    wc.on("page-favicon-updated", (_event, favicons) => {
       if (favicons.length > 0) {
         this.updateTab(tabId, { favicon: favicons[0] });
-        this.safeSend('page:favicon', { tabId, faviconUrl: favicons[0] });
+        this.safeSend("page:favicon", { tabId, faviconUrl: favicons[0] });
       }
     });
 
-    wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-      if (errorCode === -3) return; // ERR_ABORTED
-      wc.loadURL(`horizon://error?code=${errorCode}&url=${encodeURIComponent(validatedURL)}`);
-      this.updateTab(tabId, {
-        errorState: { type: 'load-failed', errorCode, errorDescription, validatedURL },
-      });
-    });
+    wc.on(
+      "did-fail-load",
+      (_event, errorCode, errorDescription, validatedURL) => {
+        if (errorCode === -3) return; // ERR_ABORTED
+        wc.loadURL(
+          `horizon://error?code=${errorCode}&url=${encodeURIComponent(validatedURL)}`,
+        );
+        this.updateTab(tabId, {
+          errorState: {
+            type: "load-failed",
+            errorCode,
+            errorDescription,
+            validatedURL,
+          },
+        });
+      },
+    );
 
-    wc.on('render-process-gone', () => {
+    wc.on("render-process-gone", () => {
       wc.loadURL(`horizon://error/crashed?tabId=${tabId}`);
-      this.updateTab(tabId, { errorState: { type: 'crashed' } });
+      this.updateTab(tabId, { errorState: { type: "crashed" } });
     });
   }
 
@@ -334,7 +370,7 @@ export class TabManager {
 
     this.applyBoundsToActive();
 
-    this.safeSend('tab:activated', { tabId });
+    this.safeSend("tab:activated", { tabId });
   }
 
   /**
@@ -343,7 +379,12 @@ export class TabManager {
    * numbers and makes the BrowserView track AI sidebar toggles + window
    * resizes automatically.
    */
-  setContentBounds(rect: { x: number; y: number; width: number; height: number }): void {
+  setContentBounds(rect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): void {
     this.contentBounds = {
       x: Math.round(rect.x),
       y: Math.round(rect.y),
@@ -369,7 +410,12 @@ export class TabManager {
    * full window-width minus the inset is correct at startup. The renderer
    * overwrites this within the first paint frame after mount.
    */
-  private fallbackBounds(): { x: number; y: number; width: number; height: number } {
+  private fallbackBounds(): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
     const w = this.window.getBounds();
     const chromeHeight = 146;
     const inset = 12;
@@ -388,7 +434,9 @@ export class TabManager {
     if (!this.window.isDestroyed()) {
       this.window.removeBrowserView(entry.view);
     }
-    const wc = entry.view.webContents as Electron.WebContents & { destroy?: () => void };
+    const wc = entry.view.webContents as Electron.WebContents & {
+      destroy?: () => void;
+    };
     if (wc && !wc.isDestroyed()) {
       // Electron's BrowserView webContents has a destroy() method that
       // releases the renderer process. Optional-chain on the off-chance
@@ -396,7 +444,7 @@ export class TabManager {
       wc.destroy?.();
     }
     this.tabs.delete(tabId);
-    this.safeSend('tab:closed', { tabId });
+    this.safeSend("tab:closed", { tabId });
 
     if (this.activeTabId === tabId) {
       const remaining = Array.from(this.tabs.values());
@@ -468,21 +516,28 @@ export class TabManager {
     return Array.from(this.groups.values());
   }
 
-  createGroup(name: string, color: TabGroupColor, tabIds: string[] = []): TabGroup {
+  createGroup(
+    name: string,
+    color: TabGroupColor,
+    tabIds: string[] = [],
+  ): TabGroup {
     const group: TabGroup = { id: uuidv4(), name, color };
     this.groups.set(group.id, group);
     for (const tabId of tabIds) this.assignTabToGroup(tabId, group.id);
-    this.safeSend('tabGroup:created', group);
+    this.safeSend("tabGroup:created", group);
     this.emitChange();
     return group;
   }
 
-  updateGroup(groupId: string, changes: Partial<{ name: string; color: TabGroupColor }>): void {
+  updateGroup(
+    groupId: string,
+    changes: Partial<{ name: string; color: TabGroupColor }>,
+  ): void {
     const group = this.groups.get(groupId);
     if (!group) return;
     if (changes.name !== undefined) group.name = changes.name;
     if (changes.color !== undefined) group.color = changes.color;
-    this.safeSend('tabGroup:updated', group);
+    this.safeSend("tabGroup:updated", group);
     this.emitChange();
   }
 
@@ -491,10 +546,11 @@ export class TabManager {
     // Remove the groupId from every tab that belonged to it, but leave
     // the tabs themselves intact — same as Chrome's "Ungroup" behavior.
     for (const { tab } of this.tabs.values()) {
-      if (tab.groupId === groupId) this.updateTab(tab.id, { groupId: undefined });
+      if (tab.groupId === groupId)
+        this.updateTab(tab.id, { groupId: undefined });
     }
     this.groups.delete(groupId);
-    this.safeSend('tabGroup:deleted', { groupId });
+    this.safeSend("tabGroup:deleted", { groupId });
     this.emitChange();
   }
 
@@ -533,11 +589,14 @@ export class TabManager {
       // DevTools renders inside the (possibly hidden / clipped) BV slot
       // and the user perceives "nothing happened". A detached window
       // is unambiguously visible.
-      wc.openDevTools({ mode: 'detach' });
+      wc.openDevTools({ mode: "detach" });
     }
   }
 
-  openDevTools(tabId: string, mode: 'right' | 'bottom' | 'undocked' | 'detach' = 'detach'): void {
+  openDevTools(
+    tabId: string,
+    mode: "right" | "bottom" | "undocked" | "detach" = "detach",
+  ): void {
     const entry = this.tabs.get(tabId);
     if (entry) {
       entry.view.webContents.openDevTools({ mode });
@@ -553,7 +612,7 @@ export class TabManager {
 
   printToPDF(tabId: string, outputPath: string): Promise<string> {
     const entry = this.tabs.get(tabId);
-    if (!entry) throw new Error('Tab not found');
+    if (!entry) throw new Error("Tab not found");
     return entry.view.webContents.printToPDF({}).then(async (data) => {
       await writeFile(outputPath, data);
       return outputPath;
@@ -602,7 +661,9 @@ export class TabManager {
     if (from === -1) return;
 
     const isPinned = !!this.tabs.get(tabId)?.tab.isPinned;
-    const pinnedCount = Array.from(this.tabs.values()).filter((t) => t.tab.isPinned).length;
+    const pinnedCount = Array.from(this.tabs.values()).filter(
+      (t) => t.tab.isPinned,
+    ).length;
     const min = isPinned ? 0 : pinnedCount;
     const max = isPinned ? Math.max(0, pinnedCount - 1) : ids.length - 1;
     const clamped = Math.max(min, Math.min(max, targetIndex));
@@ -617,7 +678,7 @@ export class TabManager {
       if (entry) next.set(id, entry);
     }
     this.tabs = next;
-    this.safeSend('tab:reordered', { tabId, index: clamped });
+    this.safeSend("tab:reordered", { tabId, index: clamped });
   }
 
   private updateTab(tabId: string, updates: Partial<Tab>): void {
@@ -625,6 +686,6 @@ export class TabManager {
     if (!entry) return;
     Object.assign(entry.tab, updates);
     // Notify renderer via IPC
-    this.safeSend('tab:updated', { ...entry.tab, ...updates });
+    this.safeSend("tab:updated", { ...entry.tab, ...updates });
   }
 }

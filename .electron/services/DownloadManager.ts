@@ -1,8 +1,13 @@
-import { app, DownloadItem as ElectronDownloadItem, Event, WebContents } from 'electron';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import type { DownloadItem } from '../../src/types/browser';
-import { DownloadStore, type DownloadListener } from './DownloadStore';
+import {
+  app,
+  DownloadItem as ElectronDownloadItem,
+  Event,
+  WebContents,
+} from "electron";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import type { DownloadItem } from "../../src/types/browser";
+import { DownloadStore, type DownloadListener } from "./DownloadStore";
 
 export class DownloadManager {
   private store: DownloadStore;
@@ -12,9 +17,16 @@ export class DownloadManager {
     this.store = store;
   }
 
-  handleDownload(_event: Event, item: ElectronDownloadItem, _wc: WebContents): void {
+  handleDownload(
+    _event: Event,
+    item: ElectronDownloadItem,
+    _wc: WebContents,
+  ): void {
     const id = uuidv4();
-    const downloadPath = path.join(app.getPath('downloads'), item.getFilename());
+    const downloadPath = path.join(
+      app.getPath("downloads"),
+      item.getFilename(),
+    );
     item.setSavePath(downloadPath);
 
     const record: DownloadItem = {
@@ -23,7 +35,7 @@ export class DownloadManager {
       url: item.getURL(),
       totalBytes: item.getTotalBytes(),
       receivedBytes: 0,
-      state: 'progressing',
+      state: "progressing",
       startTime: Date.now(),
       savePath: downloadPath,
       mimeType: item.getMimeType(),
@@ -32,20 +44,24 @@ export class DownloadManager {
     this.handles.set(id, item);
     this.store.upsert(record);
 
-    item.on('updated', (_e, state) => {
+    item.on("updated", (_e, state) => {
       const current = this.store.get(id);
       if (!current) return;
       this.store.upsert({
         ...current,
         receivedBytes: item.getReceivedBytes(),
         totalBytes: item.getTotalBytes(),
-        state: state === 'progressing' ? 'progressing' : 'interrupted',
+        state: state === "progressing" ? "progressing" : "interrupted",
       });
     });
 
-    item.once('done', (_e, state) => {
+    item.once("done", (_e, state) => {
       this.handles.delete(id);
-      this.store.finalize(id, state === 'completed' ? 'completed' : 'cancelled', Date.now());
+      this.store.finalize(
+        id,
+        state === "completed" ? "completed" : "cancelled",
+        Date.now(),
+      );
     });
   }
 
@@ -53,21 +69,21 @@ export class DownloadManager {
     const handle = this.handles.get(downloadId);
     if (!handle) return;
     handle.pause();
-    this.store.setState(downloadId, 'interrupted');
+    this.store.setState(downloadId, "interrupted");
   }
 
   resume(downloadId: string): void {
     const handle = this.handles.get(downloadId);
     if (!handle) return;
     handle.resume();
-    this.store.setState(downloadId, 'progressing');
+    this.store.setState(downloadId, "progressing");
   }
 
   cancel(downloadId: string): void {
     const handle = this.handles.get(downloadId);
     if (!handle) return;
     handle.cancel();
-    this.store.finalize(downloadId, 'cancelled', Date.now());
+    this.store.finalize(downloadId, "cancelled", Date.now());
   }
 
   getDownloads(): DownloadItem[] {

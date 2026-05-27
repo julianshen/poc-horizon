@@ -1,18 +1,18 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useBrowserStore } from '../../stores/browserStore';
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useBrowserStore } from "../../stores/browserStore";
 
 const POPULAR_LANGUAGES = [
-  'English',
-  'Spanish',
-  'Chinese',
-  'French',
-  'German',
-  'Japanese',
-  'Korean',
-  'Italian',
-  'Portuguese',
-  'Russian',
-  'Arabic',
+  "English",
+  "Spanish",
+  "Chinese",
+  "French",
+  "German",
+  "Japanese",
+  "Korean",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Arabic",
 ];
 
 export const TranslationBar: React.FC = () => {
@@ -26,15 +26,18 @@ export const TranslationBar: React.FC = () => {
   } = useBrowserStore();
   const activeTabId = useBrowserStore((s) => s.activeTabId);
 
-  const [targetLang, setTargetLang] = useState('English');
+  const [targetLang, setTargetLang] = useState("English");
 
   // Per-tab status lives in the store — that's how a translation that
   // completes while the user is on a different tab survives the tab
   // switch. The bar's visible status is whatever the active tab's
   // store entry says (absent → idle).
-  const tabState = activeTabId ? translationStatesByTab[activeTabId] : undefined;
-  const status: 'idle' | 'translating' | 'done' | 'error' = tabState?.status ?? 'idle';
-  const errorMsg = tabState?.errorMsg ?? '';
+  const tabState = activeTabId
+    ? translationStatesByTab[activeTabId]
+    : undefined;
+  const status: "idle" | "translating" | "done" | "error" =
+    tabState?.status ?? "idle";
+  const errorMsg = tabState?.errorMsg ?? "";
 
   // Monotonic request id keyed by tabId. Bumped on every translate /
   // restore / cancel / close so stale promise resolutions check seq
@@ -50,9 +53,10 @@ export const TranslationBar: React.FC = () => {
   // Fetch initial setting
   useEffect(() => {
     if (!showTranslationBar) return;
-    window.horizonAPI.invoke('settings:get', { key: 'translateTargetLang' })
+    window.horizonAPI
+      .invoke("settings:get", { key: "translateTargetLang" })
       .then((val) => {
-        if (typeof val === 'string' && val.trim()) {
+        if (typeof val === "string" && val.trim()) {
           setTargetLang(val);
         }
       })
@@ -66,16 +70,32 @@ export const TranslationBar: React.FC = () => {
   // The visible progress bar still tracks the active tab only.
   useEffect(() => {
     if (!showTranslationBar) return;
-    const unsub = window.horizonAPI.on('translate:progress', (progress: { tabId: string; translated: number; total: number; done: boolean }) => {
-      if (progress.done) {
-        setTranslationStateForTab(progress.tabId, { status: 'done' });
-      }
-      if (progress.tabId === activeTabId) {
-        setTranslationProgress({ translated: progress.translated, total: progress.total });
-      }
-    });
+    const unsub = window.horizonAPI.on(
+      "translate:progress",
+      (progress: {
+        tabId: string;
+        translated: number;
+        total: number;
+        done: boolean;
+      }) => {
+        if (progress.done) {
+          setTranslationStateForTab(progress.tabId, { status: "done" });
+        }
+        if (progress.tabId === activeTabId) {
+          setTranslationProgress({
+            translated: progress.translated,
+            total: progress.total,
+          });
+        }
+      },
+    );
     return unsub;
-  }, [showTranslationBar, activeTabId, setTranslationProgress, setTranslationStateForTab]);
+  }, [
+    showTranslationBar,
+    activeTabId,
+    setTranslationProgress,
+    setTranslationStateForTab,
+  ]);
 
   // When the active tab changes, sync the visible progress bar to the
   // new tab (the per-tab status itself is already in the store).
@@ -83,29 +103,48 @@ export const TranslationBar: React.FC = () => {
     setTranslationProgress(null);
   }, [activeTabId, setTranslationProgress]);
 
-  const handleLanguageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLang = e.target.value;
-    setTargetLang(newLang);
-    window.horizonAPI.invoke('settings:set', { key: 'translateTargetLang', value: newLang }).catch(() => {});
-  }, []);
+  const handleLanguageChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const newLang = e.target.value;
+      setTargetLang(newLang);
+      window.horizonAPI
+        .invoke("settings:set", { key: "translateTargetLang", value: newLang })
+        .catch(() => {});
+    },
+    [],
+  );
 
   const handleTranslate = useCallback(async () => {
     if (!activeTabId) return;
     const seq = bumpSeq(activeTabId);
     const tabId = activeTabId;
-    setTranslationStateForTab(tabId, { status: 'translating' });
+    setTranslationStateForTab(tabId, { status: "translating" });
     setTranslationProgress({ translated: 0, total: 100 });
     try {
-      const res = (await window.horizonAPI.invoke('translate:page', { targetLang })) as { ok: boolean; error?: string };
+      const res = (await window.horizonAPI.invoke("translate:page", {
+        targetLang,
+      })) as { ok: boolean; error?: string };
       if (seq !== requestSeq.current[tabId]) return;
       if (res && !res.ok) {
-        setTranslationStateForTab(tabId, { status: 'error', errorMsg: res.error || 'Translation failed' });
+        setTranslationStateForTab(tabId, {
+          status: "error",
+          errorMsg: res.error || "Translation failed",
+        });
       }
     } catch (err) {
       if (seq !== requestSeq.current[tabId]) return;
-      setTranslationStateForTab(tabId, { status: 'error', errorMsg: (err as Error).message || 'Translation failed' });
+      setTranslationStateForTab(tabId, {
+        status: "error",
+        errorMsg: (err as Error).message || "Translation failed",
+      });
     }
-  }, [targetLang, activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
+  }, [
+    targetLang,
+    activeTabId,
+    bumpSeq,
+    setTranslationProgress,
+    setTranslationStateForTab,
+  ]);
 
   const handleRestore = useCallback(async () => {
     if (!activeTabId) return;
@@ -113,9 +152,12 @@ export const TranslationBar: React.FC = () => {
     setTranslationStateForTab(activeTabId, null);
     setTranslationProgress(null);
     try {
-      await window.horizonAPI.invoke('translate:restore');
+      await window.horizonAPI.invoke("translate:restore");
     } catch (err) {
-      setTranslationStateForTab(activeTabId, { status: 'error', errorMsg: (err as Error).message || 'Restore failed' });
+      setTranslationStateForTab(activeTabId, {
+        status: "error",
+        errorMsg: (err as Error).message || "Restore failed",
+      });
     }
   }, [activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
@@ -125,15 +167,18 @@ export const TranslationBar: React.FC = () => {
     setTranslationStateForTab(activeTabId, null);
     setTranslationProgress(null);
     try {
-      await window.horizonAPI.invoke('translate:cancel');
+      await window.horizonAPI.invoke("translate:cancel");
     } catch (err) {
-      setTranslationStateForTab(activeTabId, { status: 'error', errorMsg: (err as Error).message || 'Cancellation failed' });
+      setTranslationStateForTab(activeTabId, {
+        status: "error",
+        errorMsg: (err as Error).message || "Cancellation failed",
+      });
     }
   }, [activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
   const close = useCallback(() => {
     if (activeTabId) bumpSeq(activeTabId);
-    toggleOverlay('showTranslationBar');
+    toggleOverlay("showTranslationBar");
     setTranslationProgress(null);
     // Leave translationStatesByTab intact — a hidden bar doesn't
     // forget; reopening on a translated tab still shows "Show Original".
@@ -150,8 +195,9 @@ export const TranslationBar: React.FC = () => {
       setTranslationStateForTab(activeTabId, null);
       setTranslationProgress(null);
     };
-    window.addEventListener('horizon:translate-restore', onMenuRestore);
-    return () => window.removeEventListener('horizon:translate-restore', onMenuRestore);
+    window.addEventListener("horizon:translate-restore", onMenuRestore);
+    return () =>
+      window.removeEventListener("horizon:translate-restore", onMenuRestore);
   }, [activeTabId, bumpSeq, setTranslationProgress, setTranslationStateForTab]);
 
   // Window-level Escape listener — the onKeyDown on the bar's container
@@ -159,17 +205,20 @@ export const TranslationBar: React.FC = () => {
   useEffect(() => {
     if (!showTranslationBar) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === "Escape") close();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [showTranslationBar, close]);
 
   if (!showTranslationBar) return null;
 
-  const pct = translationProgress && translationProgress.total > 0
-    ? Math.round((translationProgress.translated / translationProgress.total) * 100)
-    : 0;
+  const pct =
+    translationProgress && translationProgress.total > 0
+      ? Math.round(
+          (translationProgress.translated / translationProgress.total) * 100,
+        )
+      : 0;
 
   return (
     <div
@@ -177,13 +226,13 @@ export const TranslationBar: React.FC = () => {
       role="dialog"
       aria-label="Translation"
       style={{
-        background: 'var(--surface-overlay)',
-        backdropFilter: 'saturate(180%) blur(20px)',
-        WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        boxShadow: 'var(--shadow-lg)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--chrome-border)',
-        outline: 'none',
+        background: "var(--surface-overlay)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+        boxShadow: "var(--shadow-lg)",
+        borderRadius: "var(--radius-lg)",
+        border: "1px solid var(--chrome-border)",
+        outline: "none",
       }}
     >
       <div className="flex items-center gap-2">
@@ -201,28 +250,31 @@ export const TranslationBar: React.FC = () => {
           <path d="M5 8h10M4 14h6M9 5v3M12 14c0 3-2 5-5 5M5 19c3 0 5-2 5-5" />
           <path d="M14 20l4-9 4 9M15.5 17h5" />
         </svg>
-        <span className="text-xs font-semibold" style={{ color: 'var(--chrome-fg)' }}>
+        <span
+          className="text-xs font-semibold"
+          style={{ color: "var(--chrome-fg)" }}
+        >
           Translate
         </span>
       </div>
 
-      {status === 'translating' && translationProgress ? (
+      {status === "translating" && translationProgress ? (
         <div className="flex items-center gap-2">
           <div
             className="w-24 h-1.5 rounded-full overflow-hidden"
-            style={{ background: 'var(--chrome-bg-hover)' }}
+            style={{ background: "var(--chrome-bg-hover)" }}
           >
             <div
               className="h-full transition-all duration-300"
               style={{
                 width: `${pct}%`,
-                background: 'var(--accent-color, #1a73e8)',
+                background: "var(--accent-color, #1a73e8)",
               }}
             />
           </div>
           <span
             className="text-xs tabular-nums"
-            style={{ color: 'var(--chrome-fg-muted)' }}
+            style={{ color: "var(--chrome-fg-muted)" }}
           >
             {pct}%
           </span>
@@ -233,17 +285,21 @@ export const TranslationBar: React.FC = () => {
           onChange={handleLanguageChange}
           className="text-sm bg-transparent outline-none cursor-pointer"
           style={{
-            color: 'var(--chrome-fg)',
-            border: 'none',
+            color: "var(--chrome-fg)",
+            border: "none",
           }}
         >
           {POPULAR_LANGUAGES.map((lang) => (
-            <option key={lang} value={lang} style={{ color: '#000' }}>
+            <option key={lang} value={lang} style={{ color: "#000" }}>
               {lang}
             </option>
           ))}
           {!POPULAR_LANGUAGES.includes(targetLang) && (
-            <option key={targetLang} value={targetLang} style={{ color: '#000' }}>
+            <option
+              key={targetLang}
+              value={targetLang}
+              style={{ color: "#000" }}
+            >
               {targetLang}
             </option>
           )}
@@ -251,42 +307,42 @@ export const TranslationBar: React.FC = () => {
       )}
 
       <div className="flex items-center gap-1.5">
-        {status === 'idle' && (
+        {status === "idle" && (
           <button
             onClick={handleTranslate}
             className="text-xs px-2.5 py-1 rounded"
             style={{
-              background: 'var(--accent-color, #1a73e8)',
-              color: '#fff',
+              background: "var(--accent-color, #1a73e8)",
+              color: "#fff",
               fontWeight: 500,
             }}
           >
             Translate
           </button>
         )}
-        {status === 'translating' && (
+        {status === "translating" && (
           <button
             onClick={handleCancel}
             className="text-xs px-2.5 py-1 rounded"
             style={{
-              borderColor: '#fca5a5',
-              color: '#b91c1c',
-              background: '#fef2f2',
+              borderColor: "#fca5a5",
+              color: "#b91c1c",
+              background: "#fef2f2",
               fontWeight: 500,
-              border: '1px solid #fca5a5',
+              border: "1px solid #fca5a5",
             }}
           >
             Cancel
           </button>
         )}
-        {(status === 'done' || status === 'error') && (
+        {(status === "done" || status === "error") && (
           <button
             onClick={handleRestore}
             className="text-xs px-2.5 py-1 rounded border"
             style={{
-              borderColor: 'var(--chrome-border)',
-              color: 'var(--chrome-fg)',
-              background: 'var(--chrome-bg-hover)',
+              borderColor: "var(--chrome-border)",
+              color: "var(--chrome-fg)",
+              background: "var(--chrome-bg-hover)",
               fontWeight: 500,
             }}
           >
@@ -306,13 +362,13 @@ export const TranslationBar: React.FC = () => {
         </button>
       </div>
 
-      {status === 'error' && errorMsg && (
+      {status === "error" && errorMsg && (
         <div
           className="absolute -bottom-7 right-0 text-xs px-2 py-0.5 rounded shadow-sm whitespace-nowrap"
           style={{
-            background: '#fee2e2',
-            color: '#991b1b',
-            border: '1px solid #fca5a5',
+            background: "#fee2e2",
+            color: "#991b1b",
+            border: "1px solid #fca5a5",
           }}
         >
           {errorMsg}

@@ -1,6 +1,11 @@
-import { app, BrowserWindow, Menu, MenuItemConstructorOptions, shell } from 'electron';
-import type { TabManager } from './TabManager';
-
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  MenuItemConstructorOptions,
+  shell,
+} from "electron";
+import type { TabManager } from "./TabManager";
 
 interface Deps {
   /** Lookup the TabManager of the currently focused window. */
@@ -11,7 +16,7 @@ interface Deps {
   openNewWindow: (opts?: { incognito?: boolean }) => void;
 }
 
-const isMac = process.platform === 'darwin';
+const isMac = process.platform === "darwin";
 
 /**
  * Tell the chrome renderer of the focused window to run a UI command —
@@ -23,7 +28,7 @@ function sendMenuCommand(win: BrowserWindow | null, command: string): void {
   if (!win || win.isDestroyed()) return;
   const wc = win.webContents;
   if (!wc || wc.isDestroyed()) return;
-  wc.send('menu:command', { command });
+  wc.send("menu:command", { command });
 }
 
 /** Build and install the application menu. Call once on app ready. */
@@ -32,27 +37,29 @@ export function installAppMenu(deps: Deps): void {
   const winOf = (): BrowserWindow | null => deps.resolveWindow();
 
   const fileMenu: MenuItemConstructorOptions = {
-    label: 'File',
+    label: "File",
     submenu: [
       {
-        label: 'New Tab',
-        accelerator: 'CmdOrCtrl+T',
-        click: () => { tabOf()?.createTab(); },
+        label: "New Tab",
+        accelerator: "CmdOrCtrl+T",
+        click: () => {
+          tabOf()?.createTab();
+        },
       },
       {
-        label: 'New Window',
-        accelerator: 'CmdOrCtrl+N',
+        label: "New Window",
+        accelerator: "CmdOrCtrl+N",
         click: () => deps.openNewWindow(),
       },
       {
-        label: 'New Incognito Window',
-        accelerator: 'CmdOrCtrl+Shift+N',
+        label: "New Incognito Window",
+        accelerator: "CmdOrCtrl+Shift+N",
         click: () => deps.openNewWindow({ incognito: true }),
       },
-      { type: 'separator' },
+      { type: "separator" },
       {
-        label: 'Close Tab',
-        accelerator: 'CmdOrCtrl+W',
+        label: "Close Tab",
+        accelerator: "CmdOrCtrl+W",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
@@ -60,38 +67,38 @@ export function installAppMenu(deps: Deps): void {
         },
       },
       {
-        label: 'Close Window',
-        accelerator: 'CmdOrCtrl+Shift+W',
-        role: 'close',
+        label: "Close Window",
+        accelerator: "CmdOrCtrl+Shift+W",
+        role: "close",
       },
     ],
   };
 
   const editMenu: MenuItemConstructorOptions = {
-    label: 'Edit',
+    label: "Edit",
     submenu: [
-      { role: 'undo' },
-      { role: 'redo' },
-      { type: 'separator' },
-      { role: 'cut' },
-      { role: 'copy' },
-      { role: 'paste' },
-      { role: 'selectAll' },
-      { type: 'separator' },
+      { role: "undo" },
+      { role: "redo" },
+      { type: "separator" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "selectAll" },
+      { type: "separator" },
       {
-        label: 'Find in Page',
-        accelerator: 'CmdOrCtrl+F',
-        click: () => sendMenuCommand(winOf(), 'find:open'),
+        label: "Find in Page",
+        accelerator: "CmdOrCtrl+F",
+        click: () => sendMenuCommand(winOf(), "find:open"),
       },
     ],
   };
 
   const viewMenu: MenuItemConstructorOptions = {
-    label: 'View',
+    label: "View",
     submenu: [
       {
-        label: 'Reload',
-        accelerator: 'CmdOrCtrl+R',
+        label: "Reload",
+        accelerator: "CmdOrCtrl+R",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
@@ -99,18 +106,18 @@ export function installAppMenu(deps: Deps): void {
         },
       },
       {
-        label: 'Force Reload',
-        accelerator: 'CmdOrCtrl+Shift+R',
+        label: "Force Reload",
+        accelerator: "CmdOrCtrl+Shift+R",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
           if (tm && id) tm.reload(id, true);
         },
       },
-      { type: 'separator' },
+      { type: "separator" },
       {
-        label: 'Actual Size',
-        accelerator: 'CmdOrCtrl+0',
+        label: "Actual Size",
+        accelerator: "CmdOrCtrl+0",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
@@ -118,30 +125,30 @@ export function installAppMenu(deps: Deps): void {
         },
       },
       {
-        label: 'Zoom In',
-        accelerator: 'CmdOrCtrl+=',
+        label: "Zoom In",
+        accelerator: "CmdOrCtrl+=",
         click: () => bumpZoom(tabOf(), +0.1),
       },
       {
-        label: 'Zoom Out',
-        accelerator: 'CmdOrCtrl+-',
+        label: "Zoom Out",
+        accelerator: "CmdOrCtrl+-",
         click: () => bumpZoom(tabOf(), -0.1),
       },
-      { type: 'separator' },
+      { type: "separator" },
       {
-        label: 'Translate Page',
-        accelerator: 'CmdOrCtrl+Alt+T',
-        click: () => sendMenuCommand(winOf(), 'translate:open'),
+        label: "Translate Page",
+        accelerator: "CmdOrCtrl+Alt+T",
+        click: () => sendMenuCommand(winOf(), "translate:open"),
       },
       {
-        label: 'Restore Original Page',
-        click: () => sendMenuCommand(winOf(), 'translate:restore'),
+        label: "Restore Original Page",
+        click: () => sendMenuCommand(winOf(), "translate:restore"),
       },
-      { type: 'separator' },
-      { role: 'togglefullscreen' },
+      { type: "separator" },
+      { role: "togglefullscreen" },
       {
-        label: 'Toggle Developer Tools',
-        accelerator: isMac ? 'Cmd+Alt+I' : 'Ctrl+Shift+I',
+        label: "Toggle Developer Tools",
+        accelerator: isMac ? "Cmd+Alt+I" : "Ctrl+Shift+I",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
@@ -152,11 +159,11 @@ export function installAppMenu(deps: Deps): void {
   };
 
   const historyMenu: MenuItemConstructorOptions = {
-    label: 'History',
+    label: "History",
     submenu: [
       {
-        label: 'Back',
-        accelerator: 'CmdOrCtrl+[',
+        label: "Back",
+        accelerator: "CmdOrCtrl+[",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
@@ -164,51 +171,53 @@ export function installAppMenu(deps: Deps): void {
         },
       },
       {
-        label: 'Forward',
-        accelerator: 'CmdOrCtrl+]',
+        label: "Forward",
+        accelerator: "CmdOrCtrl+]",
         click: () => {
           const tm = tabOf();
           const id = tm?.getActiveTabId();
           if (tm && id) tm.goForward(id);
         },
       },
-      { type: 'separator' },
+      { type: "separator" },
       {
-        label: 'Show All History',
-        accelerator: 'CmdOrCtrl+Y',
-        click: () => sendMenuCommand(winOf(), 'panel:history'),
+        label: "Show All History",
+        accelerator: "CmdOrCtrl+Y",
+        click: () => sendMenuCommand(winOf(), "panel:history"),
       },
     ],
   };
 
   const bookmarksMenu: MenuItemConstructorOptions = {
-    label: 'Bookmarks',
+    label: "Bookmarks",
     submenu: [
       {
-        label: 'Bookmark This Page',
-        accelerator: 'CmdOrCtrl+D',
-        click: () => sendMenuCommand(winOf(), 'bookmark:add'),
+        label: "Bookmark This Page",
+        accelerator: "CmdOrCtrl+D",
+        click: () => sendMenuCommand(winOf(), "bookmark:add"),
       },
       {
-        label: 'Show All Bookmarks',
-        accelerator: 'CmdOrCtrl+Shift+B',
-        click: () => sendMenuCommand(winOf(), 'panel:bookmarks'),
+        label: "Show All Bookmarks",
+        accelerator: "CmdOrCtrl+Shift+B",
+        click: () => sendMenuCommand(winOf(), "panel:bookmarks"),
       },
     ],
   };
 
   const windowMenu: MenuItemConstructorOptions = {
-    label: 'Window',
-    role: 'windowMenu',
+    label: "Window",
+    role: "windowMenu",
   };
 
   const helpMenu: MenuItemConstructorOptions = {
-    label: 'Help',
-    role: 'help',
+    label: "Help",
+    role: "help",
     submenu: [
       {
-        label: 'Horizon on GitHub',
-        click: () => { void shell.openExternal('https://github.com/'); },
+        label: "Horizon on GitHub",
+        click: () => {
+          void shell.openExternal("https://github.com/");
+        },
       },
     ],
   };
@@ -220,26 +229,34 @@ export function installAppMenu(deps: Deps): void {
     template.push({
       label: app.name,
       submenu: [
-        { role: 'about' },
-        { type: 'separator' },
+        { role: "about" },
+        { type: "separator" },
         {
-          label: 'Settings…',
-          accelerator: 'CmdOrCtrl+,',
-          click: () => sendMenuCommand(winOf(), 'panel:settings'),
+          label: "Settings…",
+          accelerator: "CmdOrCtrl+,",
+          click: () => sendMenuCommand(winOf(), "panel:settings"),
         },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
       ],
     });
   }
 
-  template.push(fileMenu, editMenu, viewMenu, historyMenu, bookmarksMenu, windowMenu, helpMenu);
+  template.push(
+    fileMenu,
+    editMenu,
+    viewMenu,
+    historyMenu,
+    bookmarksMenu,
+    windowMenu,
+    helpMenu,
+  );
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

@@ -1,6 +1,6 @@
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
-import type { HistoryEntry, HistoryClearRange } from '../../src/types/browser';
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
+import type { HistoryEntry, HistoryClearRange } from "../../src/types/browser";
 
 const MAX_ENTRIES = 5000;
 
@@ -20,7 +20,7 @@ export class HistoryManager {
 
   private load(): HistoryEntry[] {
     try {
-      return JSON.parse(fs.readFileSync(this.historyPath, 'utf-8'));
+      return JSON.parse(fs.readFileSync(this.historyPath, "utf-8"));
     } catch {
       return [];
     }
@@ -55,13 +55,18 @@ export class HistoryManager {
   search(query: string, limit = 50): HistoryEntry[] {
     const q = query.toLowerCase();
     return this.entries
-      .filter((e) => e.url.toLowerCase().includes(q) || e.title.toLowerCase().includes(q))
+      .filter(
+        (e) =>
+          e.url.toLowerCase().includes(q) || e.title.toLowerCase().includes(q),
+      )
       .sort((a, b) => b.visitTime - a.visitTime)
       .slice(0, limit);
   }
 
   getRecent(limit = 50): HistoryEntry[] {
-    return [...this.entries].sort((a, b) => b.visitTime - a.visitTime).slice(0, limit);
+    return [...this.entries]
+      .sort((a, b) => b.visitTime - a.visitTime)
+      .slice(0, limit);
   }
 
   clear(range?: HistoryClearRange): number {

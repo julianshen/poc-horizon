@@ -107,24 +107,24 @@ The `aiAdvertiseAgent` setting (default on) is a kill-switch for users who don't
 
 ### § 8 Conformance checklist for agents
 
-| Requirement | Status |
-|---|---|
-| MUST resolve effective policy per § 3 ordering | partial (site-wide done; per-page + per-element pending) |
-| MUST honor `prohibited` triggers without retry | partial (the triggers we map are honored; agent doesn't infinitely retry by construction) |
-| MUST gate `requires_human` triggers via user confirmation | ✅ |
-| MUST prefer structured actions when `data-agent-action` is present | ⏳ (depends on `data-agent-*` + structured-action invocation) |
-| MUST send `X-Horizon-Agent: true` when configured to advertise presence | ✅ |
-| MUST report effective policy provenance to the user on request | ⏳ (level is surfaced to the agent; no UI chip yet for the user) |
+| Requirement                                                             | Status                                                                                    |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| MUST resolve effective policy per § 3 ordering                          | partial (site-wide done; per-page + per-element pending)                                  |
+| MUST honor `prohibited` triggers without retry                          | partial (the triggers we map are honored; agent doesn't infinitely retry by construction) |
+| MUST gate `requires_human` triggers via user confirmation               | ✅                                                                                        |
+| MUST prefer structured actions when `data-agent-action` is present      | ⏳ (depends on `data-agent-*` + structured-action invocation)                             |
+| MUST send `X-Horizon-Agent: true` when configured to advertise presence | ✅                                                                                        |
+| MUST report effective policy provenance to the user on request          | ⏳ (level is surfaced to the agent; no UI chip yet for the user)                          |
 
 ## llms.txt extensions v1 — status
 
-| Section | Status | Notes |
-|---|---|---|
-| Standard `llms.txt` parsing | ✅ | `LlmsTxtResolver` + `llmsTxtParser` since pre-spec |
-| `## Tools` | ⏳ | Same blocker as Agent Policy § 4.4 — needs structured-action invocation |
-| `## Authentication` | ⏳ | Auth resolution is the long pole |
-| `## Examples` | ⏳ | Cheap to parse + surface; low priority |
-| Sideloaded skills (`~/.horizon/skills/*.md`) | ⏳ | Path TBD; the existing `domain-skills/` system covers the per-host case |
+| Section                                      | Status | Notes                                                                   |
+| -------------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| Standard `llms.txt` parsing                  | ✅     | `LlmsTxtResolver` + `llmsTxtParser` since pre-spec                      |
+| `## Tools`                                   | ⏳     | Same blocker as Agent Policy § 4.4 — needs structured-action invocation |
+| `## Authentication`                          | ⏳     | Auth resolution is the long pole                                        |
+| `## Examples`                                | ⏳     | Cheap to parse + surface; low priority                                  |
+| Sideloaded skills (`~/.horizon/skills/*.md`) | ⏳     | Path TBD; the existing `domain-skills/` system covers the per-host case |
 
 ## Known limitations
 
@@ -145,12 +145,12 @@ The `aiAdvertiseAgent` setting (default on) is a kill-switch for users who don't
 
 ## Files
 
-| Module | Purpose |
-|---|---|
-| `.electron/services/agentPolicy.ts` | Types, parser, conformance-level computation, trigger constants |
-| `.electron/services/AgentPolicyResolver.ts` | `/agent.json` fetcher with ETag + TTL cache |
-| `.electron/services/AiActionGuard.ts` | Three-state decision (`allow`/`prompt`/`deny`) consulting both user policy and site policy |
-| `.electron/services/HorizonBridgeServer.ts` | `getAgentPolicy` route; navigate auto-hint includes `agentPolicy.{level,site,summary}` |
-| `.electron/main.ts` | `installAgentIdentificationHeader()` adds `X-Horizon-Agent: true` |
-| `resources/pi-extension/horizon-bridge.ts` | `browser_get_agent_policy` Pi tool registration |
-| `resources/pi-extension/skills/SKILL.md` | Teaches the agent to consult policy before deep workflows |
+| Module                                      | Purpose                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `.electron/services/agentPolicy.ts`         | Types, parser, conformance-level computation, trigger constants                            |
+| `.electron/services/AgentPolicyResolver.ts` | `/agent.json` fetcher with ETag + TTL cache                                                |
+| `.electron/services/AiActionGuard.ts`       | Three-state decision (`allow`/`prompt`/`deny`) consulting both user policy and site policy |
+| `.electron/services/HorizonBridgeServer.ts` | `getAgentPolicy` route; navigate auto-hint includes `agentPolicy.{level,site,summary}`     |
+| `.electron/main.ts`                         | `installAgentIdentificationHeader()` adds `X-Horizon-Agent: true`                          |
+| `resources/pi-extension/horizon-bridge.ts`  | `browser_get_agent_policy` Pi tool registration                                            |
+| `resources/pi-extension/skills/SKILL.md`    | Teaches the agent to consult policy before deep workflows                                  |

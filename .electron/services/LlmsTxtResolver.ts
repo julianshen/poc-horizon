@@ -1,4 +1,4 @@
-import { net } from 'electron';
+import { net } from "electron";
 
 /**
  * llms.txt / llms-full.txt resolver.
@@ -15,10 +15,16 @@ import { net } from 'electron';
  *   yet — would need an integrity/freshness model first.
  */
 export class LlmsTxtResolver {
-  private cache = new Map<string, string | null>();   // origin → contents | null (404)
-  private both = new Map<string, { llmsTxt: string | null; llmsFullTxt: string | null }>();
+  private cache = new Map<string, string | null>(); // origin → contents | null (404)
+  private both = new Map<
+    string,
+    { llmsTxt: string | null; llmsFullTxt: string | null }
+  >();
   private inflight = new Map<string, Promise<string | null>>();
-  private inflightBoth = new Map<string, Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }>>();
+  private inflightBoth = new Map<
+    string,
+    Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }>
+  >();
 
   /** Get the best available llms*.txt for an origin (full preferred). Null if neither. */
   async fetch(origin: string): Promise<string | null> {
@@ -37,7 +43,9 @@ export class LlmsTxtResolver {
   }
 
   /** Get both files for an origin. Either or both may be null. Cached per-origin. */
-  async fetchBoth(origin: string): Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }> {
+  async fetchBoth(
+    origin: string,
+  ): Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }> {
     if (this.both.has(origin)) return this.both.get(origin)!;
     const existing = this.inflightBoth.get(origin);
     if (existing) return existing;
@@ -56,7 +64,7 @@ export class LlmsTxtResolver {
   }
 
   private async doFetch(origin: string): Promise<string | null> {
-    for (const path of ['/llms-full.txt', '/llms.txt']) {
+    for (const path of ["/llms-full.txt", "/llms.txt"]) {
       const text = await this.tryGet(`${origin}${path}`);
       if (text !== null) return text;
     }
@@ -65,21 +73,35 @@ export class LlmsTxtResolver {
 
   private tryGet(url: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const req = net.request({ method: 'GET', url, redirect: 'follow' });
-      let body = '';
+      const req = net.request({ method: "GET", url, redirect: "follow" });
+      let body = "";
       // 3-second hard cap — agent shouldn't block on a slow llms.txt fetch.
-      const timer = setTimeout(() => { req.abort(); resolve(null); }, 3000);
-      req.on('response', (res) => {
+      const timer = setTimeout(() => {
+        req.abort();
+        resolve(null);
+      }, 3000);
+      req.on("response", (res) => {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           clearTimeout(timer);
           resolve(null);
           return;
         }
-        res.on('data', (chunk) => { body += chunk.toString('utf8'); });
-        res.on('end', () => { clearTimeout(timer); resolve(body || null); });
-        res.on('error', () => { clearTimeout(timer); resolve(null); });
+        res.on("data", (chunk) => {
+          body += chunk.toString("utf8");
+        });
+        res.on("end", () => {
+          clearTimeout(timer);
+          resolve(body || null);
+        });
+        res.on("error", () => {
+          clearTimeout(timer);
+          resolve(null);
+        });
       });
-      req.on('error', () => { clearTimeout(timer); resolve(null); });
+      req.on("error", () => {
+        clearTimeout(timer);
+        resolve(null);
+      });
       req.end();
     });
   }

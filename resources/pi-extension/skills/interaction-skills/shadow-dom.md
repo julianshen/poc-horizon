@@ -29,4 +29,4 @@ Then walk the returned tree — closed roots are still in the CDP representation
 
 ## Detecting shadow boundaries
 
-`browser_describe_at({ x, y })` returns the *light DOM* element. If the visible thing is inside a shadow root, the descriptor will be the host element (e.g., `<my-button>`). That's a signal to use CDP traversal if you need details about what's inside.
+`browser_describe_at({ x, y })` returns the _light DOM_ element. If the visible thing is inside a shadow root, the descriptor will be the host element (e.g., `<my-button>`). That's a signal to use CDP traversal if you need details about what's inside.

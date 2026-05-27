@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from "fs";
 
 export interface PersistedTab {
   url: string;
@@ -39,36 +39,53 @@ export class TabSessionStore {
 
   constructor(
     private readonly sessionPath: string,
-    private readonly schedule: (cb: () => void, ms: number) => NodeJS.Timeout = setTimeout,
+    private readonly schedule: (
+      cb: () => void,
+      ms: number,
+    ) => NodeJS.Timeout = setTimeout,
     private readonly cancel: (t: NodeJS.Timeout) => void = clearTimeout,
-    private readonly log: Logger = console
+    private readonly log: Logger = console,
   ) {}
 
   load(): PersistedTab[] {
     let raw: string;
     try {
-      raw = fs.readFileSync(this.sessionPath, 'utf-8');
+      raw = fs.readFileSync(this.sessionPath, "utf-8");
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT') return []; // First launch — expected, silent.
-      this.log.warn(`[TabSessionStore] failed to read ${this.sessionPath}:`, err);
+      if (code === "ENOENT") return []; // First launch — expected, silent.
+      this.log.warn(
+        `[TabSessionStore] failed to read ${this.sessionPath}:`,
+        err,
+      );
       return [];
     }
     try {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) {
-        this.log.warn(`[TabSessionStore] session file is not an array; ignoring`);
+        this.log.warn(
+          `[TabSessionStore] session file is not an array; ignoring`,
+        );
         return [];
       }
       return parsed.filter(isRestorable);
     } catch (err) {
       // Don't lose the user's session — quarantine the bad file so they can
       // recover and we start clean.
-      this.log.error(`[TabSessionStore] session file is corrupt; quarantining`, err);
+      this.log.error(
+        `[TabSessionStore] session file is corrupt; quarantining`,
+        err,
+      );
       try {
-        fs.renameSync(this.sessionPath, `${this.sessionPath}.corrupt-${Date.now()}`);
+        fs.renameSync(
+          this.sessionPath,
+          `${this.sessionPath}.corrupt-${Date.now()}`,
+        );
       } catch (renameErr) {
-        this.log.error(`[TabSessionStore] could not quarantine corrupt session:`, renameErr);
+        this.log.error(
+          `[TabSessionStore] could not quarantine corrupt session:`,
+          renameErr,
+        );
       }
       return [];
     }
@@ -89,7 +106,10 @@ export class TabSessionStore {
     try {
       fs.writeFileSync(this.sessionPath, JSON.stringify(restorable, null, 2));
     } catch (err) {
-      this.log.error(`[TabSessionStore] failed to write ${this.sessionPath}:`, err);
+      this.log.error(
+        `[TabSessionStore] failed to write ${this.sessionPath}:`,
+        err,
+      );
     }
   }
 
@@ -100,7 +120,7 @@ export class TabSessionStore {
       this.timer = null;
     }
     try {
-      fs.writeFileSync(this.sessionPath, '[]');
+      fs.writeFileSync(this.sessionPath, "[]");
     } catch (err) {
       this.log.error(`[TabSessionStore] failed to clear session:`, err);
     }
@@ -124,7 +144,7 @@ export class TabSessionStore {
 }
 
 function isRestorable(t: PersistedTab): boolean {
-  if (!t || typeof t.url !== 'string') return false;
+  if (!t || typeof t.url !== "string") return false;
   if (SKIP_PATTERNS.some((p) => p.test(t.url))) return false;
   return RESTORABLE.test(t.url);
 }

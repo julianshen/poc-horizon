@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useBrowserStore } from '../stores/browserStore';
+import { useEffect } from "react";
+import { useBrowserStore } from "../stores/browserStore";
 
 interface IncomingSelection {
   selection: string;
@@ -15,12 +15,15 @@ interface IncomingSelection {
  */
 export function useAskFromSelection(): void {
   useEffect(() => {
-    const unsub = window.horizonAPI.on('ai:askFromSelection', (payload: unknown) => {
-      const s = payload as IncomingSelection;
-      const store = useBrowserStore.getState();
-      store.pushSelection(s);
-      if (!store.showAI) store.toggleAI();
-    });
+    const unsub = window.horizonAPI.on(
+      "ai:askFromSelection",
+      (payload: unknown) => {
+        const s = payload as IncomingSelection;
+        const store = useBrowserStore.getState();
+        store.pushSelection(s);
+        if (!store.showAI) store.toggleAI();
+      },
+    );
     return unsub;
   }, []);
 }

@@ -14,19 +14,19 @@
 
 ## File Structure
 
-| File | Action | Responsibility |
-|------|--------|----------------|
-| `src/utils/theme.ts` | Create | Hex → rgba, contrast text, lighten color, accent style builder, theme resolver |
-| `src/hooks/useTheme.ts` | Create | Read settings, apply `data-theme`, inject accent override, handle system sync |
-| `src/App.tsx` | Edit | Call `useTheme()` |
-| `src/index.css` | Edit | Rename `[data-theme="dark"]` → `[data-theme="midnight"]`, add Ocean + Forest presets, remove `@media (prefers-color-scheme: dark)` |
-| `src/types/browser.ts` | Edit | Update `Settings.theme` union type |
-| `shared/constants.ts` | Edit | Bump `schemaVersion` to `2`, update `theme` default |
-| `.electron/services/SettingsManager.ts` | Edit | Add legacy theme migration + validation |
-| `src/components/overlays/SettingsPanel.tsx` | Edit | Update theme dropdown options, add accent color picker |
-| `tests/unit/utils/theme.test.ts` | Create | Unit tests for theme utilities |
-| `tests/unit/hooks/useTheme.test.ts` | Create | Unit tests for `useTheme` hook |
-| `tests/unit/settings-manager.test.ts` | Edit | Add migration tests |
+| File                                        | Action | Responsibility                                                                                                                     |
+| ------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/utils/theme.ts`                        | Create | Hex → rgba, contrast text, lighten color, accent style builder, theme resolver                                                     |
+| `src/hooks/useTheme.ts`                     | Create | Read settings, apply `data-theme`, inject accent override, handle system sync                                                      |
+| `src/App.tsx`                               | Edit   | Call `useTheme()`                                                                                                                  |
+| `src/index.css`                             | Edit   | Rename `[data-theme="dark"]` → `[data-theme="midnight"]`, add Ocean + Forest presets, remove `@media (prefers-color-scheme: dark)` |
+| `src/types/browser.ts`                      | Edit   | Update `Settings.theme` union type                                                                                                 |
+| `shared/constants.ts`                       | Edit   | Bump `schemaVersion` to `2`, update `theme` default                                                                                |
+| `.electron/services/SettingsManager.ts`     | Edit   | Add legacy theme migration + validation                                                                                            |
+| `src/components/overlays/SettingsPanel.tsx` | Edit   | Update theme dropdown options, add accent color picker                                                                             |
+| `tests/unit/utils/theme.test.ts`            | Create | Unit tests for theme utilities                                                                                                     |
+| `tests/unit/hooks/useTheme.test.ts`         | Create | Unit tests for `useTheme` hook                                                                                                     |
+| `tests/unit/settings-manager.test.ts`       | Edit   | Add migration tests                                                                                                                |
 
 ---
 
@@ -35,33 +35,34 @@
 ### Task 1: `hexToRgba`
 
 **Files:**
+
 - Create: `src/utils/theme.ts`
 - Test: `tests/unit/utils/theme.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { hexToRgba } from '@/utils/theme';
+import { describe, it, expect } from "vitest";
+import { hexToRgba } from "@/utils/theme";
 
-describe('hexToRgba', () => {
-  it('converts a 6-digit hex to rgba', () => {
-    expect(hexToRgba('#d44d7a', 0.1)).toBe('rgba(212, 77, 122, 0.1)');
+describe("hexToRgba", () => {
+  it("converts a 6-digit hex to rgba", () => {
+    expect(hexToRgba("#d44d7a", 0.1)).toBe("rgba(212, 77, 122, 0.1)");
   });
 
-  it('converts a 3-digit hex to rgba', () => {
-    expect(hexToRgba('#abc', 0.5)).toBe('rgba(170, 187, 204, 0.5)');
+  it("converts a 3-digit hex to rgba", () => {
+    expect(hexToRgba("#abc", 0.5)).toBe("rgba(170, 187, 204, 0.5)");
   });
 
-  it('returns empty string for invalid hex', () => {
-    expect(hexToRgba('invalid', 0.1)).toBe('');
-    expect(hexToRgba('', 0.1)).toBe('');
-    expect(hexToRgba('#zzzzzz', 0.1)).toBe('');
+  it("returns empty string for invalid hex", () => {
+    expect(hexToRgba("invalid", 0.1)).toBe("");
+    expect(hexToRgba("", 0.1)).toBe("");
+    expect(hexToRgba("#zzzzzz", 0.1)).toBe("");
   });
 
-  it('handles edge values', () => {
-    expect(hexToRgba('#000000', 1)).toBe('rgba(0, 0, 0, 1)');
-    expect(hexToRgba('#ffffff', 0)).toBe('rgba(255, 255, 255, 0)');
+  it("handles edge values", () => {
+    expect(hexToRgba("#000000", 1)).toBe("rgba(0, 0, 0, 1)");
+    expect(hexToRgba("#ffffff", 0)).toBe("rgba(255, 255, 255, 0)");
   });
 });
 ```
@@ -90,11 +91,11 @@ export function hexToRgba(hex: string, alpha: number): string {
     g = parseInt(normalized[2] + normalized[2], 16);
     b = parseInt(normalized[3] + normalized[3], 16);
   } else {
-    return '';
+    return "";
   }
 
   if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
-    return '';
+    return "";
   }
 
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
@@ -119,6 +120,7 @@ git commit -m "feat(theme): add hexToRgba utility"
 ### Task 2: `getContrastTextColor`
 
 **Files:**
+
 - Modify: `src/utils/theme.ts`
 - Test: `tests/unit/utils/theme.test.ts`
 
@@ -127,25 +129,25 @@ git commit -m "feat(theme): add hexToRgba utility"
 Append to `tests/unit/utils/theme.test.ts`:
 
 ```typescript
-import { getContrastTextColor } from '@/utils/theme';
+import { getContrastTextColor } from "@/utils/theme";
 
-describe('getContrastTextColor', () => {
-  it('returns dark text for light backgrounds', () => {
-    expect(getContrastTextColor('#ffffff')).toBe('#1a1612');
-    expect(getContrastTextColor('#eeeeee')).toBe('#1a1612');
+describe("getContrastTextColor", () => {
+  it("returns dark text for light backgrounds", () => {
+    expect(getContrastTextColor("#ffffff")).toBe("#1a1612");
+    expect(getContrastTextColor("#eeeeee")).toBe("#1a1612");
   });
 
-  it('returns light text for dark backgrounds', () => {
-    expect(getContrastTextColor('#1a1612')).toBe('#ffffff');
-    expect(getContrastTextColor('#000000')).toBe('#ffffff');
+  it("returns light text for dark backgrounds", () => {
+    expect(getContrastTextColor("#1a1612")).toBe("#ffffff");
+    expect(getContrastTextColor("#000000")).toBe("#ffffff");
   });
 
-  it('returns dark text for medium-light colors', () => {
-    expect(getContrastTextColor('#d44d7a')).toBe('#1a1612');
+  it("returns dark text for medium-light colors", () => {
+    expect(getContrastTextColor("#d44d7a")).toBe("#1a1612");
   });
 
-  it('returns empty string for invalid hex', () => {
-    expect(getContrastTextColor('invalid')).toBe('');
+  it("returns empty string for invalid hex", () => {
+    expect(getContrastTextColor("invalid")).toBe("");
   });
 });
 ```
@@ -176,16 +178,16 @@ export function getContrastTextColor(hex: string): string {
     g = parseInt(normalized[2] + normalized[2], 16);
     b = parseInt(normalized[3] + normalized[3], 16);
   } else {
-    return '';
+    return "";
   }
 
   if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
-    return '';
+    return "";
   }
 
   // WCAG relative luminance formula
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#1a1612' : '#ffffff';
+  return luminance > 0.5 ? "#1a1612" : "#ffffff";
 }
 ```
 
@@ -207,6 +209,7 @@ git commit -m "feat(theme): add getContrastTextColor utility"
 ### Task 3: `lightenColor`
 
 **Files:**
+
 - Modify: `src/utils/theme.ts`
 - Test: `tests/unit/utils/theme.test.ts`
 
@@ -215,25 +218,25 @@ git commit -m "feat(theme): add getContrastTextColor utility"
 Append to `tests/unit/utils/theme.test.ts`:
 
 ```typescript
-import { lightenColor } from '@/utils/theme';
+import { lightenColor } from "@/utils/theme";
 
-describe('lightenColor', () => {
-  it('lightens a blue color', () => {
-    const result = lightenColor('#2a82c8', 15);
+describe("lightenColor", () => {
+  it("lightens a blue color", () => {
+    const result = lightenColor("#2a82c8", 15);
     expect(result).toMatch(/^#[0-9a-f]{6}$/);
     // Should be lighter than the input
-    const inputL = parseInt('#2a82c8'.slice(3, 5), 16);
+    const inputL = parseInt("#2a82c8".slice(3, 5), 16);
     const resultL = parseInt(result.slice(3, 5), 16);
     expect(resultL).toBeGreaterThan(inputL);
   });
 
-  it('clamps lightness at 100%', () => {
-    const result = lightenColor('#ffffff', 50);
-    expect(result).toBe('#ffffff');
+  it("clamps lightness at 100%", () => {
+    const result = lightenColor("#ffffff", 50);
+    expect(result).toBe("#ffffff");
   });
 
-  it('returns empty string for invalid hex', () => {
-    expect(lightenColor('invalid', 15)).toBe('');
+  it("returns empty string for invalid hex", () => {
+    expect(lightenColor("invalid", 15)).toBe("");
   });
 });
 ```
@@ -263,9 +266,15 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
     }
     h /= 6;
   }
@@ -315,18 +324,18 @@ export function lightenColor(hex: string, amount: number): string {
     g = parseInt(normalized[2] + normalized[2], 16);
     b = parseInt(normalized[3] + normalized[3], 16);
   } else {
-    return '';
+    return "";
   }
 
   if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
-    return '';
+    return "";
   }
 
   const [h, s, l] = rgbToHsl(r, g, b);
   const newL = Math.min(100, l + amount);
   const [nr, ng, nb] = hslToRgb(h, s, newL);
 
-  const toHex = (v: number) => v.toString(16).padStart(2, '0');
+  const toHex = (v: number) => v.toString(16).padStart(2, "0");
   return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
 }
 ```
@@ -349,6 +358,7 @@ git commit -m "feat(theme): add lightenColor utility"
 ### Task 4: `buildAccentStyle` and `resolveTheme`
 
 **Files:**
+
 - Modify: `src/utils/theme.ts`
 - Test: `tests/unit/utils/theme.test.ts`
 
@@ -357,44 +367,44 @@ git commit -m "feat(theme): add lightenColor utility"
 Append to `tests/unit/utils/theme.test.ts`:
 
 ```typescript
-import { buildAccentStyle, resolveTheme } from '@/utils/theme';
+import { buildAccentStyle, resolveTheme } from "@/utils/theme";
 
-describe('buildAccentStyle', () => {
-  it('returns empty string for empty accentColor', () => {
-    expect(buildAccentStyle('')).toBe('');
+describe("buildAccentStyle", () => {
+  it("returns empty string for empty accentColor", () => {
+    expect(buildAccentStyle("")).toBe("");
   });
 
-  it('returns empty string for invalid hex', () => {
-    expect(buildAccentStyle('invalid')).toBe('');
+  it("returns empty string for invalid hex", () => {
+    expect(buildAccentStyle("invalid")).toBe("");
   });
 
-  it('builds CSS with valid hex', () => {
-    const css = buildAccentStyle('#d44d7a');
-    expect(css).toContain('--accent-primary: #d44d7a');
-    expect(css).toContain('--accent-text: #ffffff');
-    expect(css).toContain('--omnibox-ring: rgba(212, 77, 122, 0.2)');
+  it("builds CSS with valid hex", () => {
+    const css = buildAccentStyle("#d44d7a");
+    expect(css).toContain("--accent-primary: #d44d7a");
+    expect(css).toContain("--accent-text: #ffffff");
+    expect(css).toContain("--omnibox-ring: rgba(212, 77, 122, 0.2)");
   });
 
-  it('includes gradient with lightened secondary stop', () => {
-    const css = buildAccentStyle('#2a82c8');
-    expect(css).toContain('linear-gradient(135deg, #2a82c8 0%,');
+  it("includes gradient with lightened secondary stop", () => {
+    const css = buildAccentStyle("#2a82c8");
+    expect(css).toContain("linear-gradient(135deg, #2a82c8 0%,");
   });
 });
 
-describe('resolveTheme', () => {
-  it('returns named presets directly', () => {
-    expect(resolveTheme('dia', false)).toBe('dia');
-    expect(resolveTheme('midnight', false)).toBe('midnight');
-    expect(resolveTheme('ocean', true)).toBe('ocean');
-    expect(resolveTheme('forest', false)).toBe('forest');
+describe("resolveTheme", () => {
+  it("returns named presets directly", () => {
+    expect(resolveTheme("dia", false)).toBe("dia");
+    expect(resolveTheme("midnight", false)).toBe("midnight");
+    expect(resolveTheme("ocean", true)).toBe("ocean");
+    expect(resolveTheme("forest", false)).toBe("forest");
   });
 
-  it('resolves system to dia on light OS', () => {
-    expect(resolveTheme('system', false)).toBe('dia');
+  it("resolves system to dia on light OS", () => {
+    expect(resolveTheme("system", false)).toBe("dia");
   });
 
-  it('resolves system to midnight on dark OS', () => {
-    expect(resolveTheme('system', true)).toBe('midnight');
+  it("resolves system to midnight on dark OS", () => {
+    expect(resolveTheme("system", true)).toBe("midnight");
   });
 });
 ```
@@ -411,22 +421,23 @@ Append to `src/utils/theme.ts`:
 
 ```typescript
 export function buildAccentStyle(accentColor: string): string {
-  if (!accentColor) return '';
+  if (!accentColor) return "";
 
   const normalized = accentColor.trim().toLowerCase();
   const valid = /^#([0-9a-f]{6}|[0-9a-f]{3})$/.test(normalized);
-  if (!valid) return '';
+  if (!valid) return "";
 
-  const sixDigit = normalized.length === 4
-    ? `#${normalized[1]}${normalized[1]}${normalized[2]}${normalized[2]}${normalized[3]}${normalized[3]}`
-    : normalized;
+  const sixDigit =
+    normalized.length === 4
+      ? `#${normalized[1]}${normalized[1]}${normalized[2]}${normalized[2]}${normalized[3]}${normalized[3]}`
+      : normalized;
 
   const textColor = getContrastTextColor(sixDigit);
   const soft = hexToRgba(sixDigit, 0.1);
   const ring = hexToRgba(sixDigit, 0.2);
   const lightened = lightenColor(sixDigit, 15);
 
-  if (!textColor || !soft || !lightened) return '';
+  if (!textColor || !soft || !lightened) return "";
 
   return `:root, [data-theme] {
   --accent-primary: ${sixDigit};
@@ -439,11 +450,11 @@ export function buildAccentStyle(accentColor: string): string {
 }
 
 export function resolveTheme(
-  theme: 'system' | 'dia' | 'midnight' | 'ocean' | 'forest',
-  isDarkOS: boolean
-): 'dia' | 'midnight' | 'ocean' | 'forest' {
-  if (theme === 'system') {
-    return isDarkOS ? 'midnight' : 'dia';
+  theme: "system" | "dia" | "midnight" | "ocean" | "forest",
+  isDarkOS: boolean,
+): "dia" | "midnight" | "ocean" | "forest" {
+  if (theme === "system") {
+    return isDarkOS ? "midnight" : "dia";
   }
   return theme;
 }
@@ -469,6 +480,7 @@ git commit -m "feat(theme): add buildAccentStyle and resolveTheme utilities"
 ### Task 5: Update CSS for named presets
 
 **Files:**
+
 - Modify: `src/index.css`
 
 - [ ] **Step 1: Rename `[data-theme="dark"]` to `[data-theme="midnight"]`**
@@ -499,13 +511,14 @@ After the `[data-theme="midnight"]` block, add:
   --surface-overlay: rgba(235, 241, 247, 0.92);
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-hover: rgba(0, 30, 60, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(10, 25, 40, 0.06), 0 0 0 0.5px rgba(10, 25, 40, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(10, 25, 40, 0.06), 0 0 0 0.5px rgba(10, 25, 40, 0.06);
   --omnibox-bg: #ffffff;
   --omnibox-bg-focus: #ffffff;
   --omnibox-ring: rgba(42, 130, 200, 0.18);
   --accent-primary: #2a82c8;
-  --accent-soft: rgba(42, 130, 200, 0.10);
-  --accent-light: rgba(42, 130, 200, 0.10);
+  --accent-soft: rgba(42, 130, 200, 0.1);
+  --accent-light: rgba(42, 130, 200, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #2a82c8 0%, #5eb8e8 100%);
   --ai-accent: #2a82c8;
@@ -527,13 +540,14 @@ After the `[data-theme="midnight"]` block, add:
   --surface-overlay: rgba(236, 240, 232, 0.92);
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-hover: rgba(20, 50, 15, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(15, 30, 12, 0.06), 0 0 0 0.5px rgba(15, 30, 12, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(15, 30, 12, 0.06), 0 0 0 0.5px rgba(15, 30, 12, 0.06);
   --omnibox-bg: #ffffff;
   --omnibox-bg-focus: #ffffff;
   --omnibox-ring: rgba(70, 150, 80, 0.18);
   --accent-primary: #469650;
-  --accent-soft: rgba(70, 150, 80, 0.10);
-  --accent-light: rgba(70, 150, 80, 0.10);
+  --accent-soft: rgba(70, 150, 80, 0.1);
+  --accent-light: rgba(70, 150, 80, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #469650 0%, #82c860 100%);
   --ai-accent: #469650;
@@ -559,6 +573,7 @@ git commit -m "feat(theme): add Ocean and Forest presets, remove prefers-color-s
 ### Task 6: Update Settings type and defaults
 
 **Files:**
+
 - Modify: `src/types/browser.ts`
 - Modify: `shared/constants.ts`
 - Test: `tests/unit/settings-manager.test.ts`
@@ -568,18 +583,19 @@ git commit -m "feat(theme): add Ocean and Forest presets, remove prefers-color-s
 In `src/types/browser.ts` line 86, change:
 
 ```typescript
-theme: 'light' | 'dark' | 'system';
+theme: "light" | "dark" | "system";
 ```
 
 to:
 
 ```typescript
-theme: 'system' | 'dia' | 'midnight' | 'ocean' | 'forest';
+theme: "system" | "dia" | "midnight" | "ocean" | "forest";
 ```
 
 - [ ] **Step 2: Bump schema version and update defaults**
 
 In `shared/constants.ts`:
+
 1. Change `schemaVersion: 1` to `schemaVersion: 2`
 2. Ensure `theme: 'system' as const` is present (it already is)
 3. Ensure `accentColor: ''` is present (it already is)
@@ -615,51 +631,51 @@ private load(): Settings {
 Append to `tests/unit/settings-manager.test.ts`:
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { writeFileSync } from 'fs';
-import { SettingsManager } from '@electron/services/SettingsManager';
-import { DEFAULT_SETTINGS } from '@shared/constants';
-import { useTmpDir } from '../helpers/tmpdir';
+import { describe, it, expect } from "vitest";
+import { writeFileSync } from "fs";
+import { SettingsManager } from "@electron/services/SettingsManager";
+import { DEFAULT_SETTINGS } from "@shared/constants";
+import { useTmpDir } from "../helpers/tmpdir";
 
-const tmp = useTmpDir('horizon-settings-migration');
-const settingsPath = () => tmp.path('settings.json');
+const tmp = useTmpDir("horizon-settings-migration");
+const settingsPath = () => tmp.path("settings.json");
 
-describe('SettingsManager theme migration', () => {
+describe("SettingsManager theme migration", () => {
   it("migrates legacy 'light' to 'dia'", () => {
     writeFileSync(
       settingsPath(),
-      JSON.stringify({ schemaVersion: 1, theme: 'light' })
+      JSON.stringify({ schemaVersion: 1, theme: "light" }),
     );
     const sm = new SettingsManager(settingsPath());
-    expect(sm.get('theme')).toBe('dia');
-    expect(sm.get('schemaVersion')).toBe(DEFAULT_SETTINGS.schemaVersion);
+    expect(sm.get("theme")).toBe("dia");
+    expect(sm.get("schemaVersion")).toBe(DEFAULT_SETTINGS.schemaVersion);
   });
 
   it("migrates legacy 'dark' to 'midnight'", () => {
     writeFileSync(
       settingsPath(),
-      JSON.stringify({ schemaVersion: 1, theme: 'dark' })
+      JSON.stringify({ schemaVersion: 1, theme: "dark" }),
     );
     const sm = new SettingsManager(settingsPath());
-    expect(sm.get('theme')).toBe('midnight');
+    expect(sm.get("theme")).toBe("midnight");
   });
 
   it("keeps 'system' unchanged", () => {
     writeFileSync(
       settingsPath(),
-      JSON.stringify({ schemaVersion: 1, theme: 'system' })
+      JSON.stringify({ schemaVersion: 1, theme: "system" }),
     );
     const sm = new SettingsManager(settingsPath());
-    expect(sm.get('theme')).toBe('system');
+    expect(sm.get("theme")).toBe("system");
   });
 
-  it('resets invalid theme values to default', () => {
+  it("resets invalid theme values to default", () => {
     writeFileSync(
       settingsPath(),
-      JSON.stringify({ schemaVersion: 1, theme: 'invalid-theme' })
+      JSON.stringify({ schemaVersion: 1, theme: "invalid-theme" }),
     );
     const sm = new SettingsManager(settingsPath());
-    expect(sm.get('theme')).toBe(DEFAULT_SETTINGS.theme);
+    expect(sm.get("theme")).toBe(DEFAULT_SETTINGS.theme);
   });
 });
 ```
@@ -684,6 +700,7 @@ git commit -m "feat(theme): update Settings type, bump schemaVersion, add theme 
 ### Task 7: Implement `useTheme` hook
 
 **Files:**
+
 - Create: `src/hooks/useTheme.ts`
 - Test: `tests/unit/hooks/useTheme.test.ts`
 
@@ -692,25 +709,25 @@ git commit -m "feat(theme): update Settings type, bump schemaVersion, add theme 
 Create `tests/unit/hooks/useTheme.test.ts`:
 
 ```typescript
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
-import { useTheme } from '@/hooks/useTheme';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { useTheme } from "@/hooks/useTheme";
 
-describe('useTheme', () => {
+describe("useTheme", () => {
   let originalDataset: string | undefined;
   let styleTag: HTMLStyleElement | null;
 
   beforeEach(() => {
     originalDataset = document.documentElement.dataset.theme;
     delete document.documentElement.dataset.theme;
-    styleTag = document.getElementById('accent-override') as HTMLStyleElement;
+    styleTag = document.getElementById("accent-override") as HTMLStyleElement;
     if (styleTag) styleTag.remove();
 
     // Mock horizonAPI
     (window as Record<string, unknown>).horizonAPI = {
       invoke: vi.fn((channel: string) => {
-        if (channel === 'settings:getAll') {
-          return Promise.resolve({ theme: 'midnight', accentColor: '' });
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "midnight", accentColor: "" });
         }
         return Promise.resolve(undefined);
       }),
@@ -724,27 +741,29 @@ describe('useTheme', () => {
     } else {
       delete document.documentElement.dataset.theme;
     }
-    styleTag = document.getElementById('accent-override') as HTMLStyleElement;
+    styleTag = document.getElementById("accent-override") as HTMLStyleElement;
     if (styleTag) styleTag.remove();
     vi.restoreAllMocks();
   });
 
-  it('sets dataset.theme from settings on mount', async () => {
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.resolve({ theme: 'ocean', accentColor: '' });
-      }
-      return Promise.resolve(undefined);
-    });
+  it("sets dataset.theme from settings on mount", async () => {
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "ocean", accentColor: "" });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(document.documentElement.dataset.theme).toBe('ocean');
+    expect(document.documentElement.dataset.theme).toBe("ocean");
   });
 
-  it('resolves system to dia on light OS', async () => {
-    Object.defineProperty(window, 'matchMedia', {
+  it("resolves system to dia on light OS", async () => {
+    Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
         matches: false,
@@ -755,114 +774,140 @@ describe('useTheme', () => {
       })),
     });
 
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.resolve({ theme: 'system', accentColor: '' });
-      }
-      return Promise.resolve(undefined);
-    });
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "system", accentColor: "" });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(document.documentElement.dataset.theme).toBe('dia');
+    expect(document.documentElement.dataset.theme).toBe("dia");
   });
 
-  it('injects accent-override style when accentColor is set', async () => {
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.resolve({ theme: 'dia', accentColor: '#ff0000' });
-      }
-      return Promise.resolve(undefined);
-    });
+  it("injects accent-override style when accentColor is set", async () => {
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "dia", accentColor: "#ff0000" });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    const tag = document.getElementById('accent-override') as HTMLStyleElement;
+    const tag = document.getElementById("accent-override") as HTMLStyleElement;
     expect(tag).toBeTruthy();
-    expect(tag.textContent).toContain('--accent-primary: #ff0000');
+    expect(tag.textContent).toContain("--accent-primary: #ff0000");
   });
 
-  it('removes accent-override when accentColor is empty', async () => {
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.resolve({ theme: 'dia', accentColor: '' });
-      }
-      return Promise.resolve(undefined);
-    });
+  it("removes accent-override when accentColor is empty", async () => {
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "dia", accentColor: "" });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(document.getElementById('accent-override')).toBeNull();
+    expect(document.getElementById("accent-override")).toBeNull();
   });
 
-  it('reacts to settings:changed event for theme', async () => {
-    let changeCallback: ((payload: { key: string; value: unknown }) => void) | null = null;
-    (window.horizonAPI as { on: typeof vi.fn }).on = vi.fn((channel: string, cb: (payload: { key: string; value: unknown }) => void) => {
-      if (channel === 'settings:changed') changeCallback = cb;
-      return () => {};
-    });
+  it("reacts to settings:changed event for theme", async () => {
+    let changeCallback:
+      | ((payload: { key: string; value: unknown }) => void)
+      | null = null;
+    (window.horizonAPI as { on: typeof vi.fn }).on = vi.fn(
+      (
+        channel: string,
+        cb: (payload: { key: string; value: unknown }) => void,
+      ) => {
+        if (channel === "settings:changed") changeCallback = cb;
+        return () => {};
+      },
+    );
 
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.resolve({ theme: 'dia', accentColor: '' });
-      }
-      return Promise.resolve(undefined);
-    });
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "dia", accentColor: "" });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(document.documentElement.dataset.theme).toBe('dia');
+    expect(document.documentElement.dataset.theme).toBe("dia");
 
     if (changeCallback) {
-      changeCallback({ key: 'theme', value: 'forest' });
+      changeCallback({ key: "theme", value: "forest" });
     }
-    expect(document.documentElement.dataset.theme).toBe('forest');
+    expect(document.documentElement.dataset.theme).toBe("forest");
   });
 
-  it('reacts to settings:changed event for accentColor', async () => {
-    let changeCallback: ((payload: { key: string; value: unknown }) => void) | null = null;
-    (window.horizonAPI as { on: typeof vi.fn }).on = vi.fn((channel: string, cb: (payload: { key: string; value: unknown }) => void) => {
-      if (channel === 'settings:changed') changeCallback = cb;
-      return () => {};
-    });
+  it("reacts to settings:changed event for accentColor", async () => {
+    let changeCallback:
+      | ((payload: { key: string; value: unknown }) => void)
+      | null = null;
+    (window.horizonAPI as { on: typeof vi.fn }).on = vi.fn(
+      (
+        channel: string,
+        cb: (payload: { key: string; value: unknown }) => void,
+      ) => {
+        if (channel === "settings:changed") changeCallback = cb;
+        return () => {};
+      },
+    );
 
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.resolve({ theme: 'dia', accentColor: '' });
-      }
-      return Promise.resolve(undefined);
-    });
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.resolve({ theme: "dia", accentColor: "" });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(document.getElementById('accent-override')).toBeNull();
+    expect(document.getElementById("accent-override")).toBeNull();
 
     if (changeCallback) {
-      changeCallback({ key: 'accentColor', value: '#00ff00' });
+      changeCallback({ key: "accentColor", value: "#00ff00" });
     }
 
-    const tag = document.getElementById('accent-override') as HTMLStyleElement;
+    const tag = document.getElementById("accent-override") as HTMLStyleElement;
     expect(tag).toBeTruthy();
-    expect(tag.textContent).toContain('--accent-primary: #00ff00');
+    expect(tag.textContent).toContain("--accent-primary: #00ff00");
   });
 
-  it('falls back to defaults when settings:getAll rejects', async () => {
-    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn((channel: string) => {
-      if (channel === 'settings:getAll') {
-        return Promise.reject(new Error('IPC error'));
-      }
-      return Promise.resolve(undefined);
-    });
+  it("falls back to defaults when settings:getAll rejects", async () => {
+    (window.horizonAPI as { invoke: typeof vi.fn }).invoke = vi.fn(
+      (channel: string) => {
+        if (channel === "settings:getAll") {
+          return Promise.reject(new Error("IPC error"));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
 
     renderHook(() => useTheme());
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(document.documentElement.dataset.theme).toBe('dia');
+    expect(document.documentElement.dataset.theme).toBe("dia");
   });
 });
 ```
@@ -878,26 +923,28 @@ Expected: FAIL with "useTheme is not defined"
 Create `src/hooks/useTheme.ts`:
 
 ```typescript
-import { useEffect } from 'react';
-import { resolveTheme, buildAccentStyle } from '../utils/theme';
+import { useEffect } from "react";
+import { resolveTheme, buildAccentStyle } from "../utils/theme";
 
-const FALLBACK_THEME = 'dia';
+const FALLBACK_THEME = "dia";
 
 function applyTheme(theme: string, accentColor: string): void {
-  const isDarkOS = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDarkOS = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const resolved = resolveTheme(
-    theme as 'system' | 'dia' | 'midnight' | 'ocean' | 'forest',
-    isDarkOS
+    theme as "system" | "dia" | "midnight" | "ocean" | "forest",
+    isDarkOS,
   );
   document.documentElement.dataset.theme = resolved;
 
   const accentCss = buildAccentStyle(accentColor);
-  let styleTag = document.getElementById('accent-override') as HTMLStyleElement | null;
+  let styleTag = document.getElementById(
+    "accent-override",
+  ) as HTMLStyleElement | null;
 
   if (accentCss) {
     if (!styleTag) {
-      styleTag = document.createElement('style');
-      styleTag.id = 'accent-override';
+      styleTag = document.createElement("style");
+      styleTag.id = "accent-override";
       document.head.appendChild(styleTag);
     }
     styleTag.textContent = accentCss;
@@ -915,66 +962,75 @@ export function useTheme(): void {
 
     const init = async (): Promise<void> => {
       try {
-        const settings = (await window.horizonAPI.invoke('settings:getAll', {})) as {
+        const settings = (await window.horizonAPI.invoke(
+          "settings:getAll",
+          {},
+        )) as {
           theme?: string;
           accentColor?: string;
         } | null;
         if (cancelled) return;
         const theme = settings?.theme ?? FALLBACK_THEME;
-        const accentColor = settings?.accentColor ?? '';
+        const accentColor = settings?.accentColor ?? "";
         applyTheme(theme, accentColor);
 
-        if (theme === 'system' && mediaQuery === null) {
-          mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        if (theme === "system" && mediaQuery === null) {
+          mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
           mediaListener = () => {
-            applyTheme('system', accentColor);
+            applyTheme("system", accentColor);
           };
-          mediaQuery.addEventListener('change', mediaListener);
+          mediaQuery.addEventListener("change", mediaListener);
         }
       } catch {
         if (!cancelled) {
-          applyTheme(FALLBACK_THEME, '');
+          applyTheme(FALLBACK_THEME, "");
         }
       }
     };
 
     unsubscribeSettings = window.horizonAPI.on(
-      'settings:changed',
+      "settings:changed",
       (payload: unknown) => {
         const { key, value } = payload as { key: string; value: unknown };
-        if (key === 'theme') {
-          const accent =
-            (document.getElementById('accent-override')?.textContent ?? '').includes('--accent-primary')
-              ? ''
-              : '';
+        if (key === "theme") {
+          const accent = (
+            document.getElementById("accent-override")?.textContent ?? ""
+          ).includes("--accent-primary")
+            ? ""
+            : "";
           // Re-read accent from current DOM state is unreliable; better:
           // The accent override style itself doesn't change on theme change,
           // so we only need to re-apply the theme. But we need the current
           // accentColor. Since we don't have it in closure here, we must
           // re-invoke settings:getAll or store it. For simplicity, re-invoke.
-          void window.horizonAPI.invoke('settings:getAll', {}).then((settings) => {
-            if (cancelled) return;
-            const s = settings as { theme?: string; accentColor?: string } | undefined;
-            applyTheme(s?.theme ?? FALLBACK_THEME, s?.accentColor ?? '');
-            // Re-attach/detach media listener based on new theme
-            const newTheme = s?.theme ?? FALLBACK_THEME;
-            if (newTheme !== 'system' && mediaQuery && mediaListener) {
-              mediaQuery.removeEventListener('change', mediaListener);
-              mediaQuery = null;
-              mediaListener = null;
-            } else if (newTheme === 'system' && mediaQuery === null) {
-              mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-              mediaListener = () => {
-                applyTheme('system', s?.accentColor ?? '');
-              };
-              mediaQuery.addEventListener('change', mediaListener);
-            }
-          });
-        } else if (key === 'accentColor') {
-          const currentTheme = document.documentElement.dataset.theme ?? FALLBACK_THEME;
-          applyTheme(currentTheme, (value as string) ?? '');
+          void window.horizonAPI
+            .invoke("settings:getAll", {})
+            .then((settings) => {
+              if (cancelled) return;
+              const s = settings as
+                | { theme?: string; accentColor?: string }
+                | undefined;
+              applyTheme(s?.theme ?? FALLBACK_THEME, s?.accentColor ?? "");
+              // Re-attach/detach media listener based on new theme
+              const newTheme = s?.theme ?? FALLBACK_THEME;
+              if (newTheme !== "system" && mediaQuery && mediaListener) {
+                mediaQuery.removeEventListener("change", mediaListener);
+                mediaQuery = null;
+                mediaListener = null;
+              } else if (newTheme === "system" && mediaQuery === null) {
+                mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+                mediaListener = () => {
+                  applyTheme("system", s?.accentColor ?? "");
+                };
+                mediaQuery.addEventListener("change", mediaListener);
+              }
+            });
+        } else if (key === "accentColor") {
+          const currentTheme =
+            document.documentElement.dataset.theme ?? FALLBACK_THEME;
+          applyTheme(currentTheme, (value as string) ?? "");
         }
-      }
+      },
     );
 
     void init();
@@ -983,7 +1039,7 @@ export function useTheme(): void {
       cancelled = true;
       if (unsubscribeSettings) unsubscribeSettings();
       if (mediaQuery && mediaListener) {
-        mediaQuery.removeEventListener('change', mediaListener);
+        mediaQuery.removeEventListener("change", mediaListener);
       }
     };
   }, []);
@@ -1010,6 +1066,7 @@ git commit -m "feat(theme): add useTheme hook with system sync and accent overri
 ### Task 8: Call `useTheme` in App.tsx
 
 **Files:**
+
 - Modify: `src/App.tsx`
 
 - [ ] **Step 1: Add import and call**
@@ -1049,6 +1106,7 @@ git commit -m "feat(theme): wire useTheme into App component"
 ### Task 9: Update SettingsPanel UI
 
 **Files:**
+
 - Modify: `src/components/overlays/SettingsPanel.tsx`
 - Test: `tests/unit/SettingsPanel.test.tsx`
 
@@ -1085,19 +1143,19 @@ After the theme `Field`, add:
   <div className="flex items-center gap-2">
     <input
       type="color"
-      value={settings?.accentColor || '#d44d7a'}
-      onChange={(e) => update('accentColor', e.target.value)}
+      value={settings?.accentColor || "#d44d7a"}
+      onChange={(e) => update("accentColor", e.target.value)}
       className="w-8 h-8 rounded cursor-pointer"
     />
     {settings?.accentColor ? (
       <button
         className="text-xs underline"
-        onClick={() => update('accentColor', '')}
+        onClick={() => update("accentColor", "")}
       >
         Reset to default
       </button>
     ) : (
-      <span className="text-xs" style={{ color: 'var(--chrome-fg-subtle)' }}>
+      <span className="text-xs" style={{ color: "var(--chrome-fg-subtle)" }}>
         Using preset default
       </span>
     )}
@@ -1165,4 +1223,4 @@ git commit -m "fix(theme): address test and lint issues"
 
 ---
 
-*Plan based on spec: `docs/superpowers/specs/2026-05-27-theme-setup-design.md`*
+_Plan based on spec: `docs/superpowers/specs/2026-05-27-theme-setup-design.md`_

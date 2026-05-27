@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
-import { readerExtract } from '@electron/services/readerExtract';
+import { describe, it, expect } from "vitest";
+import { readerExtract } from "@electron/services/readerExtract";
 
 const ARTICLE = `<!doctype html><html lang="en">
 <head><title>Mars Lander Touches Down</title></head>
@@ -22,23 +22,26 @@ const ARTICLE = `<!doctype html><html lang="en">
   <footer><div class="comments">Comment from RandomUser</div></footer>
 </body></html>`;
 
-describe('readerExtract', () => {
-  it('returns the article title and a substantial textContent', () => {
-    const a = readerExtract(ARTICLE, 'https://example.com/mars');
+describe("readerExtract", () => {
+  it("returns the article title and a substantial textContent", () => {
+    const a = readerExtract(ARTICLE, "https://example.com/mars");
     expect(a).not.toBeNull();
-    expect(a!.title.toLowerCase()).toContain('mars lander');
+    expect(a!.title.toLowerCase()).toContain("mars lander");
     expect(a!.textContent.length).toBeGreaterThan(200);
     expect(a!.readingMinutes).toBeGreaterThanOrEqual(1);
   });
 
-  it('strips the nav/footer noise from textContent', () => {
-    const a = readerExtract(ARTICLE, 'https://example.com/mars');
+  it("strips the nav/footer noise from textContent", () => {
+    const a = readerExtract(ARTICLE, "https://example.com/mars");
     expect(a!.textContent).not.toMatch(/Sign In/);
     expect(a!.textContent).not.toMatch(/RandomUser/);
   });
 
-  it('returns null on pages without article-shaped content', () => {
-    const a = readerExtract('<html><body><div></div></body></html>', 'https://example.com');
+  it("returns null on pages without article-shaped content", () => {
+    const a = readerExtract(
+      "<html><body><div></div></body></html>",
+      "https://example.com",
+    );
     expect(a).toBeNull();
   });
 });

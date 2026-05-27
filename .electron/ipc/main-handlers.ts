@@ -1,17 +1,20 @@
-import { ipcMain, BrowserWindow, IpcMainInvokeEvent, session } from 'electron';
-import { IPC_CHANNELS } from './channels';
-import { applySpellcheckToSession } from '../services/spellcheck';
-import { TabManager } from '../services/TabManager';
-import { translatePage, restorePage } from '../services/pageTranslator';
-import { translateText } from '../services/LlmTranslator';
-import { SettingsManager } from '../services/SettingsManager';
-import { applyProxySettingsToCoreSessions, getIncognitoSession } from '../services/proxy';
-import { BookmarkManager } from '../services/BookmarkManager';
-import { HistoryManager } from '../services/HistoryManager';
-import { DownloadManager } from '../services/DownloadManager';
-import { PasswordManager } from '../services/PasswordManager';
-import { AutofillManager } from '../services/AutofillManager';
-import type { IpcChannels } from '../../src/types/ipc';
+import { ipcMain, BrowserWindow, IpcMainInvokeEvent, session } from "electron";
+import { IPC_CHANNELS } from "./channels";
+import { applySpellcheckToSession } from "../services/spellcheck";
+import { TabManager } from "../services/TabManager";
+import { translatePage, restorePage } from "../services/pageTranslator";
+import { translateText } from "../services/LlmTranslator";
+import { SettingsManager } from "../services/SettingsManager";
+import {
+  applyProxySettingsToCoreSessions,
+  getIncognitoSession,
+} from "../services/proxy";
+import { BookmarkManager } from "../services/BookmarkManager";
+import { HistoryManager } from "../services/HistoryManager";
+import { DownloadManager } from "../services/DownloadManager";
+import { PasswordManager } from "../services/PasswordManager";
+import { AutofillManager } from "../services/AutofillManager";
+import type { IpcChannels } from "../../src/types/ipc";
 
 const activeTranslations = new Map<string, AbortController>();
 
@@ -44,9 +47,11 @@ export type ContextResolver = (event: IpcMainInvokeEvent) => WindowContext;
  */
 function handle<K extends keyof IpcChannels>(
   channel: K,
-  fn: (event: IpcMainInvokeEvent, payload: IpcChannels[K]) => unknown
+  fn: (event: IpcMainInvokeEvent, payload: IpcChannels[K]) => unknown,
 ): void {
-  ipcMain.handle(channel, (event, payload) => fn(event, payload as IpcChannels[K]));
+  ipcMain.handle(channel, (event, payload) =>
+    fn(event, payload as IpcChannels[K]),
+  );
 }
 
 /**
@@ -58,61 +63,109 @@ function handle<K extends keyof IpcChannels>(
  * webContents.id lookup so a multi-window (e.g. regular + incognito)
  * setup routes correctly.
  */
-export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolver): void {
-  const ctx = (event: IpcMainInvokeEvent): WindowContext => resolveContext(event);
-  const { settingsManager, bookmarkManager, historyManager, downloadManager, passwordManager, autofillManager } = deps;
+export function registerIpcHandlers(
+  deps: IpcDeps,
+  resolveContext: ContextResolver,
+): void {
+  const ctx = (event: IpcMainInvokeEvent): WindowContext =>
+    resolveContext(event);
+  const {
+    settingsManager,
+    bookmarkManager,
+    historyManager,
+    downloadManager,
+    passwordManager,
+    autofillManager,
+  } = deps;
 
-  handle('tab:create', (event, { url }) => ctx(event).tabManager.createTab(url));
-  handle('tab:close', (event, { tabId }) => ctx(event).tabManager.closeTab(tabId));
-  handle('tab:activate', (event, { tabId }) => ctx(event).tabManager.activateTab(tabId));
-  handle('tab:pin', (event, { tabId, pinned }) => ctx(event).tabManager.setPinned(tabId, pinned));
-  handle('tab:mute', (event, { tabId }) => ctx(event).tabManager.setMuted(tabId, true));
-  handle('tab:unmute', (event, { tabId }) => ctx(event).tabManager.setMuted(tabId, false));
-  handle('tab:duplicate', (event, { tabId }) => ctx(event).tabManager.duplicate(tabId));
-  handle('tab:reorder', (event, { tabId, index }) => ctx(event).tabManager.reorder(tabId, index));
-
-  handle('tabGroup:create', (event, { name, color, tabIds }) =>
-    ctx(event).tabManager.createGroup(name, color, tabIds ?? [])
+  handle("tab:create", (event, { url }) =>
+    ctx(event).tabManager.createTab(url),
   );
-  handle('tabGroup:update', (event, { groupId, changes }) =>
-    ctx(event).tabManager.updateGroup(groupId, changes)
+  handle("tab:close", (event, { tabId }) =>
+    ctx(event).tabManager.closeTab(tabId),
   );
-  handle('tabGroup:delete', (event, { groupId }) => ctx(event).tabManager.deleteGroup(groupId));
-  handle('tabGroup:addTab', (event, { groupId, tabId }) =>
-    ctx(event).tabManager.assignTabToGroup(tabId, groupId)
+  handle("tab:activate", (event, { tabId }) =>
+    ctx(event).tabManager.activateTab(tabId),
   );
-  handle('tabGroup:removeTab', (event, { tabId }) => ctx(event).tabManager.removeTabFromGroup(tabId));
+  handle("tab:pin", (event, { tabId, pinned }) =>
+    ctx(event).tabManager.setPinned(tabId, pinned),
+  );
+  handle("tab:mute", (event, { tabId }) =>
+    ctx(event).tabManager.setMuted(tabId, true),
+  );
+  handle("tab:unmute", (event, { tabId }) =>
+    ctx(event).tabManager.setMuted(tabId, false),
+  );
+  handle("tab:duplicate", (event, { tabId }) =>
+    ctx(event).tabManager.duplicate(tabId),
+  );
+  handle("tab:reorder", (event, { tabId, index }) =>
+    ctx(event).tabManager.reorder(tabId, index),
+  );
 
-  handle('navigation:go', (event, { tabId, url }) => ctx(event).tabManager.navigate(tabId, url));
-  handle('navigation:back', (event, { tabId }) => ctx(event).tabManager.goBack(tabId));
-  handle('navigation:forward', (event, { tabId }) => ctx(event).tabManager.goForward(tabId));
-  handle('navigation:reload', (event, { tabId, hard }) => ctx(event).tabManager.reload(tabId, hard));
-  handle('navigation:stop', (event, { tabId }) => ctx(event).tabManager.stop(tabId));
+  handle("tabGroup:create", (event, { name, color, tabIds }) =>
+    ctx(event).tabManager.createGroup(name, color, tabIds ?? []),
+  );
+  handle("tabGroup:update", (event, { groupId, changes }) =>
+    ctx(event).tabManager.updateGroup(groupId, changes),
+  );
+  handle("tabGroup:delete", (event, { groupId }) =>
+    ctx(event).tabManager.deleteGroup(groupId),
+  );
+  handle("tabGroup:addTab", (event, { groupId, tabId }) =>
+    ctx(event).tabManager.assignTabToGroup(tabId, groupId),
+  );
+  handle("tabGroup:removeTab", (event, { tabId }) =>
+    ctx(event).tabManager.removeTabFromGroup(tabId),
+  );
 
-  handle('window:minimize', (event) => ctx(event).window.minimize());
-  handle('window:maximize', (event) => {
+  handle("navigation:go", (event, { tabId, url }) =>
+    ctx(event).tabManager.navigate(tabId, url),
+  );
+  handle("navigation:back", (event, { tabId }) =>
+    ctx(event).tabManager.goBack(tabId),
+  );
+  handle("navigation:forward", (event, { tabId }) =>
+    ctx(event).tabManager.goForward(tabId),
+  );
+  handle("navigation:reload", (event, { tabId, hard }) =>
+    ctx(event).tabManager.reload(tabId, hard),
+  );
+  handle("navigation:stop", (event, { tabId }) =>
+    ctx(event).tabManager.stop(tabId),
+  );
+
+  handle("window:minimize", (event) => ctx(event).window.minimize());
+  handle("window:maximize", (event) => {
     const w = ctx(event).window;
     if (w.isMaximized()) w.unmaximize();
     else w.maximize();
   });
-  handle('window:close', (event) => ctx(event).window.close());
+  handle("window:close", (event) => ctx(event).window.close());
 
-  handle('app:quit', () => process.exit(0));
-  handle('app:getVersion', () => '1.0.0');
+  handle("app:quit", () => process.exit(0));
+  handle("app:getVersion", () => "1.0.0");
 
-  handle('settings:get', (_event, { key }) =>
-    settingsManager.get(key as Parameters<typeof settingsManager.get>[0])
+  handle("settings:get", (_event, { key }) =>
+    settingsManager.get(key as Parameters<typeof settingsManager.get>[0]),
   );
-  handle('settings:getAll', () => settingsManager.getAll());
-  handle('settings:set', async (event, { key, value }) => {
-    settingsManager.set(key as Parameters<typeof settingsManager.set>[0], value as never);
+  handle("settings:getAll", () => settingsManager.getAll());
+  handle("settings:set", async (event, { key, value }) => {
+    settingsManager.set(
+      key as Parameters<typeof settingsManager.set>[0],
+      value as never,
+    );
     // Re-apply spellchecker languages when the user changes them.
-    if (key === 'spellcheckLanguages' && Array.isArray(value)) {
+    if (key === "spellcheckLanguages" && Array.isArray(value)) {
       const langs = value as string[];
       applySpellcheckToSession(session.defaultSession, langs);
       applySpellcheckToSession(getIncognitoSession(), langs);
     }
-    if (key === 'proxyType' || key === 'proxyRules' || key === 'proxyBypassRules') {
+    if (
+      key === "proxyType" ||
+      key === "proxyRules" ||
+      key === "proxyBypassRules"
+    ) {
       // set() above is synchronous (writeFileSync); the subsequent
       // get() calls see the just-set value. await so the renderer
       // gets the SETTINGS_CHANGED event AFTER setProxy completes —
@@ -121,79 +174,132 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
       // rejection (malformed config) and log; never silently fail.
       try {
         await applyProxySettingsToCoreSessions({
-          proxyType: settingsManager.get('proxyType'),
-          proxyRules: settingsManager.get('proxyRules'),
-          proxyBypassRules: settingsManager.get('proxyBypassRules'),
+          proxyType: settingsManager.get("proxyType"),
+          proxyRules: settingsManager.get("proxyRules"),
+          proxyBypassRules: settingsManager.get("proxyBypassRules"),
         });
       } catch (err) {
-        console.error('[ipc] settings:set proxy reapply failed:', (err as Error).message);
+        console.error(
+          "[ipc] settings:set proxy reapply failed:",
+          (err as Error).message,
+        );
       }
     }
-    ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
+    ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, {
+      key,
+      value,
+    });
   });
-  handle('settings:reset', (_event, payload) =>
-    settingsManager.reset((payload as { key?: string }).key as Parameters<typeof settingsManager.reset>[0])
+  handle("settings:reset", (_event, payload) =>
+    settingsManager.reset(
+      (payload as { key?: string }).key as Parameters<
+        typeof settingsManager.reset
+      >[0],
+    ),
   );
 
-  handle('bookmark:getTree', () => bookmarkManager.getTree());
-  handle('bookmark:add', (_event, { url, title, parentId }) => bookmarkManager.add(url, title, parentId));
-  handle('bookmark:remove', (_event, { bookmarkId }) => bookmarkManager.remove(bookmarkId));
-  handle('bookmark:move', (_event, { bookmarkId, parentId, index }) => bookmarkManager.move(bookmarkId, parentId, index));
-  handle('bookmark:update', (_event, { bookmarkId, changes }) => bookmarkManager.update(bookmarkId, changes));
-  handle('bookmark:import', (_event, { data }) => bookmarkManager.import(data));
-  handle('bookmark:export', () => bookmarkManager.export());
+  handle("bookmark:getTree", () => bookmarkManager.getTree());
+  handle("bookmark:add", (_event, { url, title, parentId }) =>
+    bookmarkManager.add(url, title, parentId),
+  );
+  handle("bookmark:remove", (_event, { bookmarkId }) =>
+    bookmarkManager.remove(bookmarkId),
+  );
+  handle("bookmark:move", (_event, { bookmarkId, parentId, index }) =>
+    bookmarkManager.move(bookmarkId, parentId, index),
+  );
+  handle("bookmark:update", (_event, { bookmarkId, changes }) =>
+    bookmarkManager.update(bookmarkId, changes),
+  );
+  handle("bookmark:import", (_event, { data }) => bookmarkManager.import(data));
+  handle("bookmark:export", () => bookmarkManager.export());
 
-  handle('history:search', (_event, { query, limit }) => historyManager.search(query, limit));
-  handle('history:getRecent', (_event, { limit }) => historyManager.getRecent(limit));
-  handle('history:clear', (_event, { range }) => historyManager.clear(range));
+  handle("history:search", (_event, { query, limit }) =>
+    historyManager.search(query, limit),
+  );
+  handle("history:getRecent", (_event, { limit }) =>
+    historyManager.getRecent(limit),
+  );
+  handle("history:clear", (_event, { range }) => historyManager.clear(range));
 
-  handle('download:pause', (_event, { downloadId }) => downloadManager.pause(downloadId));
-  handle('download:resume', (_event, { downloadId }) => downloadManager.resume(downloadId));
-  handle('download:cancel', (_event, { downloadId }) => downloadManager.cancel(downloadId));
-  handle('download:clearCompleted', () => downloadManager.clearCompleted());
+  handle("download:pause", (_event, { downloadId }) =>
+    downloadManager.pause(downloadId),
+  );
+  handle("download:resume", (_event, { downloadId }) =>
+    downloadManager.resume(downloadId),
+  );
+  handle("download:cancel", (_event, { downloadId }) =>
+    downloadManager.cancel(downloadId),
+  );
+  handle("download:clearCompleted", () => downloadManager.clearCompleted());
 
-  handle('find:start', (event, { tabId, text, caseSensitive }) => {
+  handle("find:start", (event, { tabId, text, caseSensitive }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);
     if (!view) return;
     return view.webContents.findInPage(text, { caseSensitive });
   });
-  handle('find:next', (event, { tabId, forward }) => {
+  handle("find:next", (event, { tabId, forward }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);
     if (!view) return;
-    view.webContents.findInPage('', { forward });
+    view.webContents.findInPage("", { forward });
   });
-  handle('find:stop', (event, { tabId }) => {
+  handle("find:stop", (event, { tabId }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);
     if (!view) return;
-    view.webContents.stopFindInPage('clearSelection');
+    view.webContents.stopFindInPage("clearSelection");
   });
 
-  handle('password:getAll', () => passwordManager.getAll());
-  handle('password:save', (_event, { entry }) => passwordManager.saveEntry(entry));
-  handle('password:remove', (_event, { origin, username }) => passwordManager.remove(origin, username));
-  handle('password:getForOrigin', (_event, { origin }) => passwordManager.getForOrigin(origin));
-
-  handle('autofill:getAddresses', () => autofillManager.getAddresses());
-  handle('autofill:saveAddress', (_event, { address }) => autofillManager.saveAddress(address));
-  handle('autofill:removeAddress', (_event, { addressId }) => autofillManager.removeAddress(addressId));
-
-  handle('ui:contentBounds', (event, rect) => ctx(event).tabManager.setContentBounds(rect));
-
-  handle('zoom:set', (event, { tabId, level }) => ctx(event).tabManager.setZoom(tabId, level));
-  handle('zoom:reset', (event, { tabId }) => ctx(event).tabManager.setZoom(tabId, 1.0));
-  handle('devtools:toggle', (event, { tabId }) => ctx(event).tabManager.toggleDevTools(tabId));
-  handle('devtools:open', (event, { tabId, mode }) =>
-    ctx(event).tabManager.openDevTools(tabId, (mode ?? 'right') as 'right' | 'bottom' | 'undocked')
+  handle("password:getAll", () => passwordManager.getAll());
+  handle("password:save", (_event, { entry }) =>
+    passwordManager.saveEntry(entry),
   );
-  handle('print:start', (event, { tabId }) => ctx(event).tabManager.print(tabId));
-  handle('print:toPDF', (event, { tabId, outputPath }) => ctx(event).tabManager.printToPDF(tabId, outputPath));
+  handle("password:remove", (_event, { origin, username }) =>
+    passwordManager.remove(origin, username),
+  );
+  handle("password:getForOrigin", (_event, { origin }) =>
+    passwordManager.getForOrigin(origin),
+  );
 
-  handle('translate:page', async (event, { targetLang }) => {
+  handle("autofill:getAddresses", () => autofillManager.getAddresses());
+  handle("autofill:saveAddress", (_event, { address }) =>
+    autofillManager.saveAddress(address),
+  );
+  handle("autofill:removeAddress", (_event, { addressId }) =>
+    autofillManager.removeAddress(addressId),
+  );
+
+  handle("ui:contentBounds", (event, rect) =>
+    ctx(event).tabManager.setContentBounds(rect),
+  );
+
+  handle("zoom:set", (event, { tabId, level }) =>
+    ctx(event).tabManager.setZoom(tabId, level),
+  );
+  handle("zoom:reset", (event, { tabId }) =>
+    ctx(event).tabManager.setZoom(tabId, 1.0),
+  );
+  handle("devtools:toggle", (event, { tabId }) =>
+    ctx(event).tabManager.toggleDevTools(tabId),
+  );
+  handle("devtools:open", (event, { tabId, mode }) =>
+    ctx(event).tabManager.openDevTools(
+      tabId,
+      (mode ?? "right") as "right" | "bottom" | "undocked",
+    ),
+  );
+  handle("print:start", (event, { tabId }) =>
+    ctx(event).tabManager.print(tabId),
+  );
+  handle("print:toPDF", (event, { tabId, outputPath }) =>
+    ctx(event).tabManager.printToPDF(tabId, outputPath),
+  );
+
+  handle("translate:page", async (event, { targetLang }) => {
     const context = ctx(event);
     const tabId = context.tabManager.getActiveTabId();
-    if (!tabId) return { ok: false, error: 'no active tab' };
+    if (!tabId) return { ok: false, error: "no active tab" };
     const view = context.tabManager.getBrowserView(tabId);
-    if (!view) return { ok: false, error: 'no active tab' };
+    if (!view) return { ok: false, error: "no active tab" };
 
     const existing = activeTranslations.get(tabId);
     if (existing) {
@@ -208,7 +314,7 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     // tabs while showing the active one.
     const onProgress = (translated: number, total: number) => {
       if (!context.window.isDestroyed() && !controller.signal.aborted) {
-        context.window.webContents.send('translate:progress', {
+        context.window.webContents.send("translate:progress", {
           tabId,
           translated,
           total,
@@ -218,9 +324,14 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     };
 
     try {
-      const result = await translatePage(view.webContents, targetLang, onProgress, controller.signal);
+      const result = await translatePage(
+        view.webContents,
+        targetLang,
+        onProgress,
+        controller.signal,
+      );
       if (!context.window.isDestroyed() && !controller.signal.aborted) {
-        context.window.webContents.send('translate:progress', {
+        context.window.webContents.send("translate:progress", {
           tabId,
           translated: result.translated ?? 0,
           total: result.total ?? 0,
@@ -235,7 +346,7 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     }
   });
 
-  handle('translate:cancel', (event) => {
+  handle("translate:cancel", (event) => {
     const context = ctx(event);
     const tabId = context.tabManager.getActiveTabId();
     if (tabId) {
@@ -248,7 +359,7 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     return {};
   });
 
-  handle('translate:restore', async (event) => {
+  handle("translate:restore", async (event) => {
     const context = ctx(event);
     const tabId = context.tabManager.getActiveTabId();
     if (!tabId) return { restored: 0 };
@@ -265,7 +376,7 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     return restorePage(view.webContents);
   });
 
-  handle('translate:selection', async (_event, { text, targetLang }) => {
+  handle("translate:selection", async (_event, { text, targetLang }) => {
     const res = await translateText(text, targetLang);
     return res;
   });

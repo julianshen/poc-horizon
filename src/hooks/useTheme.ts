@@ -1,23 +1,25 @@
-import { useEffect } from 'react';
-import { resolveTheme, buildAccentStyle } from '../utils/theme';
+import { useEffect } from "react";
+import { resolveTheme, buildAccentStyle } from "../utils/theme";
 
-const FALLBACK_THEME = 'dia';
+const FALLBACK_THEME = "dia";
 
 function applyTheme(theme: string, accentColor: string): void {
-  const isDarkOS = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDarkOS = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const resolved = resolveTheme(
-    theme as 'system' | 'dia' | 'midnight' | 'ocean' | 'forest',
-    isDarkOS
+    theme as "system" | "dia" | "midnight" | "ocean" | "forest",
+    isDarkOS,
   );
   document.documentElement.dataset.theme = resolved;
 
   const accentCss = buildAccentStyle(accentColor);
-  let styleTag = document.getElementById('accent-override') as HTMLStyleElement | null;
+  let styleTag = document.getElementById(
+    "accent-override",
+  ) as HTMLStyleElement | null;
 
   if (accentCss) {
     if (!styleTag) {
-      styleTag = document.createElement('style');
-      styleTag.id = 'accent-override';
+      styleTag = document.createElement("style");
+      styleTag.id = "accent-override";
       document.head.appendChild(styleTag);
     }
     styleTag.textContent = accentCss;
@@ -35,58 +37,66 @@ export function useTheme(): void {
 
     const init = async (): Promise<void> => {
       try {
-        const settings = (await window.horizonAPI.invoke('settings:getAll', {})) as {
+        const settings = (await window.horizonAPI.invoke(
+          "settings:getAll",
+          {},
+        )) as {
           theme?: string;
           accentColor?: string;
         } | null;
         if (cancelled) return;
         const theme = settings?.theme ?? FALLBACK_THEME;
-        const accentColor = settings?.accentColor ?? '';
+        const accentColor = settings?.accentColor ?? "";
         applyTheme(theme, accentColor);
 
-        if (theme === 'system' && mediaQuery === null) {
-          mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        if (theme === "system" && mediaQuery === null) {
+          mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
           mediaListener = () => {
-            applyTheme('system', accentColor);
+            applyTheme("system", accentColor);
           };
-          mediaQuery.addEventListener('change', mediaListener);
+          mediaQuery.addEventListener("change", mediaListener);
         }
       } catch {
         if (!cancelled) {
-          applyTheme(FALLBACK_THEME, '');
+          applyTheme(FALLBACK_THEME, "");
         }
       }
     };
 
     unsubscribeSettings = window.horizonAPI.on(
-      'settings:changed',
+      "settings:changed",
       (payload: unknown) => {
         const { key, value } = payload as { key: string; value: unknown };
-        if (key === 'theme') {
-          void window.horizonAPI.invoke('settings:getAll', {}).then((settings) => {
-            if (cancelled) return;
-            const s = settings as { theme?: string; accentColor?: string } | undefined;
-            const newTheme = s?.theme ?? FALLBACK_THEME;
-            const newAccent = s?.accentColor ?? '';
-            applyTheme(newTheme, newAccent);
+        if (key === "theme") {
+          void window.horizonAPI
+            .invoke("settings:getAll", {})
+            .then((settings) => {
+              if (cancelled) return;
+              const s = settings as
+                | { theme?: string; accentColor?: string }
+                | undefined;
+              const newTheme = s?.theme ?? FALLBACK_THEME;
+              const newAccent = s?.accentColor ?? "";
+              applyTheme(newTheme, newAccent);
 
-            if (newTheme !== 'system' && mediaQuery && mediaListener) {
-              mediaQuery.removeEventListener('change', mediaListener);
-              mediaQuery = null;
-              mediaListener = null;
-            } else if (newTheme === 'system' && mediaQuery === null) {
-              mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-              mediaListener = () => {
-                applyTheme('system', newAccent);
-              };
-              mediaQuery.addEventListener('change', mediaListener);
-            }
-          });
-        } else if (key === 'accentColor') {
-          const currentTheme = document.documentElement.dataset.theme ?? FALLBACK_THEME;
-          applyTheme(currentTheme, (value as string) ?? '');
+              if (newTheme !== "system" && mediaQuery && mediaListener) {
+                mediaQuery.removeEventListener("change", mediaListener);
+                mediaQuery = null;
+                mediaListener = null;
+              } else if (newTheme === "system" && mediaQuery === null) {
+                mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+                mediaListener = () => {
+                  applyTheme("system", newAccent);
+                };
+                mediaQuery.addEventListener("change", mediaListener);
+              }
+            });
+        } else if (key === "accentColor") {
+          const currentTheme =
+            document.documentElement.dataset.theme ?? FALLBACK_THEME;
+          applyTheme(currentTheme, (value as string) ?? "");
         }
-      }
+      },
     );
 
     void init();
@@ -95,7 +105,7 @@ export function useTheme(): void {
       cancelled = true;
       if (unsubscribeSettings) unsubscribeSettings();
       if (mediaQuery && mediaListener) {
-        mediaQuery.removeEventListener('change', mediaListener);
+        mediaQuery.removeEventListener("change", mediaListener);
       }
     };
   }, []);

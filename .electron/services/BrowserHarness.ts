@@ -1,4 +1,4 @@
-import { WebContents } from 'electron';
+import { WebContents } from "electron";
 
 /** Minimal TabManager surface used by BrowserHarness for multi-tab
  *  orchestration. Typed locally so BrowserHarness stays decoupled from
@@ -8,7 +8,12 @@ export interface TabManagerLike {
   createTab(url?: string): { id: string };
   closeTab(id: string): void;
   activateTab(id: string): void;
-  getAllTabs(): Array<{ id: string; url: string; title: string; isActive: boolean }>;
+  getAllTabs(): Array<{
+    id: string;
+    url: string;
+    title: string;
+    isActive: boolean;
+  }>;
   getActiveTabId(): string | null;
   getBrowserView(id: string): { webContents: WebContents } | undefined;
 }
@@ -17,24 +22,45 @@ export interface TabManagerLike {
  * Result types for harness primitives. JSON-serialisable so the agent
  * subprocess can consume them without special decoders.
  */
-export interface ClickArgs { x: number; y: number; button?: 'left' | 'right' | 'middle' }
-export interface TypeArgs { text: string; delayMs?: number }
-export interface ScrollArgs { x?: number; y?: number; deltaX?: number; deltaY?: number }
-export interface ScreenshotResult { format: 'png' | 'jpeg'; base64: string; width: number; height: number }
+export interface ClickArgs {
+  x: number;
+  y: number;
+  button?: "left" | "right" | "middle";
+}
+export interface TypeArgs {
+  text: string;
+  delayMs?: number;
+}
+export interface ScrollArgs {
+  x?: number;
+  y?: number;
+  deltaX?: number;
+  deltaY?: number;
+}
+export interface ScreenshotResult {
+  format: "png" | "jpeg";
+  base64: string;
+  width: number;
+  height: number;
+}
 export interface ScreenshotOptions {
   /** PNG (lossless, larger) or JPEG (smaller, lossy). Defaults vary per call site. */
-  format?: 'png' | 'jpeg';
+  format?: "png" | "jpeg";
   /** JPEG only; 1-100. Default 70. */
   quality?: number;
 }
-export type EvaluateResult = { ok: true; value: unknown } | { ok: false; error: string };
+export type EvaluateResult =
+  | { ok: true; value: unknown }
+  | { ok: false; error: string };
 export interface Mark {
   id: number;
-  x: number; y: number;          // click target = center of rect
-  w: number; h: number;
+  x: number;
+  y: number; // click target = center of rect
+  w: number;
+  h: number;
   tag: string;
   role: string | null;
-  label: string;                  // accessible name / text, trimmed
+  label: string; // accessible name / text, trimmed
   href: string | null;
 }
 
@@ -65,7 +91,9 @@ export class BrowserHarness {
   /** Set of CDP methods the agent has subscribed to. */
   private subscribed = new Set<string>();
   /** Bound listener — kept so we can remove cleanly on detach. */
-  private cdpListener: ((event: Electron.Event, method: string, params: unknown) => void) | null = null;
+  private cdpListener:
+    | ((event: Electron.Event, method: string, params: unknown) => void)
+    | null = null;
   private static EVENT_BUF_CAP = 200;
 
   /** When set, multi-tab tools (openTab / switchTab / closeTab / listTabs)
@@ -79,10 +107,14 @@ export class BrowserHarness {
     if (tm !== undefined) this.tm = tm;
     if (this.attachedTo === wc) return;
     if (this.attachedTo) this.detach();
-    if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
+    if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
     this.attachedTo = wc;
     // Re-bind the CDP event listener so existing subscriptions resume on the new wc.
-    this.cdpListener = (_event: Electron.Event, method: string, params: unknown): void => {
+    this.cdpListener = (
+      _event: Electron.Event,
+      method: string,
+      params: unknown,
+    ): void => {
       if (!this.subscribed.has(method)) return;
       const bucket = this.eventBuf.get(method) ?? [];
       bucket.push({ at: Date.now(), method, params });
@@ -91,15 +123,17 @@ export class BrowserHarness {
       }
       this.eventBuf.set(method, bucket);
     };
-    wc.debugger.on('message', this.cdpListener);
+    wc.debugger.on("message", this.cdpListener);
   }
 
   /** Detach if attached. Safe to call multiple times. */
   detach(): void {
     if (!this.attachedTo) return;
     try {
-      if (this.cdpListener) this.attachedTo.debugger.off('message', this.cdpListener);
-      if (this.attachedTo.debugger.isAttached()) this.attachedTo.debugger.detach();
+      if (this.cdpListener)
+        this.attachedTo.debugger.off("message", this.cdpListener);
+      if (this.attachedTo.debugger.isAttached())
+        this.attachedTo.debugger.detach();
     } catch {
       /* webContents may be destroyed; ignore */
     }
@@ -111,7 +145,10 @@ export class BrowserHarness {
   }
 
   private require(): WebContents {
-    if (!this.attachedTo) throw new Error('BrowserHarness: not attached. Call attach(webContents) first.');
+    if (!this.attachedTo)
+      throw new Error(
+        "BrowserHarness: not attached. Call attach(webContents) first.",
+      );
     return this.attachedTo;
   }
 
@@ -119,29 +156,46 @@ export class BrowserHarness {
 
   async navigate(url: string): Promise<void> {
     const wc = this.require();
-    await wc.debugger.sendCommand('Page.navigate', { url });
+    await wc.debugger.sendCommand("Page.navigate", { url });
   }
 
-  async click({ x, y, button = 'left' }: ClickArgs): Promise<void> {
+  async click({ x, y, button = "left" }: ClickArgs): Promise<void> {
     const wc = this.require();
     const common = { x, y, button, clickCount: 1 };
-    await wc.debugger.sendCommand('Input.dispatchMouseEvent', { ...common, type: 'mousePressed' });
-    await wc.debugger.sendCommand('Input.dispatchMouseEvent', { ...common, type: 'mouseReleased' });
+    await wc.debugger.sendCommand("Input.dispatchMouseEvent", {
+      ...common,
+      type: "mousePressed",
+    });
+    await wc.debugger.sendCommand("Input.dispatchMouseEvent", {
+      ...common,
+      type: "mouseReleased",
+    });
   }
 
   async type({ text, delayMs = 0 }: TypeArgs): Promise<void> {
     const wc = this.require();
     for (const ch of text) {
-      await wc.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'char', text: ch });
+      await wc.debugger.sendCommand("Input.dispatchKeyEvent", {
+        type: "char",
+        text: ch,
+      });
       if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
     }
   }
 
-  async scroll({ x = 0, y = 0, deltaX = 0, deltaY = 0 }: ScrollArgs): Promise<void> {
+  async scroll({
+    x = 0,
+    y = 0,
+    deltaX = 0,
+    deltaY = 0,
+  }: ScrollArgs): Promise<void> {
     const wc = this.require();
-    await wc.debugger.sendCommand('Input.dispatchMouseEvent', {
-      type: 'mouseWheel',
-      x, y, deltaX, deltaY,
+    await wc.debugger.sendCommand("Input.dispatchMouseEvent", {
+      type: "mouseWheel",
+      x,
+      y,
+      deltaX,
+      deltaY,
     });
   }
 
@@ -159,31 +213,49 @@ export class BrowserHarness {
    * The overlay is injected, captured, and removed in one Runtime.evaluate
    * call so we leave no DOM residue if the agent's next action races us.
    */
-  async screenshotMarked({ order = 'reading', format = 'jpeg', quality = 70 }: { order?: 'reading' | 'dom' } & ScreenshotOptions = {}): Promise<ScreenshotResult & { marks: Mark[] }> {
+  async screenshotMarked({
+    order = "reading",
+    format = "jpeg",
+    quality = 70,
+  }: { order?: "reading" | "dom" } & ScreenshotOptions = {}): Promise<
+    ScreenshotResult & { marks: Mark[] }
+  > {
     const wc = this.require();
     // Phase 1: mount the overlay + collect marks. Returns marks; we use them
     // *after* the screenshot so we can remove the overlay first.
     // `order` is JSON-encoded so the script is still a single self-contained
     // expression that Runtime.evaluate accepts.
-    const mount = (await wc.debugger.sendCommand('Runtime.evaluate', {
+    const mount = (await wc.debugger.sendCommand("Runtime.evaluate", {
       expression: MARK_INJECT_JS.replace('"__ORDER__"', JSON.stringify(order)),
       returnByValue: true,
       awaitPromise: true,
     })) as { exceptionDetails?: { text: string }; result: { value?: Mark[] } };
-    if (mount.exceptionDetails) throw new Error(`screenshotMarked mount: ${mount.exceptionDetails.text}`);
+    if (mount.exceptionDetails)
+      throw new Error(`screenshotMarked mount: ${mount.exceptionDetails.text}`);
     const marks: Mark[] = mount.result.value ?? [];
     // Phase 2: capture. JPEG default keeps marked screenshots small for
     // the high-iteration agent loop (PNG screenshots accumulate to ~MBs
     // per session and blow upstream API request limits).
-    const captureParams = format === 'jpeg' ? { format: 'jpeg', quality } : { format: 'png' };
-    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', captureParams)) as { data: string };
-    const metrics = (await wc.debugger.sendCommand('Page.getLayoutMetrics')) as {
+    const captureParams =
+      format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
+    const { data } = (await wc.debugger.sendCommand(
+      "Page.captureScreenshot",
+      captureParams,
+    )) as { data: string };
+    const metrics = (await wc.debugger.sendCommand(
+      "Page.getLayoutMetrics",
+    )) as {
       visualViewport: { clientWidth: number; clientHeight: number };
     };
     // Phase 3: remove the overlay. Best-effort — page may already be navigating.
     try {
-      await wc.debugger.sendCommand('Runtime.evaluate', { expression: MARK_REMOVE_JS, returnByValue: true });
-    } catch { /* */ }
+      await wc.debugger.sendCommand("Runtime.evaluate", {
+        expression: MARK_REMOVE_JS,
+        returnByValue: true,
+      });
+    } catch {
+      /* */
+    }
     return {
       format,
       base64: data,
@@ -193,11 +265,20 @@ export class BrowserHarness {
     };
   }
 
-  async screenshot({ format = 'png', quality = 70 }: ScreenshotOptions = {}): Promise<ScreenshotResult> {
+  async screenshot({
+    format = "png",
+    quality = 70,
+  }: ScreenshotOptions = {}): Promise<ScreenshotResult> {
     const wc = this.require();
-    const captureParams = format === 'jpeg' ? { format: 'jpeg', quality } : { format: 'png' };
-    const { data } = (await wc.debugger.sendCommand('Page.captureScreenshot', captureParams)) as { data: string };
-    const metrics = (await wc.debugger.sendCommand('Page.getLayoutMetrics')) as {
+    const captureParams =
+      format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
+    const { data } = (await wc.debugger.sendCommand(
+      "Page.captureScreenshot",
+      captureParams,
+    )) as { data: string };
+    const metrics = (await wc.debugger.sendCommand(
+      "Page.getLayoutMetrics",
+    )) as {
       visualViewport: { clientWidth: number; clientHeight: number };
     };
     return {
@@ -218,13 +299,18 @@ export class BrowserHarness {
    */
   async evaluate(expression: string): Promise<EvaluateResult> {
     const wc = this.require();
-    const res = (await wc.debugger.sendCommand('Runtime.evaluate', {
+    const res = (await wc.debugger.sendCommand("Runtime.evaluate", {
       expression,
       returnByValue: true,
       awaitPromise: true,
-    })) as { exceptionDetails?: { text: string; exception?: { description?: string } }; result: { value?: unknown } };
+    })) as {
+      exceptionDetails?: { text: string; exception?: { description?: string } };
+      result: { value?: unknown };
+    };
     if (res.exceptionDetails) {
-      const msg = res.exceptionDetails.exception?.description ?? res.exceptionDetails.text;
+      const msg =
+        res.exceptionDetails.exception?.description ??
+        res.exceptionDetails.text;
       return { ok: false, error: msg };
     }
     return { ok: true, value: res.result.value };
@@ -237,7 +323,7 @@ export class BrowserHarness {
    */
   async getDom(depth = 4): Promise<DomNode> {
     const wc = this.require();
-    const res = (await wc.debugger.sendCommand('DOM.getDocument', {
+    const res = (await wc.debugger.sendCommand("DOM.getDocument", {
       depth,
       pierce: false,
     })) as { root: DomNode };
@@ -257,9 +343,9 @@ export class BrowserHarness {
    * (Readability needs the original HTML, not just the visible text).
    */
   async getHtml(): Promise<string> {
-    const r = await this.evaluate('document.documentElement.outerHTML');
+    const r = await this.evaluate("document.documentElement.outerHTML");
     if (!r.ok) throw new Error(r.error);
-    return String(r.value ?? '');
+    return String(r.value ?? "");
   }
 
   /**
@@ -267,7 +353,10 @@ export class BrowserHarness {
    * webContents. Power-user escape hatch when the high-level primitives
    * don't cover the operation. See https://chromedevtools.github.io/devtools-protocol/
    */
-  async cdp(method: string, params?: Record<string, unknown>): Promise<unknown> {
+  async cdp(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<unknown> {
     const wc = this.require();
     return await wc.debugger.sendCommand(method, params ?? {});
   }
@@ -282,7 +371,7 @@ export class BrowserHarness {
    * decorative nodes — what the agent actually needs.
    */
   async getAxTree(): Promise<unknown> {
-    return await this.cdp('Accessibility.getFullAXTree', {});
+    return await this.cdp("Accessibility.getFullAXTree", {});
   }
 
   /**
@@ -318,44 +407,54 @@ export class BrowserHarness {
 
     // networkIdle uses Network.* events — enable the domain once.
     let lastRequestAt = Date.now();
-    let idleHandler: ((event: Electron.Event, method: string) => void) | null = null;
+    let idleHandler: ((event: Electron.Event, method: string) => void) | null =
+      null;
     if (idle) {
-      await wc.debugger.sendCommand('Network.enable', {}).catch(() => {});
+      await wc.debugger.sendCommand("Network.enable", {}).catch(() => {});
       idleHandler = (_e: Electron.Event, method: string): void => {
-        if (method === 'Network.requestWillBeSent' || method === 'Network.responseReceived') {
+        if (
+          method === "Network.requestWillBeSent" ||
+          method === "Network.responseReceived"
+        ) {
           lastRequestAt = Date.now();
         }
       };
-      wc.debugger.on('message', idleHandler);
+      wc.debugger.on("message", idleHandler);
     }
-    const cleanup = (): void => { if (idleHandler) wc.debugger.off('message', idleHandler); };
+    const cleanup = (): void => {
+      if (idleHandler) wc.debugger.off("message", idleHandler);
+    };
 
     try {
       while (Date.now() < deadline) {
         if (sel) {
           const r = await this.evaluate(
-            `(()=>{const e=document.querySelector(${JSON.stringify(sel)});return !!(e && e.offsetParent !== null);})()`
+            `(()=>{const e=document.querySelector(${JSON.stringify(sel)});return !!(e && e.offsetParent !== null);})()`,
           );
-          if (r.ok && r.value === true) return { ok: true, reason: 'selector' };
+          if (r.ok && r.value === true) return { ok: true, reason: "selector" };
         }
         if (selGone) {
-          const r = await this.evaluate(`!document.querySelector(${JSON.stringify(selGone)})`);
-          if (r.ok && r.value === true) return { ok: true, reason: 'selectorGone' };
+          const r = await this.evaluate(
+            `!document.querySelector(${JSON.stringify(selGone)})`,
+          );
+          if (r.ok && r.value === true)
+            return { ok: true, reason: "selectorGone" };
         }
         if (urlRe) {
           const re = new RegExp(urlRe);
-          if (re.test(wc.getURL())) return { ok: true, reason: 'urlMatch' };
+          if (re.test(wc.getURL())) return { ok: true, reason: "urlMatch" };
         }
         if (pred) {
           const r = await this.evaluate(`!!(${pred})`);
-          if (r.ok && r.value === true) return { ok: true, reason: 'predicate' };
+          if (r.ok && r.value === true)
+            return { ok: true, reason: "predicate" };
         }
         if (idle && Date.now() - lastRequestAt >= idle) {
-          return { ok: true, reason: 'networkIdle' };
+          return { ok: true, reason: "networkIdle" };
         }
         await new Promise((r) => setTimeout(r, 100));
       }
-      return { ok: false, reason: 'timeout' };
+      return { ok: false, reason: "timeout" };
     } finally {
       cleanup();
     }
@@ -429,11 +528,15 @@ export class BrowserHarness {
    *   collectEvents() → ten Network.responseReceived events
    */
   async subscribeEvent(method: string): Promise<{ ok: boolean }> {
-    if (!method.includes('.')) return { ok: false };
+    if (!method.includes(".")) return { ok: false };
     this.subscribed.add(method);
     if (!this.eventBuf.has(method)) this.eventBuf.set(method, []);
-    const domain = method.split('.')[0];
-    try { await this.cdp(`${domain}.enable`, {}); } catch { /* not all domains have .enable */ }
+    const domain = method.split(".")[0];
+    try {
+      await this.cdp(`${domain}.enable`, {});
+    } catch {
+      /* not all domains have .enable */
+    }
     return { ok: true };
   }
 
@@ -477,23 +580,36 @@ export class BrowserHarness {
   // ─── Multi-tab orchestration ────────────────────────────────────────
 
   private requireTm(): TabManagerLike {
-    if (!this.tm) throw new Error('BrowserHarness: no TabManager bound. Multi-tab ops require attach(wc, tm).');
+    if (!this.tm)
+      throw new Error(
+        "BrowserHarness: no TabManager bound. Multi-tab ops require attach(wc, tm).",
+      );
     return this.tm;
   }
 
   /** Open a new tab, switch the harness's debugger to it, return the descriptor. */
-  openTab(url?: string): { id: string; url: string; title: string; isActive: boolean } {
+  openTab(url?: string): {
+    id: string;
+    url: string;
+    title: string;
+    isActive: boolean;
+  } {
     const tm = this.requireTm();
     const tab = tm.createTab(url);
     tm.activateTab(tab.id);
     const view = tm.getBrowserView(tab.id);
     if (view) this.attach(view.webContents);
     const full = tm.getAllTabs().find((t) => t.id === tab.id);
-    return full ?? { id: tab.id, url: url ?? '', title: '', isActive: true };
+    return full ?? { id: tab.id, url: url ?? "", title: "", isActive: true };
   }
 
   /** Switch the active tab + re-attach the debugger to its webContents. */
-  switchTab(id: string): { id: string; url: string; title: string; isActive: boolean } {
+  switchTab(id: string): {
+    id: string;
+    url: string;
+    title: string;
+    isActive: boolean;
+  } {
     const tm = this.requireTm();
     const tab = tm.getAllTabs().find((t) => t.id === id);
     if (!tab) throw new Error(`switchTab: unknown tab ${id}`);
@@ -514,7 +630,12 @@ export class BrowserHarness {
     return { closed: after < before };
   }
 
-  listTabs(): Array<{ id: string; url: string; title: string; isActive: boolean }> {
+  listTabs(): Array<{
+    id: string;
+    url: string;
+    title: string;
+    isActive: boolean;
+  }> {
     return this.requireTm().getAllTabs();
   }
 
@@ -523,7 +644,11 @@ export class BrowserHarness {
    * registry's inlineInjection() defines window.__horizon.helpers,
    * then we call the named function with the supplied args.
    */
-  async callHelper(registryInjection: string, name: string, args: unknown[] = []): Promise<EvaluateResult> {
+  async callHelper(
+    registryInjection: string,
+    name: string,
+    args: unknown[] = [],
+  ): Promise<EvaluateResult> {
     const callExpr = `(function(){
       ${registryInjection};
       var fn = window.__horizon && window.__horizon.helpers && window.__horizon.helpers[${JSON.stringify(name)}];
@@ -650,7 +775,10 @@ const MARK_REMOVE_JS = `(() => { const o = document.getElementById('__horizon_ma
  * page-coordinate rectangle the sort needs to read.
  */
 export interface RawMark {
-  x: number; y: number; w: number; h: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
   tag: string;
   role: string | null;
   label: string;

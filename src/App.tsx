@@ -1,27 +1,27 @@
-import React, { useCallback } from 'react';
-import { TitleBar } from './components/chrome/TitleBar';
-import { Toolbar } from './components/chrome/Toolbar';
-import { TabBar } from './components/chrome/TabBar';
-import { BookmarksBar } from './components/chrome/BookmarksBar';
-import { BrowserContentArea } from './components/chrome/BrowserContentArea';
-import { FindInPage } from './components/overlays/FindInPage';
-import { TranslationBar } from './components/overlays/TranslationBar';
-import { PageErrorOverlay } from './components/overlays/PageErrorOverlay';
-import { DownloadsShelf } from './components/overlays/DownloadsShelf';
-import { HistoryPanel } from './components/overlays/HistoryPanel';
-import { BookmarksPanel } from './components/overlays/BookmarksPanel';
-import { SettingsPanel } from './components/overlays/SettingsPanel';
-import { AIPanel } from './components/overlays/AIPanel';
-import { CommandPalette } from './components/overlays/CommandPalette';
-import { PermissionPrompt } from './components/overlays/PermissionPrompt';
-import { AiActionPrompt } from './components/overlays/AiActionPrompt';
-import { useBrowserStore } from './stores/browserStore';
-import { useTabs } from './hooks/useTabs';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { useMenuCommands } from './hooks/useMenuCommands';
-import { useLlmsTxtGuide } from './hooks/useLlmsTxtGuide';
-import { useAskFromSelection } from './hooks/useAskFromSelection';
-import { useTheme } from './hooks/useTheme';
+import React, { useCallback } from "react";
+import { TitleBar } from "./components/chrome/TitleBar";
+import { Toolbar } from "./components/chrome/Toolbar";
+import { TabBar } from "./components/chrome/TabBar";
+import { BookmarksBar } from "./components/chrome/BookmarksBar";
+import { BrowserContentArea } from "./components/chrome/BrowserContentArea";
+import { FindInPage } from "./components/overlays/FindInPage";
+import { TranslationBar } from "./components/overlays/TranslationBar";
+import { PageErrorOverlay } from "./components/overlays/PageErrorOverlay";
+import { DownloadsShelf } from "./components/overlays/DownloadsShelf";
+import { HistoryPanel } from "./components/overlays/HistoryPanel";
+import { BookmarksPanel } from "./components/overlays/BookmarksPanel";
+import { SettingsPanel } from "./components/overlays/SettingsPanel";
+import { AIPanel } from "./components/overlays/AIPanel";
+import { CommandPalette } from "./components/overlays/CommandPalette";
+import { PermissionPrompt } from "./components/overlays/PermissionPrompt";
+import { AiActionPrompt } from "./components/overlays/AiActionPrompt";
+import { useBrowserStore } from "./stores/browserStore";
+import { useTabs } from "./hooks/useTabs";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useMenuCommands } from "./hooks/useMenuCommands";
+import { useLlmsTxtGuide } from "./hooks/useLlmsTxtGuide";
+import { useAskFromSelection } from "./hooks/useAskFromSelection";
+import { useTheme } from "./hooks/useTheme";
 
 const App: React.FC = () => {
   useTabs();
@@ -37,12 +37,15 @@ const App: React.FC = () => {
 
   const handleReload = useCallback(() => {
     if (activeTabId) {
-      window.horizonAPI.invoke('navigation:reload', { tabId: activeTabId });
+      window.horizonAPI.invoke("navigation:reload", { tabId: activeTabId });
     }
   }, [activeTabId]);
 
   return (
-    <div className="flex flex-col h-screen relative" style={{ background: 'var(--chrome-bg)' }}>
+    <div
+      className="flex flex-col h-screen relative"
+      style={{ background: "var(--chrome-bg)" }}
+    >
       <TitleBar />
       <TabBar />
       <Toolbar />
@@ -51,9 +54,9 @@ const App: React.FC = () => {
         <div
           className="flex-1 min-w-0 relative overflow-hidden"
           style={{
-            background: 'var(--surface-1)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-card)',
+            background: "var(--surface-1)",
+            borderRadius: "var(--radius-lg)",
+            boxShadow: "var(--shadow-card)",
           }}
         >
           <BrowserContentArea />

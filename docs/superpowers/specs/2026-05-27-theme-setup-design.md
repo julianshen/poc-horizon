@@ -25,13 +25,14 @@ Currently `Settings.theme` exists in the data model and appears as a dropdown in
 ```typescript
 // src/types/browser.ts
 export interface Settings {
-  theme: 'system' | 'dia' | 'midnight' | 'ocean' | 'forest';
+  theme: "system" | "dia" | "midnight" | "ocean" | "forest";
   accentColor: string;
   // ... other fields unchanged
 }
 ```
 
 Legacy values `'light'` and `'dark'` are **deprecated**. `SettingsManager` migrates them on load:
+
 - `'light'` → `'dia'`
 - `'dark'` → `'midnight'`
 
@@ -40,8 +41,8 @@ Legacy values `'light'` and `'dark'` are **deprecated**. `SettingsManager` migra
 ```typescript
 // shared/constants.ts
 export const DEFAULT_SETTINGS = {
-  theme: 'system' as const,
-  accentColor: '', // empty = use preset default
+  theme: "system" as const,
+  accentColor: "", // empty = use preset default
   // ...
 };
 ```
@@ -59,8 +60,8 @@ Each preset is a full `[data-theme="<name>"]` block that redefines all relevant 
 
 [data-theme="midnight"] {
   --chrome-bg: #08090c;
-  --chrome-bg-top: rgba(8, 9, 12, 0.90);
-  --chrome-bg-chrome: rgba(13, 15, 20, 0.80);
+  --chrome-bg-top: rgba(8, 9, 12, 0.9);
+  --chrome-bg-chrome: rgba(13, 15, 20, 0.8);
   --chrome-fg: #f3f3f5;
   --chrome-fg-muted: #9a9ca8;
   --chrome-fg-subtle: #5d5f6b;
@@ -70,12 +71,18 @@ Each preset is a full `[data-theme="<name>"]` block that redefines all relevant 
   --surface-2: #191b22;
   --surface-hover: #22242d;
   --surface-overlay: rgba(19, 21, 27, 0.85);
-  --tab-bg-active: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  --tab-bg-active: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
   --tab-bg-hover: rgba(255, 255, 255, 0.04);
-  --tab-shadow-active: 0 1px 0 rgba(255,255,255,0.06) inset, 0 0 0 0.5px rgba(255,255,255,0.14);
+  --tab-shadow-active:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 0 0.5px rgba(255, 255, 255, 0.14);
   --omnibox-bg: #13151b;
   --omnibox-bg-focus: #191b22;
-  --omnibox-ring: rgba(232, 163, 104, 0.20);
+  --omnibox-ring: rgba(232, 163, 104, 0.2);
   --accent-primary: #e8a368;
   --accent-soft: rgba(232, 163, 104, 0.14);
   --accent-light: rgba(232, 163, 104, 0.14);
@@ -100,13 +107,14 @@ Each preset is a full `[data-theme="<name>"]` block that redefines all relevant 
   --surface-overlay: rgba(235, 241, 247, 0.92);
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-hover: rgba(0, 30, 60, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(10, 25, 40, 0.06), 0 0 0 0.5px rgba(10, 25, 40, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(10, 25, 40, 0.06), 0 0 0 0.5px rgba(10, 25, 40, 0.06);
   --omnibox-bg: #ffffff;
   --omnibox-bg-focus: #ffffff;
   --omnibox-ring: rgba(42, 130, 200, 0.18);
   --accent-primary: #2a82c8;
-  --accent-soft: rgba(42, 130, 200, 0.10);
-  --accent-light: rgba(42, 130, 200, 0.10);
+  --accent-soft: rgba(42, 130, 200, 0.1);
+  --accent-light: rgba(42, 130, 200, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #2a82c8 0%, #5eb8e8 100%);
   --ai-accent: #2a82c8;
@@ -128,13 +136,14 @@ Each preset is a full `[data-theme="<name>"]` block that redefines all relevant 
   --surface-overlay: rgba(236, 240, 232, 0.92);
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-hover: rgba(20, 50, 15, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(15, 30, 12, 0.06), 0 0 0 0.5px rgba(15, 30, 12, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(15, 30, 12, 0.06), 0 0 0 0.5px rgba(15, 30, 12, 0.06);
   --omnibox-bg: #ffffff;
   --omnibox-bg-focus: #ffffff;
   --omnibox-ring: rgba(70, 150, 80, 0.18);
   --accent-primary: #469650;
-  --accent-soft: rgba(70, 150, 80, 0.10);
-  --accent-light: rgba(70, 150, 80, 0.10);
+  --accent-soft: rgba(70, 150, 80, 0.1);
+  --accent-light: rgba(70, 150, 80, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #469650 0%, #82c860 100%);
   --ai-accent: #469650;
@@ -163,6 +172,7 @@ Accent color is applied at runtime by injecting a `<style id="accent-override">`
 ```
 
 **Notes:**
+
 - `--accent-soft` and `--accent-light` both resolve to the same 10% opacity value. They are separate variables for semantic clarity (`--accent-soft` is used for button/tab hover backgrounds; `--accent-light` is used for pills and badges).
 - The override style is appended to `<head>` after the main CSS so it wins in the cascade.
 - If `accentColor` is empty, invalid, or not a 3/6-digit hex string, the `accent-override` tag is removed and the preset's default accent is used.
@@ -211,9 +221,9 @@ export function buildAccentStyle(accentColor: string): string;
 
 /** Resolve a theme setting to a concrete preset name. */
 export function resolveTheme(
-  theme: Settings['theme'],
-  isDarkOS: boolean
-): 'dia' | 'midnight' | 'ocean' | 'forest';
+  theme: Settings["theme"],
+  isDarkOS: boolean,
+): "dia" | "midnight" | "ocean" | "forest";
 ```
 
 ---
@@ -243,19 +253,19 @@ Add below the theme selector:
   <div className="flex items-center gap-2">
     <input
       type="color"
-      value={settings?.accentColor || '#d44d7a'}
-      onChange={(e) => update('accentColor', e.target.value)}
+      value={settings?.accentColor || "#d44d7a"}
+      onChange={(e) => update("accentColor", e.target.value)}
       className="w-8 h-8 rounded cursor-pointer"
     />
     {settings?.accentColor ? (
       <button
         className="text-xs underline"
-        onClick={() => update('accentColor', '')}
+        onClick={() => update("accentColor", "")}
       >
         Reset to default
       </button>
     ) : (
-      <span className="text-xs" style={{ color: 'var(--chrome-fg-subtle)' }}>
+      <span className="text-xs" style={{ color: "var(--chrome-fg-subtle)" }}>
         Using preset default
       </span>
     )}
@@ -264,6 +274,7 @@ Add below the theme selector:
 ```
 
 **Behavior:**
+
 - `input[type="color"]` always shows a valid hex value. When `accentColor` is empty, it falls back to the Dia default (`#d44d7a`) as a visual placeholder. The empty string in settings still means "use preset default."
 - Clicking "Reset to default" sets `accentColor` to `''`, which removes the `accent-override` style tag and restores the preset's built-in accent.
 
@@ -385,31 +396,31 @@ All new code must hit 90%+ lines/functions/branches/statements. The `useTheme` h
 
 ## 11. Files Modified / Created
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/index.css` | Edit | Add `[data-theme="ocean"]` and `[data-theme="forest"]`, remove `@media (prefers-color-scheme: dark)` |
-| `src/types/browser.ts` | Edit | Update `Settings.theme` type |
-| `shared/constants.ts` | Edit | Update `DEFAULT_SETTINGS.theme` default, bump `schemaVersion` |
-| `.electron/services/SettingsManager.ts` | Edit | Add theme migration in `load()` |
-| `src/utils/theme.ts` | Create | `hexToRgba`, `getContrastTextColor`, `lightenColor`, `buildAccentStyle`, `resolveTheme` |
-| `src/hooks/useTheme.ts` | Create | Theme application hook |
-| `src/App.tsx` | Edit | Call `useTheme()` |
-| `src/components/overlays/SettingsPanel.tsx` | Edit | Update theme options, add accent color picker |
-| `tests/unit/hooks/useTheme.test.ts` | Create | Unit tests for `useTheme` |
-| `tests/unit/utils/theme.test.ts` | Create | Unit tests for theme utilities |
-| `tests/unit/services/SettingsManager.test.ts` | Create | Unit tests for SettingsManager migration |
+| File                                          | Action | Description                                                                                          |
+| --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| `src/index.css`                               | Edit   | Add `[data-theme="ocean"]` and `[data-theme="forest"]`, remove `@media (prefers-color-scheme: dark)` |
+| `src/types/browser.ts`                        | Edit   | Update `Settings.theme` type                                                                         |
+| `shared/constants.ts`                         | Edit   | Update `DEFAULT_SETTINGS.theme` default, bump `schemaVersion`                                        |
+| `.electron/services/SettingsManager.ts`       | Edit   | Add theme migration in `load()`                                                                      |
+| `src/utils/theme.ts`                          | Create | `hexToRgba`, `getContrastTextColor`, `lightenColor`, `buildAccentStyle`, `resolveTheme`              |
+| `src/hooks/useTheme.ts`                       | Create | Theme application hook                                                                               |
+| `src/App.tsx`                                 | Edit   | Call `useTheme()`                                                                                    |
+| `src/components/overlays/SettingsPanel.tsx`   | Edit   | Update theme options, add accent color picker                                                        |
+| `tests/unit/hooks/useTheme.test.ts`           | Create | Unit tests for `useTheme`                                                                            |
+| `tests/unit/utils/theme.test.ts`              | Create | Unit tests for theme utilities                                                                       |
+| `tests/unit/services/SettingsManager.test.ts` | Create | Unit tests for SettingsManager migration                                                             |
 
 ---
 
 ## 12. Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| FOUC on startup (wrong colors flash before JS runs) | `:root` fallback is Dia light (the most common case); hook runs at `App` mount before paint |
-| Accent color override conflicts with preset CSS | Injected style uses `:root, [data-theme]` selector and is appended to `<head>` after preset CSS |
-| `matchMedia` listener memory leak | Cleanup in `useEffect` return |
+| Risk                                                | Mitigation                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| FOUC on startup (wrong colors flash before JS runs) | `:root` fallback is Dia light (the most common case); hook runs at `App` mount before paint     |
+| Accent color override conflicts with preset CSS     | Injected style uses `:root, [data-theme]` selector and is appended to `<head>` after preset CSS |
+| `matchMedia` listener memory leak                   | Cleanup in `useEffect` return                                                                   |
 | Existing users with `'light'`/`'dark'` values break | Migration in `SettingsManager.load()` maps them automatically; schemaVersion bump ensures merge |
-| Color contrast failures with arbitrary accentColor | `getContrastTextColor` computes a safe text color based on luminance |
+| Color contrast failures with arbitrary accentColor  | `getContrastTextColor` computes a safe text color based on luminance                            |
 
 ---
 
@@ -422,4 +433,4 @@ All new code must hit 90%+ lines/functions/branches/statements. The `useTheme` h
 
 ---
 
-*Approved by user on 2026-05-27.*
+_Approved by user on 2026-05-27._

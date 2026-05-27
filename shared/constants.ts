@@ -1,16 +1,16 @@
-export const APP_NAME = 'Horizon';
-export const APP_VERSION = '1.0.0';
+export const APP_NAME = "Horizon";
+export const APP_VERSION = "1.0.0";
 
 export const DEFAULT_SETTINGS = {
   schemaVersion: 2,
-  startupBehavior: 'restore' as const,
-  startupPages: ['https://duckduckgo.com'],
-  defaultSearchEngine: 'duckduckgo' as const,
-  downloadPath: '', // resolved at runtime
+  startupBehavior: "restore" as const,
+  startupPages: ["https://duckduckgo.com"],
+  defaultSearchEngine: "duckduckgo" as const,
+  downloadPath: "", // resolved at runtime
   askWhereToSave: false,
   downloadNotifications: true,
-  theme: 'dia' as const,
-  accentColor: '', // empty = use preset default
+  theme: "dia" as const,
+  accentColor: "", // empty = use preset default
   showBookmarksBar: true,
   showStatusBar: true,
   fontSize: 16,
@@ -27,16 +27,16 @@ export const DEFAULT_SETTINGS = {
   },
   doNotTrack: false,
   defaultPermissions: {
-    geolocation: 'block',
-    camera: 'block',
-    microphone: 'block',
-    notifications: 'block',
-    midi: 'block',
-    midiSysex: 'block',
-    pointerLock: 'ask',
-    fullscreen: 'allow',
-    openExternal: 'ask',
-    'display-capture': 'block',
+    geolocation: "block",
+    camera: "block",
+    microphone: "block",
+    notifications: "block",
+    midi: "block",
+    midiSysex: "block",
+    pointerLock: "ask",
+    fullscreen: "allow",
+    openExternal: "ask",
+    "display-capture": "block",
   } as const,
   permissionOverrides: {},
   contentSettings: {},
@@ -46,19 +46,19 @@ export const DEFAULT_SETTINGS = {
   confirmCloseMultipleTabs: true,
   hardwareAcceleration: true,
   smoothScrolling: true,
-  proxyType: 'system' as const,
+  proxyType: "system" as const,
   proxyRules: undefined as string | undefined,
   proxyBypassRules: undefined as string | undefined,
   spellcheck: true,
-  spellcheckLanguages: ['en-US'],
+  spellcheckLanguages: ["en-US"],
   certificateOverrides: {},
   // ─── AI / Pi agent (POC) ─────────────────────────────────────────
   /** Master toggle for the Pi agent integration. */
   aiEnabled: false,
   /** Path or name of the `pi` binary; if not on $PATH, an absolute path. */
-  aiPiBinary: 'pi',
+  aiPiBinary: "pi",
   /** Extra flags passed to `pi`. Session persists across app restarts via aiSessionPath. */
-  aiPiArgs: ['--mode', 'rpc'],
+  aiPiArgs: ["--mode", "rpc"],
   /**
    * Pi session file paths captured automatically; used to resume the
    * conversation on the next app launch. Keyed by window kind so a
@@ -78,7 +78,7 @@ export const DEFAULT_SETTINGS = {
    *   'all'   — prompt before every single tool call.
    * Prompts time out (deny) after 60s.
    */
-  aiConfirmActions: 'never' as 'never' | 'risky' | 'all',
+  aiConfirmActions: "never" as "never" | "risky" | "all",
   /**
    * Send `X-Horizon-Agent: true` on every outgoing request so sites
    * can identify agent-driven traffic. Agent Policy v1 § 7. Users
@@ -90,26 +90,30 @@ export const DEFAULT_SETTINGS = {
   aiSpawnOnStartup: true,
   /** Default target language for Translate Page / Translate Selection.
    *  Free-form so the user can write "Traditional Chinese", "Spanish", etc. */
-  translateTargetLang: 'English',
+  translateTargetLang: "English",
   /** Max characters of page text per @-mention prepended to the prompt. */
   aiMentionMaxChars: 30_000,
 };
 
 export const SEARCH_ENGINES = {
   duckduckgo: {
-    name: 'DuckDuckGo',
-    url: 'https://duckduckgo.com/?q={query}',
-    suggestUrl: 'https://duckduckgo.com/ac/?q={query}&type=list',
+    name: "DuckDuckGo",
+    url: "https://duckduckgo.com/?q={query}",
+    suggestUrl: "https://duckduckgo.com/ac/?q={query}&type=list",
   },
   google: {
-    name: 'Google',
-    url: 'https://www.google.com/search?q={query}',
-    suggestUrl: 'https://suggestqueries.google.com/complete/search?client=chrome&q={query}',
+    name: "Google",
+    url: "https://www.google.com/search?q={query}",
+    suggestUrl:
+      "https://suggestqueries.google.com/complete/search?client=chrome&q={query}",
   },
   bing: {
-    name: 'Bing',
-    url: 'https://www.bing.com/search?q={query}',
+    name: "Bing",
+    url: "https://www.bing.com/search?q={query}",
   },
-} as const satisfies Record<string, { name: string; url: string; suggestUrl?: string }>;
+} as const satisfies Record<
+  string,
+  { name: string; url: string; suggestUrl?: string }
+>;
 
 export type SearchEngineKey = keyof typeof SEARCH_ENGINES;

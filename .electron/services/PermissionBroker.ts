@@ -6,7 +6,7 @@
  * verify the routing without a browser.
  */
 
-export type PermissionDecision = 'allow' | 'block';
+export type PermissionDecision = "allow" | "block";
 
 export interface PermissionPrompt {
   id: string;
@@ -42,7 +42,7 @@ export class PermissionBroker {
     genId: IdGenerator = () => Math.random().toString(36).slice(2, 10),
     schedule: Schedule = setTimeout,
     cancel: Cancel = clearTimeout,
-    timeoutMs: number = DEFAULT_TIMEOUT_MS
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ) {
     this.broadcast = broadcast;
     this.genId = genId;
@@ -52,18 +52,23 @@ export class PermissionBroker {
   }
 
   /** Called from the Electron permission request handler. */
-  request(permission: string, origin: string, callback: ElectronCallback): string {
+  request(
+    permission: string,
+    origin: string,
+    callback: ElectronCallback,
+  ): string {
     const id = this.genId();
-    const timer = this.timeoutMs > 0
-      ? this.schedule(() => {
-          // Auto-deny on timeout. Mirrors the existing respond() path so the
-          // renderer can no longer reply for this id.
-          const entry = this.pending.get(id);
-          if (!entry) return;
-          this.pending.delete(id);
-          entry.callback(false);
-        }, this.timeoutMs)
-      : null;
+    const timer =
+      this.timeoutMs > 0
+        ? this.schedule(() => {
+            // Auto-deny on timeout. Mirrors the existing respond() path so the
+            // renderer can no longer reply for this id.
+            const entry = this.pending.get(id);
+            if (!entry) return;
+            this.pending.delete(id);
+            entry.callback(false);
+          }, this.timeoutMs)
+        : null;
     this.pending.set(id, { callback, timer });
     this.broadcast({ id, permission, origin });
     return id;
@@ -75,7 +80,7 @@ export class PermissionBroker {
     if (!entry) return false;
     if (entry.timer) this.cancel(entry.timer);
     this.pending.delete(id);
-    entry.callback(decision === 'allow');
+    entry.callback(decision === "allow");
     return true;
   }
 

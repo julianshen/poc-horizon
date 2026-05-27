@@ -1,6 +1,6 @@
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
-import type { SavedAddress } from '../../src/types/browser';
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
+import type { SavedAddress } from "../../src/types/browser";
 
 export class AutofillManager {
   private addresses: SavedAddress[];
@@ -11,14 +11,17 @@ export class AutofillManager {
 
   private load(): SavedAddress[] {
     try {
-      return JSON.parse(fs.readFileSync(this.addressesPath, 'utf-8'));
+      return JSON.parse(fs.readFileSync(this.addressesPath, "utf-8"));
     } catch {
       return [];
     }
   }
 
   private save(): void {
-    fs.writeFileSync(this.addressesPath, JSON.stringify(this.addresses, null, 2));
+    fs.writeFileSync(
+      this.addressesPath,
+      JSON.stringify(this.addresses, null, 2),
+    );
   }
 
   getAddresses(): SavedAddress[] {

@@ -1,14 +1,14 @@
-import { EventEmitter } from 'events';
-import type { AgentPolicy } from './agentPolicy';
-import { humanGateForTool, prohibitionForTool } from './agentPolicy';
+import { EventEmitter } from "events";
+import type { AgentPolicy } from "./agentPolicy";
+import { humanGateForTool, prohibitionForTool } from "./agentPolicy";
 
-export type ActionPolicy = 'never' | 'risky' | 'all';
+export type ActionPolicy = "never" | "risky" | "all";
 
 /** Decision the guard returns for a tool call. */
 export type ApprovalDecision =
-  | { kind: 'allow' }
-  | { kind: 'prompt'; reason?: string }
-  | { kind: 'deny'; reason: string };
+  | { kind: "allow" }
+  | { kind: "prompt"; reason?: string }
+  | { kind: "deny"; reason: string };
 
 export interface ActionPrompt {
   id: string;
@@ -28,14 +28,19 @@ export interface ActionPrompt {
  * would be unusable.
  */
 const RISKY_TOOLS = new Set<string>([
-  'click', 'type', 'scroll',
-  'navigate',
-  'cdp',              // raw CDP — can do anything; safest to gate
-  'callHelper',       // user-saved JS runs in page
-  'evaluate',         // arbitrary JS
-  'domainSkillSave', 'domainSkillRemove',
-  'saveHelper', 'removeHelper',
-  'cdpSubscribe', 'cdpUnsubscribe',
+  "click",
+  "type",
+  "scroll",
+  "navigate",
+  "cdp", // raw CDP — can do anything; safest to gate
+  "callHelper", // user-saved JS runs in page
+  "evaluate", // arbitrary JS
+  "domainSkillSave",
+  "domainSkillRemove",
+  "saveHelper",
+  "removeHelper",
+  "cdpSubscribe",
+  "cdpUnsubscribe",
 ]);
 
 /**
@@ -54,7 +59,10 @@ const RISKY_TOOLS = new Set<string>([
  * renderer.
  */
 export class AiActionGuard extends EventEmitter {
-  private pending = new Map<string, { resolve: (v: boolean) => void; timer: NodeJS.Timeout }>();
+  private pending = new Map<
+    string,
+    { resolve: (v: boolean) => void; timer: NodeJS.Timeout }
+  >();
   private counter = 0;
 
   /** Active site policy, if any. Updated by main on navigate. */
@@ -63,10 +71,16 @@ export class AiActionGuard extends EventEmitter {
   constructor(
     private policyFn: () => ActionPolicy,
     private readonly timeoutMs: number = 60_000,
-  ) { super(); }
+  ) {
+    super();
+  }
 
-  setSitePolicy(p: AgentPolicy | null): void { this.sitePolicy = p; }
-  getSitePolicy(): AgentPolicy | null { return this.sitePolicy; }
+  setSitePolicy(p: AgentPolicy | null): void {
+    this.sitePolicy = p;
+  }
+  getSitePolicy(): AgentPolicy | null {
+    return this.sitePolicy;
+  }
 
   /**
    * Three-state decision combining the user's `aiConfirmActions` policy
@@ -85,21 +99,25 @@ export class AiActionGuard extends EventEmitter {
     // Site policy: prohibited triggers — hard deny.
     const prohibition = prohibitionForTool(tool, this.sitePolicy);
     if (prohibition) {
-      return { kind: 'deny', reason: `site policy prohibits: ${prohibition}` };
+      return { kind: "deny", reason: `site policy prohibits: ${prohibition}` };
     }
     // Site policy: requires_human triggers — force prompt.
     const humanTrigger = humanGateForTool(tool, args, this.sitePolicy);
-    if (humanTrigger) return { kind: 'prompt', reason: `site requires human for ${humanTrigger}` };
+    if (humanTrigger)
+      return {
+        kind: "prompt",
+        reason: `site requires human for ${humanTrigger}`,
+      };
 
     // Fall back to user's confirmation policy.
     const p = this.policyFn();
-    if (p === 'never') return { kind: 'allow' };
-    if (p === 'all') return { kind: 'prompt' };
-    return RISKY_TOOLS.has(tool) ? { kind: 'prompt' } : { kind: 'allow' };
+    if (p === "never") return { kind: "allow" };
+    if (p === "all") return { kind: "prompt" };
+    return RISKY_TOOLS.has(tool) ? { kind: "prompt" } : { kind: "allow" };
   }
 
   needsApproval(tool: string, args: Record<string, unknown> = {}): boolean {
-    return this.evaluate(tool, args).kind !== 'allow';
+    return this.evaluate(tool, args).kind !== "allow";
   }
 
   /** Resolved with true (allow) / false (deny). Auto-denies on timeout. */
@@ -114,7 +132,7 @@ export class AiActionGuard extends EventEmitter {
         e.resolve(false);
       }, this.timeoutMs);
       this.pending.set(id, { resolve, timer });
-      this.emit('prompt', { id, tool, args, summary });
+      this.emit("prompt", { id, tool, args, summary });
     });
   }
 
@@ -145,20 +163,34 @@ export class AiActionGuard extends EventEmitter {
    */
   private summarize(tool: string, args: Record<string, unknown>): string {
     switch (tool) {
-      case 'navigate':   return `Navigate to ${String(args.url ?? '?')}`;
-      case 'click':      return `Click at (${args.x}, ${args.y})`;
-      case 'type':       return `Type ${String(args.text ?? '').slice(0, 40)}…`;
-      case 'scroll':     return `Scroll by (${args.deltaX ?? 0}, ${args.deltaY ?? 0})`;
-      case 'evaluate':   return `Run JS: ${String(args.expression ?? '').slice(0, 60)}…`;
-      case 'cdp':        return `Raw CDP: ${String(args.method ?? '')}`;
-      case 'callHelper': return `Call helper '${String(args.name ?? '')}'`;
-      case 'saveHelper': return `Save helper '${String(args.name ?? '')}'`;
-      case 'removeHelper': return `Remove helper '${String(args.name ?? '')}'`;
-      case 'domainSkillSave': return `Save note for ${String(args.host)}: ${String(args.name)}`;
-      case 'domainSkillRemove': return `Delete note ${String(args.host)}/${String(args.name)}`;
-      case 'cdpSubscribe': return `Subscribe to CDP event: ${String(args.method)}`;
-      case 'cdpUnsubscribe': return `Unsubscribe CDP event`;
-      default: return tool;
+      case "navigate":
+        return `Navigate to ${String(args.url ?? "?")}`;
+      case "click":
+        return `Click at (${args.x}, ${args.y})`;
+      case "type":
+        return `Type ${String(args.text ?? "").slice(0, 40)}…`;
+      case "scroll":
+        return `Scroll by (${args.deltaX ?? 0}, ${args.deltaY ?? 0})`;
+      case "evaluate":
+        return `Run JS: ${String(args.expression ?? "").slice(0, 60)}…`;
+      case "cdp":
+        return `Raw CDP: ${String(args.method ?? "")}`;
+      case "callHelper":
+        return `Call helper '${String(args.name ?? "")}'`;
+      case "saveHelper":
+        return `Save helper '${String(args.name ?? "")}'`;
+      case "removeHelper":
+        return `Remove helper '${String(args.name ?? "")}'`;
+      case "domainSkillSave":
+        return `Save note for ${String(args.host)}: ${String(args.name)}`;
+      case "domainSkillRemove":
+        return `Delete note ${String(args.host)}/${String(args.name)}`;
+      case "cdpSubscribe":
+        return `Subscribe to CDP event: ${String(args.method)}`;
+      case "cdpUnsubscribe":
+        return `Unsubscribe CDP event`;
+      default:
+        return tool;
     }
   }
 }

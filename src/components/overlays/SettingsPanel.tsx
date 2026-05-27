@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { SidePanel } from './SidePanel';
 import { useBrowserStore } from '../../stores/browserStore';
 import type { Settings } from '../../types/browser';
+import { Section, Field, Select, TextInput, Toggle } from './SettingsPanel.parts';
 
 export const SettingsPanel: React.FC = () => {
   const { showSettings, toggleOverlay } = useBrowserStore();
@@ -84,6 +85,42 @@ export const SettingsPanel: React.FC = () => {
               ]}
             />
           </Field>
+          <Toggle
+            label="Advertise agent traffic (X-Horizon-Agent header)"
+            checked={settings?.aiAdvertiseAgent ?? true}
+            onChange={(v) => update('aiAdvertiseAgent', v)}
+          />
+        </Section>
+        <Section title="Proxy">
+          <Field label="Proxy type">
+            <Select
+              value={(settings?.proxyType as string) ?? 'system'}
+              onChange={(v) => update('proxyType', v as 'system' | 'direct' | 'manual')}
+              options={[
+                ['system', 'Use system proxy'],
+                ['direct', 'Direct (no proxy)'],
+                ['manual', 'Manual configuration'],
+              ]}
+            />
+          </Field>
+          {settings?.proxyType === 'manual' && (
+            <>
+              <Field label="Proxy rules">
+                <TextInput
+                  value={settings?.proxyRules ?? ''}
+                  onChange={(v) => update('proxyRules', v)}
+                  placeholder="http=127.0.0.1:8080;https=127.0.0.1:8443"
+                />
+              </Field>
+              <Field label="Bypass rules">
+                <TextInput
+                  value={settings?.proxyBypassRules ?? ''}
+                  onChange={(v) => update('proxyBypassRules', v)}
+                  placeholder="<local>,*.internal"
+                />
+              </Field>
+            </>
+          )}
         </Section>
         <Section title="Downloads">
           <Toggle
@@ -97,81 +134,3 @@ export const SettingsPanel: React.FC = () => {
   );
 };
 
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <section>
-    <h3
-      className="text-[11px] font-semibold tracking-wide uppercase mb-2"
-      style={{ color: 'var(--chrome-fg-muted)', letterSpacing: '0.08em' }}
-    >
-      {title}
-    </h3>
-    <div className="space-y-2">{children}</div>
-  </section>
-);
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <label className="flex items-center justify-between gap-3 text-sm" style={{ color: 'var(--chrome-fg)' }}>
-    <span>{label}</span>
-    {children}
-  </label>
-);
-
-interface SelectProps {
-  value: string;
-  onChange: (v: string) => void;
-  options: ReadonlyArray<readonly [string, string]>;
-}
-
-const Select: React.FC<SelectProps> = ({ value, onChange, options }) => (
-  <select
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    className="h-8 px-2 rounded-md text-sm outline-none"
-    style={{
-      background: 'var(--omnibox-bg)',
-      color: 'var(--chrome-fg)',
-      border: '1px solid var(--chrome-border)',
-    }}
-  >
-    {options.map(([v, label]) => (
-      <option key={v} value={v}>
-        {label}
-      </option>
-    ))}
-  </select>
-);
-
-const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({
-  label,
-  checked,
-  onChange,
-}) => (
-  <label className="flex items-center justify-between text-sm cursor-pointer" style={{ color: 'var(--chrome-fg)' }}>
-    <span>{label}</span>
-    <span
-      role="switch"
-      aria-checked={checked}
-      tabIndex={0}
-      onClick={() => onChange(!checked)}
-      onKeyDown={(e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          onChange(!checked);
-        }
-      }}
-      className="relative w-9 h-5 rounded-full transition-colors"
-      style={{
-        background: checked ? 'var(--accent-primary)' : 'var(--chrome-border)',
-      }}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full"
-        style={{
-          transform: checked ? 'translateX(16px)' : 'translateX(0)',
-          transition: 'transform var(--transition-fast)',
-          boxShadow: 'var(--shadow-sm)',
-        }}
-      />
-    </span>
-  </label>
-);

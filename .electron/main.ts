@@ -674,8 +674,7 @@ app.whenReady().then(() => {
   installAgentIdentificationHeader(getIncognitoSession());
   // Apply user-configured proxy to both core sessions. setProxy can
   // reject on malformed config — surface the failure rather than
-  // letting it become an unhandled rejection. The user's proxy
-  // settings are settable, so this isn't a "should never happen" path.
+  // letting it become an unhandled rejection.
   applyProxySettingsToCoreSessions({
     proxyType: settingsManager.get('proxyType'),
     proxyRules: settingsManager.get('proxyRules'),

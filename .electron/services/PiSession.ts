@@ -167,7 +167,7 @@ export class PiSession extends EventEmitter {
         return;
 
       case 'message_update': {
-        const ev = msg.assistantMessageEvent as { type?: string; delta?: string } | undefined;
+        const ev = msg.assistantMessageEvent as { type?: string; delta?: string; reason?: string; errorMessage?: string } | undefined;
         if (ev?.type === 'text_delta' && typeof ev.delta === 'string') {
           // Pi burst-delivers responses (e.g. 200 deltas in 30ms when the
           // upstream LLM batches). Coalesce into ≤60Hz flushes so the
@@ -176,6 +176,36 @@ export class PiSession extends EventEmitter {
           if (!this.flushTimer) {
             this.flushTimer = setTimeout(() => this.flushDeltas(), 16);
           }
+          return;
+        }
+        // Upstream error from the LLM provider (rate limit, size limit,
+        // auth, 5xx). Pi emits this as assistantMessageEvent.type='error'
+        // and then DOES NOT necessarily emit agent_end — the turn never
+        // properly completed. We must clear `running` ourselves or the
+        // UI shows "Thinking…" forever.
+        if (ev?.type === 'error') {
+          this.flushDeltas();
+          const reason = ev.reason ?? 'error';
+          const detail = ev.errorMessage ?? '(no detail)';
+          this.emitEvent({ type: 'error', message: `Agent error (${reason}): ${detail}` });
+          this.emitEvent({ type: 'turn_end', reason: 'error' });
+          this.running = false;
+        }
+        return;
+      }
+
+      case 'auto_retry_end': {
+        // Pi retries transient errors (5xx, rate limit). If the retry
+        // ultimately failed (`aborted: true`), the assistant message
+        // never streams to completion — surface the final error and
+        // clear `running` so the spinner stops.
+        const aborted = msg.aborted as boolean | undefined;
+        const finalError = msg.finalError as string | undefined;
+        if (aborted && finalError) {
+          this.flushDeltas();
+          this.emitEvent({ type: 'error', message: `Agent retry failed: ${finalError}` });
+          this.emitEvent({ type: 'turn_end', reason: 'error' });
+          this.running = false;
         }
         return;
       }

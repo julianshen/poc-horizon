@@ -16,6 +16,24 @@ export function useMenuCommands(): void {
         case 'find:open':
           toggleOverlay('showFindBar');
           break;
+        case 'translate:open':
+          if (!useBrowserStore.getState().showTranslationBar) {
+            toggleOverlay('showTranslationBar');
+          }
+          break;
+        case 'translate:restore':
+          // Ensure the bar is visible so the user can see the restored
+          // state (and can re-translate without re-opening the menu).
+          if (!useBrowserStore.getState().showTranslationBar) {
+            toggleOverlay('showTranslationBar');
+          }
+          // Tell TranslationBar to clear its per-tab status so the bar
+          // doesn't keep showing "Show Original" after restore. The IPC
+          // is invoked from inside the bar's listener to keep a single
+          // restore path (no double-dispatch).
+          window.dispatchEvent(new Event('horizon:translate-restore'));
+          void window.horizonAPI.invoke('translate:restore');
+          break;
         case 'panel:history':
           toggleOverlay('showHistory');
           break;

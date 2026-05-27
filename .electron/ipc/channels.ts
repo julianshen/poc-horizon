@@ -64,6 +64,7 @@ export const IPC_CHANNELS = {
   AI_ACTION_DECIDE: 'ai:actionDecide',
   TRANSLATE_PAGE: 'translate:page',
   TRANSLATE_RESTORE: 'translate:restore',
+  TRANSLATE_CANCEL: 'translate:cancel',
   TRANSLATE_SELECTION: 'translate:selection',
   TRANSLATE_PROGRESS: 'translate:progress',
   WORKFLOW_LIST: 'workflow:list',

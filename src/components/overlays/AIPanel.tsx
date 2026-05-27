@@ -925,15 +925,16 @@ function surfaceIdOf(msg: A2UIMessage): string | null {
   return null;
 }
 
-/** True when the tool result looks like a base64 PNG (browser_screenshot). */
+/** True when the tool result looks like a base64 image (browser_screenshot / _marked). */
 function isImageResult(out: unknown): boolean {
   if (!out || typeof out !== 'object') return false;
   const o = out as { format?: string; base64?: string };
-  return o.format === 'png' && typeof o.base64 === 'string';
+  return (o.format === 'png' || o.format === 'jpeg') && typeof o.base64 === 'string';
 }
 function imageDataUri(out: unknown): string {
-  const o = out as { base64: string };
-  return `data:image/png;base64,${o.base64}`;
+  const o = out as { format?: string; base64: string };
+  const mime = o.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  return `data:${mime};base64,${o.base64}`;
 }
 
 const ThinkingDots: React.FC = () => (

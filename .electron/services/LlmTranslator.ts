@@ -5,6 +5,8 @@ interface TranslateOptions {
   binary?: string;
   /** Hard timeout in ms (default: 60_000). */
   timeoutMs?: number;
+  /** Abort signal to cancel translation. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -34,17 +36,43 @@ export async function translateText(
     text;
 
   return new Promise<string | null>((resolve) => {
+    if (opts.signal?.aborted) {
+      resolve(null);
+      return;
+    }
+
     const proc = spawn(binary, ['-p', '--no-session', '--no-tools', prompt], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
     let killed = false;
-    const timer = setTimeout(() => { killed = true; proc.kill(); }, timeoutMs);
+    let timer: NodeJS.Timeout | null = null;
+
+    const cleanup = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
+    };
+    const onAbort = () => {
+      killed = true;
+      cleanup();        // clear the timeout + drop the listener synchronously
+      proc.kill();
+      resolve(null);
+    };
+
+    if (opts.signal) {
+      if (opts.signal.aborted) { onAbort(); return; }
+      opts.signal.addEventListener('abort', onAbort);
+    }
+
+    timer = setTimeout(() => { killed = true; cleanup(); proc.kill(); }, timeoutMs);
     proc.stdout.setEncoding('utf8');
     proc.stdout.on('data', (c: string) => { out += c; });
-    proc.on('error', () => { clearTimeout(timer); resolve(null); });
+    proc.on('error', () => {
+      cleanup();
+      resolve(null);
+    });
     proc.on('exit', () => {
-      clearTimeout(timer);
+      cleanup();
       if (killed) { resolve(null); return; }
       const trimmed = out.trim();
       resolve(trimmed.length > 0 ? trimmed : null);

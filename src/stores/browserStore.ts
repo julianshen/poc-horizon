@@ -10,6 +10,17 @@ interface BrowserState {
   showHistory: boolean;
   showDownloads: boolean;
   showFindBar: boolean;
+  showTranslationBar: boolean;
+  translationProgress: { translated: number; total: number } | null;
+  setTranslationProgress: (progress: { translated: number; total: number } | null) => void;
+  /**
+   * Per-tab translation status. Keyed by tabId so completion of a
+   * background translation isn't lost when the user switches tabs and
+   * back. TranslationBar reads its visible state from the entry for
+   * activeTabId; absent = idle.
+   */
+  translationStatesByTab: Record<string, { status: 'translating' | 'done' | 'error'; errorMsg?: string }>;
+  setTranslationStateForTab: (tabId: string, state: { status: 'translating' | 'done' | 'error'; errorMsg?: string } | null) => void;
   showAI: boolean;
   showCmd: boolean;
   /** Queue of llms.txt navigation guides pushed by main when a new
@@ -46,7 +57,7 @@ interface BrowserState {
   reorderTab: (tabId: string, targetIndex: number) => void;
   upsertGroup: (group: TabGroup) => void;
   removeGroup: (groupId: string) => void;
-  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd') => void;
+  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd' | 'showTranslationBar') => void;
 }
 
 export const useBrowserStore = create<BrowserState>((set) => ({
@@ -58,6 +69,15 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   showHistory: false,
   showDownloads: false,
   showFindBar: false,
+  showTranslationBar: false,
+  translationProgress: null,
+  setTranslationProgress: (translationProgress) => set({ translationProgress }),
+  translationStatesByTab: {},
+  setTranslationStateForTab: (tabId, state) => set((s) => {
+    const next = { ...s.translationStatesByTab };
+    if (state === null) delete next[tabId]; else next[tabId] = state;
+    return { translationStatesByTab: next };
+  }),
   showAI: false,
   showCmd: false,
   showAppMenu: false,

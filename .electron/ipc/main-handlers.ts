@@ -2,6 +2,8 @@ import { ipcMain, BrowserWindow, IpcMainInvokeEvent, session } from 'electron';
 import { IPC_CHANNELS } from './channels';
 import { applySpellcheckToSession } from '../services/spellcheck';
 import { TabManager } from '../services/TabManager';
+import { translatePage, restorePage } from '../services/pageTranslator';
+import { translateText } from '../services/LlmTranslator';
 import { SettingsManager } from '../services/SettingsManager';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
@@ -9,6 +11,8 @@ import { DownloadManager } from '../services/DownloadManager';
 import { PasswordManager } from '../services/PasswordManager';
 import { AutofillManager } from '../services/AutofillManager';
 import type { IpcChannels } from '../../src/types/ipc';
+
+const activeTranslations = new Map<string, AbortController>();
 
 export interface WindowContext {
   tabManager: TabManager;
@@ -165,4 +169,86 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
   );
   handle('print:start', (event, { tabId }) => ctx(event).tabManager.print(tabId));
   handle('print:toPDF', (event, { tabId, outputPath }) => ctx(event).tabManager.printToPDF(tabId, outputPath));
+
+  handle('translate:page', async (event, { targetLang }) => {
+    const context = ctx(event);
+    const tabId = context.tabManager.getActiveTabId();
+    if (!tabId) return { ok: false, error: 'no active tab' };
+    const view = context.tabManager.getBrowserView(tabId);
+    if (!view) return { ok: false, error: 'no active tab' };
+
+    const existing = activeTranslations.get(tabId);
+    if (existing) {
+      existing.abort();
+    }
+
+    const controller = new AbortController();
+    activeTranslations.set(tabId, controller);
+
+    // Stamp every progress event with the source tabId so the renderer
+    // (a single TranslationBar instance) can ignore events from background
+    // tabs while showing the active one.
+    const onProgress = (translated: number, total: number) => {
+      if (!context.window.isDestroyed() && !controller.signal.aborted) {
+        context.window.webContents.send('translate:progress', {
+          tabId,
+          translated,
+          total,
+          done: false,
+        });
+      }
+    };
+
+    try {
+      const result = await translatePage(view.webContents, targetLang, onProgress, controller.signal);
+      if (!context.window.isDestroyed() && !controller.signal.aborted) {
+        context.window.webContents.send('translate:progress', {
+          tabId,
+          translated: result.translated ?? 0,
+          total: result.total ?? 0,
+          done: true,
+        });
+      }
+      return result;
+    } finally {
+      if (activeTranslations.get(tabId) === controller) {
+        activeTranslations.delete(tabId);
+      }
+    }
+  });
+
+  handle('translate:cancel', (event) => {
+    const context = ctx(event);
+    const tabId = context.tabManager.getActiveTabId();
+    if (tabId) {
+      const controller = activeTranslations.get(tabId);
+      if (controller) {
+        controller.abort();
+        activeTranslations.delete(tabId);
+      }
+    }
+    return {};
+  });
+
+  handle('translate:restore', async (event) => {
+    const context = ctx(event);
+    const tabId = context.tabManager.getActiveTabId();
+    if (!tabId) return { restored: 0 };
+    // Abort any in-flight translation for this tab first — otherwise the
+    // controller's outstanding batches keep applying after restore and
+    // re-overwrite the original DOM text.
+    const controller = activeTranslations.get(tabId);
+    if (controller) {
+      controller.abort();
+      activeTranslations.delete(tabId);
+    }
+    const view = context.tabManager.getBrowserView(tabId);
+    if (!view) return { restored: 0 };
+    return restorePage(view.webContents);
+  });
+
+  handle('translate:selection', async (_event, { text, targetLang }) => {
+    const res = await translateText(text, targetLang);
+    return res;
+  });
 }

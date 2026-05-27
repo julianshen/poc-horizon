@@ -162,11 +162,13 @@ export interface IpcChannels {
   'translate:page': { targetLang: string };
   /** Roll back a previously-translated page to its original text. */
   'translate:restore': Record<string, never>;
+  /** Cancel the current page translation in flight. */
+  'translate:cancel': Record<string, never>;
   /** Translate a selected text snippet; returns the translation
    *  (used by the right-click "Translate selection" overlay). */
   'translate:selection': { text: string; targetLang: string };
   /** Main → Renderer: progress updates while a page translation runs. */
-  'translate:progress': { translated: number; total: number; done: boolean };
+  'translate:progress': { tabId: string; translated: number; total: number; done: boolean };
   // Saved workflows.
   'workflow:list': Record<string, never>;
   'workflow:create': { name: string; prompt: string; attach: 'activeTab' | 'allTabs' | 'none' };

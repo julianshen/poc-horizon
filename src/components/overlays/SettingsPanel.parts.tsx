@@ -78,8 +78,16 @@ export const TextInput: React.FC<{ value: string; onChange: (v: string) => void;
     draftRef.current = e.target.value;
   }, []);
   const onKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') { commit(); e.currentTarget.blur(); }
-    else if (e.key === 'Escape') { setDraft(value); draftRef.current = value; e.currentTarget.blur(); }
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commit();
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      setDraft(value);
+      draftRef.current = value;
+      e.currentTarget.blur();
+    }
   }, [commit, value]);
   return (
     <input

@@ -88,17 +88,19 @@ describe("BrowserHarness", () => {
     ]);
   });
 
-  it("screenshot returns base64 + viewport dimensions", async () => {
-    const { wc } = fakeWc();
+  it("screenshot returns base64 + viewport dimensions (defaulting to jpeg)", async () => {
+    const { wc, calls } = fakeWc();
     const h = new BrowserHarness();
     h.attach(wc);
     const shot = await h.screenshot();
     expect(shot).toEqual({
-      format: "png",
-      base64: "BASE64PNG",
+      format: "jpeg",
+      base64: "BASE64PNG", // from fakeWc default
       width: 800,
       height: 600,
     });
+    const captureCall = calls.find((c) => c[0] === "Page.captureScreenshot");
+    expect(captureCall?.[1]).toEqual({ format: "jpeg", quality: 70 });
   });
 
   it("evaluate returns ok:true with the value on success", async () => {
@@ -418,7 +420,8 @@ describe("BrowserHarness", () => {
       (c) => c[0] === "Page.captureScreenshot",
     );
     expect(captureCall?.[1]).toEqual({
-      format: "png",
+      format: "jpeg",
+      quality: 70,
       clip: {
         x: 0,
         y: 0,

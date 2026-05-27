@@ -278,7 +278,7 @@ export class BrowserHarness {
   }
 
   async screenshot({
-    format = "png",
+    format = "jpeg",
     quality = 70,
     scale,
   }: ScreenshotOptions = {}): Promise<ScreenshotResult> {

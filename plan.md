@@ -41,5 +41,6 @@
 - [x] Test: `response` with `success: false` sets `this.running = false` and emits `turn_end`
 - [x] Test: `agent_end` with `errorMessage` or `stopReason: 'error'` in assistant message emits `error` event and clears `this.running`
 - [x] Test: `turn_end` with `errorMessage` or `stopReason: 'error'` in assistant message emits `error` event and clears `this.running`
+- [x] Test: consecutive `turn_end` and `agent_end` does not emit duplicate error events
 - [x] Fix: `PiSession.ts` command `response` failure handling
 - [x] Fix: `PiSession.ts` `agent_end` and `turn_end` error handling

@@ -372,4 +372,41 @@ describe("PiSession", () => {
     ).toBe(true);
     expect(session.isRunning).toBe(false);
   });
+
+  it("does not emit duplicate error events on consecutive turn_end and agent_end with errors", async () => {
+    void session.startTurn("go");
+    expect(session.isRunning).toBe(true);
+    emit({
+      type: "turn_end",
+      message: {
+        role: "assistant",
+        content: [],
+        stopReason: "error",
+        errorMessage: "400 bad request",
+      },
+      toolResults: [],
+    });
+    emit({
+      type: "agent_end",
+      messages: [
+        {
+          role: "assistant",
+          content: [],
+          stopReason: "error",
+          errorMessage: "400 bad request",
+        },
+      ],
+    });
+    const errorEvents = events.filter((e) => e.type === "error");
+    expect(errorEvents.length).toBe(1);
+    expect(errorEvents[0]).toMatchObject({
+      type: "error",
+      message: "400 bad request",
+    });
+    const turnEndEvents = events.filter(
+      (e) => e.type === "turn_end" && e.reason === "error",
+    );
+    expect(turnEndEvents.length).toBe(1);
+    expect(session.isRunning).toBe(false);
+  });
 });

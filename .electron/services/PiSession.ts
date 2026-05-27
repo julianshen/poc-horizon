@@ -331,10 +331,12 @@ export class PiSession extends EventEmitter {
         }
 
         if (errMsg) {
-          this.flushDeltas();
-          this.emitEvent({ type: "error", message: errMsg });
-          this.emitEvent({ type: "turn_end", reason: "error" });
-          this.running = false;
+          if (this.running) {
+            this.flushDeltas();
+            this.emitEvent({ type: "error", message: errMsg });
+            this.emitEvent({ type: "turn_end", reason: "error" });
+            this.running = false;
+          }
           return;
         }
 

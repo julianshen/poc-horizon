@@ -32,7 +32,7 @@ export const SettingsPanel: React.FC = () => {
         <Section title="Appearance">
           <Field label="Theme">
             <Select
-              value={settings?.theme ?? 'system'}
+              value={settings?.theme ?? 'dia'}
               onChange={(v) => update('theme', v as Settings['theme'])}
               options={[
                 ['system', 'Match system'],

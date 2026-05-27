@@ -36,7 +36,7 @@ describe("piSkillWriter", () => {
     expect(existsSync(filepath!)).toBe(true);
 
     const writtenBody = await fs.readFile(filepath!, "utf8");
-    
+
     // The written body should contain the safe truncated text and our safe truncation message
     expect(writtenBody).toContain("... [truncated to save token limit]");
     expect(writtenBody.indexOf("A".repeat(10000))).toBeGreaterThan(0);

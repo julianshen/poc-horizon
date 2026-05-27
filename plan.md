@@ -14,6 +14,6 @@ Refer to `plan.archived.md` for completed phases.
 ## Phase 8: Prevent token limit overflow from large llms.txt and llms-full.txt
 
 - [x] Test: `writePiSkill` truncates `llmsTxt` and `llmsFullTxt` to safe character limits
-- [ ] Test: Prompt augmentation under `AI_START` truncates `site-skills` to safe character limits
-- [ ] Fix: Update `piSkillWriter.ts` to truncate inputs
-- [ ] Fix: Update `.electron/main.ts` `AI_START` to truncate prompt-injected site skills
+- [x] Test: `Prompt augmentation under AI_START truncates site-skills to safe character limits`
+- [x] Fix: Update `piSkillWriter.ts` to truncate inputs
+- [x] Fix: Update `.electron/main.ts` `AI_START` to truncate prompt-injected site skills

@@ -12,7 +12,9 @@ import path from "path";
  */
 function truncateText(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
-  return text.slice(0, maxChars) + "\n\n... [truncated to save token limit] ...\n";
+  return (
+    text.slice(0, maxChars) + "\n\n... [truncated to save token limit] ...\n"
+  );
 }
 
 export async function writePiSkill(
@@ -39,7 +41,9 @@ export async function writePiSkill(
   if (existsSync(skillFile)) return skillFile;
 
   const truncatedLlmsTxt = truncateText(llmsTxt, 10000);
-  const truncatedLlmsFullTxt = llmsFullTxt ? truncateText(llmsFullTxt, 15000) : undefined;
+  const truncatedLlmsFullTxt = llmsFullTxt
+    ? truncateText(llmsFullTxt, 15000)
+    : undefined;
   const body = renderSkill(origin, truncatedLlmsTxt, truncatedLlmsFullTxt);
   try {
     await fs.mkdir(skillDir, { recursive: true });

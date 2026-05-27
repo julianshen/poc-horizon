@@ -40,6 +40,7 @@ import { PiSession } from "./services/PiSession";
 import { LlmsTxtResolver } from "./services/LlmsTxtResolver";
 import { parseLlmsTxt } from "./services/llmsTxtParser";
 import { writePiSkill } from "./services/piSkillWriter";
+import { buildAugmentedPrompt } from "./services/promptHelper";
 import { WorkflowsManager } from "./services/WorkflowsManager";
 import { HelperRegistry } from "./services/HelperRegistry";
 import { DomainSkills } from "./services/DomainSkills";
@@ -461,17 +462,15 @@ function registerHandlers(): void {
       // If enabled, prepend the active site's llms.txt as agent context.
       // Done out-of-band so a slow fetch can't block the turn (3s timeout
       // inside LlmsTxtResolver), and silently skipped if 404.
-      let augmentedPrompt = prompt;
+      let origin: string | undefined;
+      let skills: string | null = null;
       const useLlmsTxt = settingsManager.get(
         "aiUseLlmsTxt" as never,
       ) as boolean;
       if (useLlmsTxt) {
         try {
-          const origin = new URL(view.webContents.getURL()).origin;
-          const skills = await llmsTxtResolver.fetch(origin);
-          if (skills) {
-            augmentedPrompt = `<site-skills origin="${origin}">\n${skills}\n</site-skills>\n\n${augmentedPrompt}`;
-          }
+          origin = new URL(view.webContents.getURL()).origin;
+          skills = await llmsTxtResolver.fetch(origin);
         } catch {
           /* invalid URL (horizon:// etc.) — skip */
         }
@@ -480,11 +479,16 @@ function registerHandlers(): void {
       // @-mentioned tabs: extract title + url + visible text, wrap as
       // <page> blocks, prepend so the agent can reason across pages
       // without needing to navigate to each.
+      const pages: Array<{
+        url: string;
+        title: string;
+        text: string;
+        cap: number;
+      }> = [];
       if (mentionTabIds.length > 0) {
         const cap =
           (settingsManager.get("aiMentionMaxChars" as never) as number) ??
           30_000;
-        const blocks: string[] = [];
         for (const tabId of mentionTabIds) {
           const v = ctx.tabManager.getBrowserView(tabId);
           if (!v) continue;
@@ -499,19 +503,19 @@ function registerHandlers(): void {
               'document.body && document.body.innerText || ""',
               true,
             )) as string;
-            const truncated =
-              text.length > cap ? text.slice(0, cap) + "\n…[truncated]" : text;
-            blocks.push(
-              `<page url="${escapeAttr(url)}" title="${escapeAttr(title)}">\n${truncated}\n</page>`,
-            );
+            pages.push({ url, title, text, cap });
           } catch {
             /* tab destroyed or extract failed — skip */
           }
         }
-        if (blocks.length > 0) {
-          augmentedPrompt = `${blocks.join("\n\n")}\n\n${augmentedPrompt}`;
-        }
       }
+
+      const augmentedPrompt = buildAugmentedPrompt({
+        prompt,
+        skills,
+        origin,
+        pages,
+      });
 
       activePiSession = piSession;
       lastAgentActivityAt = Date.now();

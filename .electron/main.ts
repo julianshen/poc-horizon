@@ -19,7 +19,7 @@ import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 import { TabSessionStore } from './services/TabSessionStore';
 import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
 import { applySpellcheckToSession } from './services/spellcheck';
-import { applyProxySettingsToCoreSessions } from './services/proxy';
+import { applyProxySettingsToCoreSessions, getIncognitoSession } from './services/proxy';
 import { installAppMenu } from './services/appMenu';
 import { BrowserHarness } from './services/BrowserHarness';
 import { PiSession } from './services/PiSession';
@@ -665,18 +665,24 @@ app.whenReady().then(() => {
   initSingletons();
   const langs = settingsManager.get('spellcheckLanguages') as string[];
   applySpellcheckToSession(session.defaultSession, langs);
-  applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+  applySpellcheckToSession(getIncognitoSession(), langs);
   // Agent Policy v1 § 7: when the AI agent is driving a request, we
   // identify ourselves so sites can serve agent-aware responses or
   // differentiate analytics. Gated to AI-active sessions inside the
   // helper so normal browsing doesn't carry the header.
   installAgentIdentificationHeader(session.defaultSession);
-  installAgentIdentificationHeader(session.fromPartition('incognito', { cache: false }));
-  // Apply user-configured proxy to both core sessions.
-  const proxyType = settingsManager.get('proxyType');
-  const proxyRules = settingsManager.get('proxyRules');
-  const proxyBypassRules = settingsManager.get('proxyBypassRules');
-  void applyProxySettingsToCoreSessions({ proxyType, proxyRules, proxyBypassRules });
+  installAgentIdentificationHeader(getIncognitoSession());
+  // Apply user-configured proxy to both core sessions. setProxy can
+  // reject on malformed config — surface the failure rather than
+  // letting it become an unhandled rejection. The user's proxy
+  // settings are settable, so this isn't a "should never happen" path.
+  applyProxySettingsToCoreSessions({
+    proxyType: settingsManager.get('proxyType'),
+    proxyRules: settingsManager.get('proxyRules'),
+    proxyBypassRules: settingsManager.get('proxyBypassRules'),
+  }).catch((err: Error) => {
+    console.error('[main] applyProxySettingsToCoreSessions failed:', err.message);
+  });
   // Install the native application menu (macOS top-of-screen bar / Win
   // & Linux in-window menubar). Without this, Electron's default menu
   // is barely useful — no New Tab, no Reload, no Find, no DevTools.

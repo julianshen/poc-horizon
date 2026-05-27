@@ -5,7 +5,7 @@ import { TabManager } from '../services/TabManager';
 import { translatePage, restorePage } from '../services/pageTranslator';
 import { translateText } from '../services/LlmTranslator';
 import { SettingsManager } from '../services/SettingsManager';
-import { applyProxySettingsToCoreSessions } from '../services/proxy';
+import { applyProxySettingsToCoreSessions, getIncognitoSession } from '../services/proxy';
 import { BookmarkManager } from '../services/BookmarkManager';
 import { HistoryManager } from '../services/HistoryManager';
 import { DownloadManager } from '../services/DownloadManager';
@@ -110,13 +110,19 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     if (key === 'spellcheckLanguages' && Array.isArray(value)) {
       const langs = value as string[];
       applySpellcheckToSession(session.defaultSession, langs);
-      applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+      applySpellcheckToSession(getIncognitoSession(), langs);
     }
     if (key === 'proxyType' || key === 'proxyRules' || key === 'proxyBypassRules') {
-      const proxyType = settingsManager.get('proxyType');
-      const proxyRules = settingsManager.get('proxyRules');
-      const proxyBypassRules = settingsManager.get('proxyBypassRules');
-      void applyProxySettingsToCoreSessions({ proxyType, proxyRules, proxyBypassRules });
+      // set() above is synchronous (writeFileSync); the subsequent
+      // get() calls see the just-set value. Catch setProxy rejection
+      // (malformed config) and report — never silently fail.
+      applyProxySettingsToCoreSessions({
+        proxyType: settingsManager.get('proxyType'),
+        proxyRules: settingsManager.get('proxyRules'),
+        proxyBypassRules: settingsManager.get('proxyBypassRules'),
+      }).catch((err: Error) => {
+        console.error('[ipc] settings:set proxy reapply failed:', err.message);
+      });
     }
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, { key, value });
   });

@@ -150,12 +150,19 @@ export class HorizonBridgeServer {
     switch (tool) {
       case 'navigate': {
         const url = String(args.url);
+        // Clear the active site policy BEFORE navigating. The
+        // previous page's policy must not apply on the new page even
+        // for the brief window between navigate-start and policy-
+        // resolved. Default-deny semantics: no policy = apply user
+        // defaults, not stale site rules.
+        this.guard?.setSitePolicy(null);
         await this.harness.navigate(url);
-        // Auto-hint payload: agent domain notes + agent policy v1
-        // conformance. We only include host / agentPolicy when there's
-        // actual hint payload, so the common case (vanilla URL, no
-        // policy, no notes) stays {ok: true}.
-        const host = this.hostFromUrl(url);
+        // Resolve against the FINAL URL (post-redirects) so a 302 to
+        // a different origin gets that origin's policy, not the
+        // requested URL's. harness.getUrl returns the committed URL.
+        let finalUrl = url;
+        try { finalUrl = await this.harness.getUrl(); } catch { /* best effort */ }
+        const host = this.hostFromUrl(finalUrl);
         const out: Record<string, unknown> = { ok: true };
         let included = false;
         if (host && this.domainSkills) {
@@ -167,15 +174,13 @@ export class HorizonBridgeServer {
           }
         }
         if (this.policyResolver) {
-          const policy = await this.policyResolver.resolve(url);
+          const policy = await this.policyResolver.resolve(finalUrl);
           const level = computeConformanceLevel(policy);
           if (level > 0) {
             if (host && !included) out.host = host;
             out.agentPolicy = { level, site: policy?.site, summary: policy?.summary };
           }
-          // Refresh the guard's view of the site policy on every nav so
-          // requires_human / prohibited triggers always reflect the
-          // origin the agent is currently on (whether policy or not).
+          // Apply the new origin's policy.
           this.guard?.setSitePolicy(policy);
         }
         return out;
@@ -312,6 +317,12 @@ export class HorizonBridgeServer {
         const url = await this.harness.getUrl();
         const origin = AgentPolicyResolver.originOf(url);
         const policy = await this.policyResolver.resolve(url);
+        // Refresh the guard too — this is the path the agent takes
+        // when it lands on an already-loaded page (no navigate to
+        // trigger the auto-resolve), so without this update click /
+        // type / dismissOverlays would evaluate against whatever
+        // stale policy the guard happens to hold.
+        this.guard?.setSitePolicy(policy);
         return { level: computeConformanceLevel(policy), origin, policy };
       }
       // ─── Conversation maintenance ───────────────────────────────

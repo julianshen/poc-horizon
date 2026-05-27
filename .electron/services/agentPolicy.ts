@@ -112,7 +112,34 @@ export function parseAgentPolicy(raw: unknown): AgentPolicy | null {
   if (!/^1\.[0-9]+(\.[0-9]+)?$/.test(o.version)) return null;     // v1.x only
   if (typeof o.site !== 'string' || o.site.length === 0) return null;
   if (!o.capabilities || typeof o.capabilities !== 'object') return null;
-  return o as AgentPolicy;
+  // Sanitize array-shaped fields. A site that publishes
+  // `requires_human: {trigger:'payment'}` (object instead of array)
+  // would later crash our `.map`/`for..of` iterations. Drop malformed
+  // entries silently — spec § 11 says invalid means fall back to
+  // defaults, not throw.
+  const sanitizeGateArray = (v: unknown): AgentHumanGate[] | undefined => {
+    if (!Array.isArray(v)) return undefined;
+    return v.filter((e): e is AgentHumanGate =>
+      e && typeof e === 'object' && typeof (e as AgentHumanGate).trigger === 'string'
+    );
+  };
+  const sanitized: AgentPolicy = {
+    ...(o as AgentPolicy),
+    requires_human: sanitizeGateArray(o.requires_human),
+    prohibited: sanitizeGateArray(o.prohibited) as AgentProhibition[] | undefined,
+    objectives: Array.isArray(o.objectives)
+      ? o.objectives.filter((e): e is AgentObjective => !!e && typeof e === 'object' && typeof (e as AgentObjective).id === 'string')
+      : undefined,
+    actions: Array.isArray(o.actions)
+      ? o.actions.filter((e): e is AgentAction =>
+          !!e && typeof e === 'object' &&
+          typeof (e as AgentAction).name === 'string' &&
+          typeof (e as AgentAction).endpoint === 'string')
+      : undefined,
+    consent: o.consent && typeof o.consent === 'object' && !Array.isArray(o.consent)
+      ? o.consent : undefined,
+  };
+  return sanitized;
 }
 
 /** Reserved triggers from spec § 4.6. Agents MUST recognize these. */
@@ -135,26 +162,109 @@ export function isHumanGateTrigger(trigger: string): boolean {
   return RESERVED_HUMAN_TRIGGERS.has(trigger) || trigger.startsWith('irreversible:');
 }
 
-/** Map a tool call to the most-specific spec-defined human-gate trigger
- *  the active policy demands, or null if none applies. */
+/**
+ * Tools we apply heuristic-based gate matching to. Read-only tools
+ * (screenshot, axtree, get_dom, evaluate-without-side-effects) get
+ * skipped entirely — gating them on argument substrings produces
+ * noisy false-positive prompts when the agent is just inspecting a
+ * page that happens to mention "checkout" or "stripe". Spec § 4.5
+ * intent is "actions that initiate payment", not "any tool whose
+ * args reference payment-shaped strings".
+ */
+const ACTION_TOOLS = new Set<string>([
+  'navigate', 'click', 'type', 'scroll',
+  'submit', 'callHelper',
+]);
+
+/**
+ * Map a tool call to the most-specific spec-defined human-gate trigger
+ * the active policy demands, or null if none applies. Returns the
+ * matching trigger so the prompt UI can surface why the gate fired.
+ *
+ * Triggers covered:
+ *   - payment              (spec § 4.5 reserved)
+ *   - auth_change          (spec § 4.5 reserved)
+ *   - data_export          (spec § 4.5 reserved)
+ *   - irreversible:<x>     (spec § 4.5 reserved prefix)
+ *   - <vendor-custom>      (spec § 4.5 says "MUST treat as ask the user")
+ */
 export function humanGateForTool(
   tool: string,
   args: Record<string, unknown>,
   policy: AgentPolicy | null,
 ): string | null {
-  if (!policy?.requires_human) return null;
+  if (!policy?.requires_human || policy.requires_human.length === 0) return null;
   const triggers = new Set(policy.requires_human.map((g) => g.trigger));
-  // Conservative mapping — when the tool touches a payment-shaped URL
-  // or selector, flag it. Most of this matching belongs in per-element
-  // data-agent-* once that's implemented; until then we map by tool +
-  // hint.
-  if (triggers.has('payment')) {
-    const hay = JSON.stringify(args).toLowerCase();
-    if (/checkout|payment|cart\/submit|pay-now|stripe/.test(hay)) return 'payment';
+
+  // Heuristics only apply to action tools — never to pure reads.
+  if (!ACTION_TOOLS.has(tool)) return null;
+
+  const hay = JSON.stringify(args).toLowerCase();
+
+  if (triggers.has('payment') && /\bcheckout\b|\bpayment\b|cart\/submit|pay-now|\bstripe\b|\bpaypal\b/.test(hay)) {
+    return 'payment';
   }
-  if (triggers.has('auth_change')) {
-    const hay = JSON.stringify(args).toLowerCase();
-    if (/password|2fa|otp|account\/security/.test(hay)) return 'auth_change';
+  if (triggers.has('auth_change') && /\bpassword\b|\b2fa\b|\botp\b|account\/security|change-password/.test(hay)) {
+    return 'auth_change';
+  }
+  if (triggers.has('data_export') && /\bexport\b|download.*data|account.*download|\bgdpr\b/.test(hay)) {
+    return 'data_export';
+  }
+  // irreversible:<action> — any declared trigger of this shape applies
+  // when the args mention a destructive verb. Conservative.
+  for (const t of triggers) {
+    if (t.startsWith('irreversible:') && /\bdelete\b|\bremove\b|\bdestroy\b|\bclose-account\b|\bdrop\b/.test(hay)) {
+      return t;
+    }
+  }
+  // Vendor-custom triggers (anything not reserved). Per spec § 4.5:
+  // "Sites MAY define additional trigger strings; agents not recognizing
+  // them MUST treat them as 'ask the user.'" Conservative interpretation:
+  // any time the policy declares one of these AND the agent is about to
+  // run an action tool, ask. Better a noisy prompt than a silent miss.
+  for (const t of triggers) {
+    if (!RESERVED_HUMAN_TRIGGERS.has(t) && !t.startsWith('irreversible:')) {
+      return t;
+    }
+  }
+  return null;
+}
+
+/**
+ * Map a tool call to a spec-prohibited trigger the active policy
+ * declares, or null if none applies. The current trigger→tool
+ * mappings are conservative because most prohibitions need per-element
+ * `data-agent-prohibited` annotations to be precise; until that lands
+ * we honor the cases we *can* map cleanly and fall back to "any
+ * unknown prohibition trigger applies to all action tools" — better
+ * to deny noisily than silently violate a declared prohibition.
+ */
+export function prohibitionForTool(
+  tool: string,
+  policy: AgentPolicy | null,
+): string | null {
+  if (!policy?.prohibited || policy.prohibited.length === 0) return null;
+  for (const p of policy.prohibited) {
+    const t = p.trigger;
+    // Known mappings.
+    if (t === 'dark_pattern_acceptance' && tool === 'dismissOverlays') return t;
+    // captcha_solving — we never expose a captcha-solve tool, so this
+    // is unreachable by construction. Documented in captcha.md
+    // interaction skill.
+    if (t === 'captcha_solving') continue;
+    // auth_bypass / scraping_pii — without per-element annotation we
+    // can't precisely match, but we DO refuse to interact with an
+    // action tool when a site declares either. Spec § 8 says agents
+    // MUST honor prohibited triggers without retry; the safe default
+    // is to deny rather than allow when uncertain.
+    if (t === 'auth_bypass' && ACTION_TOOLS.has(tool)) return t;
+    if (t === 'scraping_pii' && (tool === 'evaluate' || tool === 'getDom' || tool === 'callHelper')) return t;
+    // Vendor-custom prohibited triggers. Spec § 4.6 doesn't have an
+    // explicit "treat unknown as deny" — but the conformance § 8
+    // language ("MUST honor prohibited triggers") strongly implies it.
+    // For action tools, deny. Read tools pass through (the site can't
+    // forbid us reading).
+    if (!RESERVED_PROHIBITED_TRIGGERS.has(t) && ACTION_TOOLS.has(tool)) return t;
   }
   return null;
 }

@@ -98,11 +98,21 @@ async function defaultFetcher(url: string, headers: Record<string, string>): Pro
   return new Promise((resolve, reject) => {
     const req = net.request({ method: 'GET', url });
     for (const [k, v] of Object.entries(headers)) req.setHeader(k, v);
-    let body = '';
+    // Collect Buffer chunks, decode once at end. Per-chunk toString('utf8')
+    // corrupts multibyte codepoints when the TCP chunk boundary lands
+    // mid-character, which is rare but causes JSON.parse failures on
+    // legitimate non-ASCII /agent.json files. ETag header can be string
+    // or string[] — normalize.
+    const chunks: Buffer[] = [];
     req.on('response', (resp) => {
-      const etag = (resp.headers['etag'] as string | undefined) ?? null;
-      resp.on('data', (chunk: Buffer) => { body += chunk.toString('utf8'); });
-      resp.on('end', () => resolve({ status: resp.statusCode, body, etag }));
+      const raw = resp.headers['etag'];
+      const etag = Array.isArray(raw) ? (raw[0] ?? null) : (typeof raw === 'string' ? raw : null);
+      resp.on('data', (chunk: Buffer) => { chunks.push(chunk); });
+      resp.on('end', () => resolve({
+        status: resp.statusCode,
+        body: Buffer.concat(chunks).toString('utf8'),
+        etag,
+      }));
       resp.on('error', reject);
     });
     req.on('error', reject);

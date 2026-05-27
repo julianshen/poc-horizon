@@ -88,6 +88,9 @@ const piSessions = new Map<number, PiSession>();
 /** The Pi session whose tool calls are currently in flight. Used by the
  *  bridge to route browser_compact back to the right subprocess. */
 let activePiSession: PiSession | null = null;
+/** Epoch ms of the last agent activity (turn start or end). Used to
+ *  decide whether to advertise X-Horizon-Agent on the current request. */
+let lastAgentActivityAt = 0;
 let bridgeServer: HorizonBridgeServer | null = null;
 let bridgePort = 0;
 const llmsTxtResolver = new LlmsTxtResolver();
@@ -99,19 +102,37 @@ function aiSessionKindFor(tm: TabManager): AiSessionKind {
 /** XML-escape for use inside an attribute value (mention <page> tags). */
 /**
  * Agent Policy v1 § 7 — identify agent-driven traffic via header.
- * Spec wants `X-Horizon-Agent: true` plus `(Agent: <model_id>)` in the
- * User-Agent. We send the canonical header always (gated by setting);
- * the User-Agent suffix is left to a future enhancement so we don't
- * accidentally break sites that fingerprint UA strings strictly.
+ * Spec § 7: "User agents that act on behalf of an AI agent SHOULD
+ * send the following request headers." We only inject when an AI
+ * session has an in-flight turn — sending the header during pure
+ * human browsing would fingerprint normal users as agents and
+ * trigger bot defenses on sites that don't distinguish.
  *
- * Sites without an agent policy still see the signal — useful for
- * telemetry / adoption metrics, and harmless (it's just an extra
- * header field).
+ * `aiAdvertiseAgent` setting can opt the user out entirely. The
+ * default is on, but only takes effect when the agent is actually
+ * driving (Pi session running OR within a grace window of its last
+ * turn — accounts for tool-result fetches and follow-up XHR).
  */
+const AGENT_HEADER_GRACE_MS = 5_000;
+
+function isAgentDriving(): boolean {
+  // Active turn from any session.
+  for (const s of piSessions.values()) {
+    if (s.isRunning) return true;
+  }
+  // Or: an agent-initiated request finishing right after turn_end (e.g.,
+  // an XHR the agent just kicked off via click). Approximated by a
+  // recently-running session within the grace window.
+  return (Date.now() - lastAgentActivityAt) < AGENT_HEADER_GRACE_MS;
+}
+
 function installAgentIdentificationHeader(s: Electron.Session): void {
   s.webRequest.onBeforeSendHeaders((details, callback) => {
     const enabled = (settingsManager?.get('aiAdvertiseAgent' as never) as boolean | undefined) ?? true;
-    if (!enabled) { callback({ requestHeaders: details.requestHeaders }); return; }
+    if (!enabled || !isAgentDriving()) {
+      callback({ requestHeaders: details.requestHeaders });
+      return;
+    }
     callback({
       requestHeaders: { ...details.requestHeaders, 'X-Horizon-Agent': 'true' },
     });
@@ -159,6 +180,9 @@ async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Pro
   piSession.on('event', (e: AgentEvent) => {
     const wc = ctx.window?.webContents;
     if (wc && !wc.isDestroyed()) wc.send(IPC_CHANNELS.AI_EVENT, e);
+    // Stamp activity on every event so the grace window for the
+    // X-Horizon-Agent header stays valid through a turn's lifetime.
+    lastAgentActivityAt = Date.now();
     // Release the CDP debugger when the turn ends so DevTools and other
     // single-client CDP consumers can attach. We re-attach on next
     // ai:start (cheap — ~50ms).
@@ -378,6 +402,7 @@ function registerHandlers(): void {
     }
 
     activePiSession = piSession;
+    lastAgentActivityAt = Date.now();
     void piSession.startTurn(augmentedPrompt);
     return { ok: true };
   });

@@ -69,13 +69,23 @@ This is the highest-leverage missing piece. It's what turns "agent clicks the UI
 
 ### § 4.5 `requires_human` — ✅ enforced
 
-`AiActionGuard.evaluate()` consults the active site policy. When `requires_human` matches a tool call (currently via `payment` URL/arg substring heuristics for `payment` and `auth_change`), the guard returns `prompt` regardless of the user's `aiConfirmActions` setting. Reserved triggers — `payment`, `data_export`, `auth_change`, `irreversible:*` — are all recognized.
+`AiActionGuard.evaluate()` consults the active site policy. When `requires_human` matches a tool call, the guard returns `prompt` regardless of the user's `aiConfirmActions` setting. All four reserved triggers are recognized: `payment` (checkout/cart/stripe-shaped args), `auth_change` (password/2fa/security args), `data_export` (export/download-data args), and the `irreversible:<action>` prefix (destructive-verb args). Vendor-custom triggers default to "ask the user" per spec § 4.5's MUST clause.
 
-The heuristics are intentionally conservative pre-per-element. Once `data-agent-requires-human` is read on click targets, gate decisions become exact rather than substring-matched.
+Heuristics apply ONLY to action tools (`navigate`, `click`, `type`, `scroll`, `submit`, `callHelper`) — never to read tools (`screenshot`, `axtree`, `getDom`, `evaluate`). This avoids the false-positive class where the agent inspecting a payment-themed page triggered a prompt for what was purely a DOM read.
 
-### § 4.6 `prohibited` — ✅ partial
+Per-element `data-agent-requires-human` annotation (spec § 6) is the next precision step.
 
-Hard-deny path implemented for `dark_pattern_acceptance` (currently mapped to the `dismiss_overlays` tool). The other reserved triggers (`auth_bypass`, `captcha_solving`, `scraping_pii`) are recognized but no agent tool currently triggers them by construction — captchas are handled by the `captcha.md` interaction-skill (detect, surface to user, never solve), and auth-bypass / pii-scraping don't map to a single tool we can intercept.
+### § 4.6 `prohibited` — ✅ enforced
+
+`prohibitionForTool()` maps declared prohibitions to tool calls:
+
+- `dark_pattern_acceptance` → blocks `dismiss_overlays`
+- `auth_bypass` → blocks any action tool (`navigate`, `click`, `type`, `scroll`, `submit`, `callHelper`)
+- `scraping_pii` → blocks read-anything tools (`evaluate`, `getDom`, `callHelper`) — leaves plain `screenshot` / `axtree` alone since those don't extract arbitrary structured data
+- `captcha_solving` → no agent tool implements captcha-solving, so the deny is unreachable by construction (detection lives in `captcha.md`)
+- Vendor-custom triggers → block any action tool. Default-deny under uncertainty: better noisy-deny than silent-violate, per spec § 8 "MUST honor prohibited triggers."
+
+Read tools always pass — the site can't forbid us from looking at the page (modulo `read.exclude_selectors` from § 4.2, which is the per-element work).
 
 ### § 4.7 `consent` — parsed, not yet enforced
 
@@ -91,7 +101,9 @@ No audit POST implemented. The record shape is also TBD in the spec ("v1.1"), so
 
 ### § 7 Reverse direction — agent identification — ✅ implemented
 
-`X-Horizon-Agent: true` is sent on every outgoing request via `webRequest.onBeforeSendHeaders`. User-toggleable via the `aiAdvertiseAgent` setting (default on). The optional `X-Horizon-Agent-Intent` and the `User-Agent: ... (Agent: <model_id>)` suffix are not yet sent — UA modification is more disruptive and the optional intent header needs the active objective to be plumbed from the agent's planner.
+`X-Horizon-Agent: true` is injected via `webRequest.onBeforeSendHeaders`, but **only when an AI session is actively driving** — either a Pi turn is running, or the request fires within a 5s grace window of the last turn event (covers tool-result XHRs that race the turn-end emit). Normal human browsing never carries the header, addressing the spec § 7 read: "user agents that act on behalf of an AI agent SHOULD send..." — not "user agents that have AI capabilities at all."
+
+The `aiAdvertiseAgent` setting (default on) is a kill-switch for users who don't want the signal even during agent sessions. The optional `X-Horizon-Agent-Intent` and `User-Agent: ... (Agent: <model_id>)` are not yet sent — UA modification is more disruptive and intent threading needs the agent's planner objective to be plumbed.
 
 ### § 8 Conformance checklist for agents
 
@@ -113,6 +125,12 @@ No audit POST implemented. The record shape is also TBD in the spec ("v1.1"), so
 | `## Authentication` | ⏳ | Auth resolution is the long pole |
 | `## Examples` | ⏳ | Cheap to parse + surface; low priority |
 | Sideloaded skills (`~/.horizon/skills/*.md`) | ⏳ | Path TBD; the existing `domain-skills/` system covers the per-host case |
+
+## Known limitations
+
+- **Single-guard singleton.** `AiActionGuard` is a process-wide singleton with one `sitePolicy` field. Two windows navigating to different origins concurrently will race — last writer wins, and a tool dispatched on the loser's window briefly sees the wrong origin's policy. Practical impact is low (multi-window concurrent AI is rare); the fix is per-window guards, a non-trivial refactor.
+- **No per-page `<meta>` / per-element `data-agent-*` reading.** Site-wide `/agent.json` is the only resolution layer. Site authors who want page-scoped or element-scoped policy don't get it yet.
+- **24h negative cache.** A site that publishes `/agent.json` for the first time during a Horizon session won't be re-checked for 24h after the initial 404. Restart clears the cache.
 
 ## Roadmap (priority order)
 

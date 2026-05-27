@@ -355,6 +355,42 @@ describe("BrowserHarness", () => {
     expect(captureCall?.[1]).toEqual({ format: "jpeg", quality: 50 });
   });
 
+  it("screenshot supports scale option and uses CDP clip with scale", async () => {
+    const sendCommand = vi.fn(async (method: string) => {
+      if (method === "Page.captureScreenshot") return { data: "X" };
+      if (method === "Page.getLayoutMetrics")
+        return { visualViewport: { clientWidth: 800, clientHeight: 600 } };
+      return {};
+    });
+    const { wc } = fakeWc({
+      debugger: {
+        isAttached: () => true,
+        attach: vi.fn(),
+        detach: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        sendCommand,
+      },
+    });
+    const h = new BrowserHarness();
+    h.attach(wc);
+    await h.screenshot({ scale: 0.5 });
+    const captureCall = sendCommand.mock.calls.find(
+      (c) => c[0] === "Page.captureScreenshot",
+    );
+    expect(captureCall?.[1]).toEqual({
+      format: "png",
+      clip: {
+        x: 0,
+        y: 0,
+        width: 800,
+        height: 600,
+        scale: 0.5,
+      },
+    });
+  });
+
+
   it("describeElementAt returns the element descriptor via evaluate", async () => {
     const { wc } = fakeWc({
       debugger: {

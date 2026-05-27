@@ -48,6 +48,8 @@ export interface ScreenshotOptions {
   format?: "png" | "jpeg";
   /** JPEG only; 1-100. Default 70. */
   quality?: number;
+  /** Scale factor (e.g. 0.5) to downscale screenshot to save LLM tokens. */
+  scale?: number;
 }
 export type EvaluateResult =
   | { ok: true; value: unknown }
@@ -268,19 +270,29 @@ export class BrowserHarness {
   async screenshot({
     format = "png",
     quality = 70,
+    scale,
   }: ScreenshotOptions = {}): Promise<ScreenshotResult> {
     const wc = this.require();
-    const captureParams =
-      format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
-    const { data } = (await wc.debugger.sendCommand(
-      "Page.captureScreenshot",
-      captureParams,
-    )) as { data: string };
     const metrics = (await wc.debugger.sendCommand(
       "Page.getLayoutMetrics",
     )) as {
       visualViewport: { clientWidth: number; clientHeight: number };
     };
+    const captureParams: Record<string, unknown> =
+      format === "jpeg" ? { format: "jpeg", quality } : { format: "png" };
+    if (scale !== undefined) {
+      captureParams.clip = {
+        x: 0,
+        y: 0,
+        width: Math.round(metrics.visualViewport.clientWidth),
+        height: Math.round(metrics.visualViewport.clientHeight),
+        scale,
+      };
+    }
+    const { data } = (await wc.debugger.sendCommand(
+      "Page.captureScreenshot",
+      captureParams,
+    )) as { data: string };
     return {
       format,
       base64: data,

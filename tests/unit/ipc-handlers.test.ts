@@ -4,10 +4,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // `registerIpcHandlers` module imports `electron`, so we mock the
 // module before importing the SUT.
 const handlers = new Map<string, (event: unknown, payload: unknown) => unknown>();
-const defaultSetProxy = vi.fn().mockResolvedValue(undefined);
-const defaultResolveProxy = vi.fn().mockResolvedValue('DIRECT');
-const incognitoSetProxy = vi.fn().mockResolvedValue(undefined);
-const incognitoResolveProxy = vi.fn().mockResolvedValue('DIRECT');
+// vi.mock() factories run hoisted before module init. vi.hoisted()
+// lifts these spy declarations to the same phase so the factory sees
+// initialized names instead of TDZ.
+const {
+  defaultSetProxy, defaultResolveProxy,
+  incognitoSetProxy, incognitoResolveProxy,
+} = vi.hoisted(() => ({
+  defaultSetProxy: vi.fn().mockResolvedValue(undefined),
+  defaultResolveProxy: vi.fn().mockResolvedValue('DIRECT'),
+  incognitoSetProxy: vi.fn().mockResolvedValue(undefined),
+  incognitoResolveProxy: vi.fn().mockResolvedValue('DIRECT'),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -569,9 +577,10 @@ describe('IPC handlers', () => {
         proxyRules: 'http=127.0.0.1:8080',
         proxyBypassRules: '<local>',
       });
-      invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' });
-      // setProxy chain is async — drain microtasks before asserting.
-      await new Promise((r) => setTimeout(r, 0));
+      // The handler awaits applyProxySettingsToCoreSessions before
+      // emitting SETTINGS_CHANGED — so awaiting invoke() awaits the
+      // proxy apply too.
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' });
       const expected = {
         mode: 'fixed_servers',
         proxyRules: 'http=127.0.0.1:8080',
@@ -585,8 +594,7 @@ describe('IPC handlers', () => {
       // Start from a clean store and only set the rules — exercises the
       // get-after-set path: the handler must observe the new rules.
       wireStatefulSettings({ proxyType: 'manual', proxyRules: undefined, proxyBypassRules: undefined });
-      invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyRules', value: 'http=10.0.0.1:3128' });
-      await new Promise((r) => setTimeout(r, 0));
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyRules', value: 'http=10.0.0.1:3128' });
       expect(defaultSetProxy).toHaveBeenCalledWith({
         mode: 'fixed_servers',
         proxyRules: 'http=10.0.0.1:3128',
@@ -594,10 +602,27 @@ describe('IPC handlers', () => {
       });
     });
 
+    it('settings:set for proxyBypassRules re-applies updated bypass rules to both sessions', async () => {
+      // Start with a manual config that's missing bypass rules; setting
+      // them must trigger a re-apply with the new value flowing through.
+      wireStatefulSettings({
+        proxyType: 'manual',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: undefined,
+      });
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyBypassRules', value: '<local>' });
+      const expected = {
+        mode: 'fixed_servers',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: '<local>',
+      };
+      expect(defaultSetProxy).toHaveBeenCalledWith(expected);
+      expect(incognitoSetProxy).toHaveBeenCalledWith(expected);
+    });
+
     it('settings:set for an unrelated key does NOT reapply the proxy', async () => {
       wireStatefulSettings({ proxyType: 'system' });
-      invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'theme', value: 'dark' });
-      await new Promise((r) => setTimeout(r, 0));
+      await invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'theme', value: 'dark' });
       expect(defaultSetProxy).not.toHaveBeenCalled();
       expect(incognitoSetProxy).not.toHaveBeenCalled();
     });
@@ -605,10 +630,10 @@ describe('IPC handlers', () => {
     it('settings:set survives a setProxy rejection without throwing or leaking unhandled', async () => {
       wireStatefulSettings({ proxyType: 'manual', proxyRules: 'malformed', proxyBypassRules: undefined });
       defaultSetProxy.mockRejectedValueOnce(new Error('CHROMIUM_INVALID_PROXY_CONFIG'));
-      // Should not throw — handler catches and logs.
-      expect(() => invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' })).not.toThrow();
-      // Drain microtasks; the catch handler logs but doesn't rethrow.
-      await new Promise((r) => setTimeout(r, 0));
+      // Handler catches internally — awaiting the invocation should
+      // resolve without throwing.
+      await expect(invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' }))
+        .resolves.toBeUndefined();
     });
   });
 });

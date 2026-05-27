@@ -1,9 +1,24 @@
 import { describe, it, expect, vi } from 'vitest';
-const defaultSetProxy = vi.fn().mockResolvedValue(undefined);
-const defaultResolveProxy = vi.fn().mockResolvedValue('DIRECT');
-const incognitoSetProxy = vi.fn().mockResolvedValue(undefined);
-const incognitoResolveProxy = vi.fn().mockResolvedValue('DIRECT');
-const fromPartition = vi.fn().mockReturnValue({
+
+// vi.mock() factories are HOISTED to the top of the file by Vitest —
+// they run before any top-level `const` initializers. If we reference
+// `defaultSetProxy` etc. directly inside the factory, those names are
+// still in TDZ when the factory executes and the import of
+// ../../.electron/services/proxy fails. vi.hoisted() lets us evaluate
+// the spy declarations at the same hoisting phase as the mock factory,
+// so the names are bound before the factory consumes them.
+const {
+  defaultSetProxy, defaultResolveProxy,
+  incognitoSetProxy, incognitoResolveProxy,
+  fromPartition,
+} = vi.hoisted(() => ({
+  defaultSetProxy: vi.fn().mockResolvedValue(undefined),
+  defaultResolveProxy: vi.fn().mockResolvedValue('DIRECT'),
+  incognitoSetProxy: vi.fn().mockResolvedValue(undefined),
+  incognitoResolveProxy: vi.fn().mockResolvedValue('DIRECT'),
+  fromPartition: vi.fn(),
+}));
+fromPartition.mockReturnValue({
   setProxy: incognitoSetProxy,
   resolveProxy: incognitoResolveProxy,
 });
@@ -77,14 +92,19 @@ describe('applyProxySettingsToSession', () => {
     expect(resolveProxy).not.toHaveBeenCalled();
   });
 
-  it('returns resolved:null when resolveProxy fails (proxy still applied)', async () => {
+  it('returns resolved:null + surfaces resolveError when resolveProxy fails (proxy still applied)', async () => {
     const setProxy = vi.fn().mockResolvedValue(undefined);
     const resolveProxy = vi.fn().mockRejectedValue(new Error('probe failed'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const r = await applyProxySettingsToSession({ setProxy, resolveProxy } as never, {
       proxyType: 'direct', proxyRules: undefined, proxyBypassRules: undefined,
     });
     expect(setProxy).toHaveBeenCalled();
     expect(r.resolved).toBeNull();
+    expect(r.resolveError).toBe('probe failed');
+    // Failure is surfaced via console.warn so it's never silently dropped.
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 

@@ -10,6 +10,11 @@ import path from "path";
  * Idempotent — skips if the SKILL.md already exists. Returns the path
  * written (or already present), or null if writing failed.
  */
+function truncateText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + "\n\n... [truncated to save token limit] ...\n";
+}
+
 export async function writePiSkill(
   origin: string,
   llmsTxt: string,
@@ -33,7 +38,9 @@ export async function writePiSkill(
 
   if (existsSync(skillFile)) return skillFile;
 
-  const body = renderSkill(origin, llmsTxt, llmsFullTxt);
+  const truncatedLlmsTxt = truncateText(llmsTxt, 10000);
+  const truncatedLlmsFullTxt = llmsFullTxt ? truncateText(llmsFullTxt, 15000) : undefined;
+  const body = renderSkill(origin, truncatedLlmsTxt, truncatedLlmsFullTxt);
   try {
     await fs.mkdir(skillDir, { recursive: true });
     await fs.writeFile(skillFile, body, "utf8");

@@ -10,3 +10,10 @@ Refer to `plan.archived.md` for completed phases.
 - [x] Test: `HorizonBridgeServer` routes `scale` parameter for both screenshot tools
 - [x] Fix: Update `BrowserHarness.ts` to implement downscaling via CDP `clip.scale`
 - [x] Fix: Update `HorizonBridgeServer.ts` to accept `scale` and set a default scale (e.g. `0.5`)
+
+## Phase 8: Prevent token limit overflow from large llms.txt and llms-full.txt
+
+- [x] Test: `writePiSkill` truncates `llmsTxt` and `llmsFullTxt` to safe character limits
+- [ ] Test: Prompt augmentation under `AI_START` truncates `site-skills` to safe character limits
+- [ ] Fix: Update `piSkillWriter.ts` to truncate inputs
+- [ ] Fix: Update `.electron/main.ts` `AI_START` to truncate prompt-injected site skills

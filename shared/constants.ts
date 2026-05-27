@@ -78,6 +78,13 @@ export const DEFAULT_SETTINGS = {
    * Prompts time out (deny) after 60s.
    */
   aiConfirmActions: 'never' as 'never' | 'risky' | 'all',
+  /**
+   * Send `X-Horizon-Agent: true` on every outgoing request so sites
+   * can identify agent-driven traffic. Agent Policy v1 § 7. Users
+   * who don't want their AI usage signalled to sites can turn this
+   * off; default on because the spec calls it out as canonical.
+   */
+  aiAdvertiseAgent: true,
   /** Spawn Pi at app startup (vs. lazily on first AI panel open). */
   aiSpawnOnStartup: true,
   /** Default target language for Translate Page / Translate Selection.

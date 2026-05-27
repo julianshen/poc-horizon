@@ -223,6 +223,25 @@ resources/pi-extension/
         └── forms.md
 ```
 
+## Agent Policy v1 (site-declared contract)
+
+Horizon implements the [Agent Policy v1 spec](https://github.com/julianshen/horizon/blob/main/docs/agent/spec/agent-policy-v1.md) — a machine-readable contract sites publish at `/agent.json` declaring what an AI agent may do autonomously, what requires human confirmation, and what's prohibited. See **[`docs/agent-policy-status.md`](agent-policy-status.md)** for the full per-section implementation status.
+
+The agent layer's interaction with site policy:
+
+```
+browser_navigate({ url })
+  → AgentPolicyResolver fetches <origin>/agent.json (ETag-cached, 24h TTL)
+  → response includes { agentPolicy: { level: 0|1|2|3, site, summary } }
+  → AiActionGuard.setSitePolicy(policy) refreshes the active gate rules
+```
+
+Per tool call the guard now makes a three-state decision: `allow` / `prompt` / `deny`. Site policy can only *raise* the bar (force prompt, or hard deny on `prohibited` triggers); it can't lower it past the user's `aiConfirmActions` setting. Most-restrictive-wins, as the spec requires.
+
+The agent can also pull the full policy on demand via `browser_get_agent_policy`. Outgoing requests carry `X-Horizon-Agent: true` (toggleable via `aiAdvertiseAgent` setting) so sites can identify agent-driven traffic.
+
+Spec coverage today: site-wide `/agent.json` resolution, conformance level reporting (0–3), `requires_human` → prompt gating, `prohibited` → hard deny gating, agent identification header. Per-page `<meta>` / per-element `data-agent-*` reading and structured action invocation (`actions[]`) are tracked in the status doc as next-up.
+
 ## Inspirations
 
 - **Anthropic Computer Use** — Set-of-Marks perception pattern (numbered overlays on clickable targets).

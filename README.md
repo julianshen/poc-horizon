@@ -20,7 +20,7 @@ Everything the agent does is observable through the AI side panel; everything ri
 Tabs (with pin/mute/groups/right-click menus), Omnibox with suggestions + ⌘K Command Palette, navigation history, bookmarks, downloads with shelf, password store backed by Electron `safeStorage`, autofill, per-tab incognito windows, Find-in-page, side panels for History / Bookmarks / Settings / Workflows. Reader mode via Mozilla Readability. /llms.txt auto-discovery and context injection. Page translation (full page + selection) via headless Pi.
 
 ### AI agent layer
-26 tools the agent calls through a local JSON-line bridge:
+27 tools the agent calls through a local JSON-line bridge:
 
 | Category | Tools |
 |---|---|
@@ -33,6 +33,7 @@ Tabs (with pin/mute/groups/right-click menus), Omnibox with suggestions + ⌘K C
 | Skills library | `skill_preamble` · `skill_list_interactions` · `skill_read_interaction` |
 | Domain skills | `domain_skill_list` · `_read` · `_save` · `_remove` · `_search` |
 | Workflows | `workflow_record_start` · `_stop` · `_run` · `_list` · `_delete` |
+| Agent policy | `get_agent_policy` (v1 spec compliance) |
 | Reflection | `get_url` · `get_title` |
 | UI | `render_ui` (A2UI declarative panels) |
 
@@ -53,6 +54,17 @@ On every `browser_navigate`, the response includes `domainSkillsAvailable: ["...
 - **JS helper registry** (`userData/js-helpers.json`) — named JS expressions the agent saves once and calls thereafter. Persistent across restarts. Site-specific extractors live here.
 - **Action workflows** (`userData/action-workflows.json`) — recorded tool-call sequences for deterministic replay. The agent runs a multi-step task once with the LLM in the loop, then `workflow_run` it cheaply afterwards.
 - **CDP event subscription** — hook into events (`Network.responseReceived`, `Page.frameNavigated`, …), buffer them across turns, drain on demand. Lets the agent observe what a click *actually* did, not just what the page now looks like.
+
+### Agent Policy v1 (site-declared contract)
+
+Sites can publish [`/agent.json`](https://github.com/julianshen/horizon/blob/main/docs/agent/spec/agent-policy-v1.md) declaring which actions an agent may perform autonomously, which require human confirmation, and which are prohibited. Horizon:
+
+- Fetches `/agent.json` per origin with ETag caching (24h TTL)
+- Computes conformance level (0–3) and surfaces it to the agent on every `browser_navigate`
+- Enforces `prohibited` triggers as hard denies, `requires_human` triggers as forced prompts (overriding the user's "never confirm" setting — site policy is more-restrictive-wins)
+- Sends `X-Horizon-Agent: true` on outgoing requests (toggleable)
+
+Full per-section implementation status in [`docs/agent-policy-status.md`](docs/agent-policy-status.md).
 
 ### Safety
 

@@ -5,6 +5,8 @@ import type { DomainSkills } from './DomainSkills';
 import type { SkillsLibrary } from './SkillsLibrary';
 import type { AiActionGuard } from './AiActionGuard';
 import type { ActionRecorder } from './ActionRecorder';
+import { AgentPolicyResolver } from './AgentPolicyResolver';
+import { computeConformanceLevel } from './agentPolicy';
 import { readerExtract } from './readerExtract';
 
 interface ToolRequest {
@@ -44,6 +46,7 @@ export class HorizonBridgeServer {
     /** Called when the agent invokes browser_compact. Wired by main to
      *  the currently-active PiSession. */
     private readonly compactSession?: (customInstructions?: string) => void,
+    private readonly policyResolver?: AgentPolicyResolver,
   ) {}
 
   /**
@@ -119,10 +122,18 @@ export class HorizonBridgeServer {
 
   private async dispatch(req: ToolRequest): Promise<ToolResponse> {
     try {
-      if (this.guard?.needsApproval(req.tool)) {
-        const allowed = await this.guard.request(req.tool, req.args);
-        if (!allowed) {
-          return { id: req.id, ok: false, error: `denied by user: ${req.tool}` };
+      if (this.guard) {
+        const decision = this.guard.evaluate(req.tool, req.args);
+        if (decision.kind === 'deny') {
+          // Hard deny — site policy prohibits this action. No user
+          // prompt; surface the reason so the agent learns.
+          return { id: req.id, ok: false, error: decision.reason };
+        }
+        if (decision.kind === 'prompt') {
+          const allowed = await this.guard.request(req.tool, req.args);
+          if (!allowed) {
+            return { id: req.id, ok: false, error: `denied by user: ${req.tool}` };
+          }
         }
       }
       const result = await this.run(req.tool, req.args);
@@ -140,15 +151,34 @@ export class HorizonBridgeServer {
       case 'navigate': {
         const url = String(args.url);
         await this.harness.navigate(url);
-        // Auto-hint: if the agent has saved per-site notes for this host,
-        // surface their filenames so it can decide whether to read them.
-        // Names only — keeps the navigate response cheap.
+        // Auto-hint payload: agent domain notes + agent policy v1
+        // conformance. We only include host / agentPolicy when there's
+        // actual hint payload, so the common case (vanilla URL, no
+        // policy, no notes) stays {ok: true}.
         const host = this.hostFromUrl(url);
+        const out: Record<string, unknown> = { ok: true };
+        let included = false;
         if (host && this.domainSkills) {
           const available = await this.domainSkills.list(host);
-          if (available.length > 0) return { ok: true, host, domainSkillsAvailable: available };
+          if (available.length > 0) {
+            out.host = host;
+            out.domainSkillsAvailable = available;
+            included = true;
+          }
         }
-        return { ok: true };
+        if (this.policyResolver) {
+          const policy = await this.policyResolver.resolve(url);
+          const level = computeConformanceLevel(policy);
+          if (level > 0) {
+            if (host && !included) out.host = host;
+            out.agentPolicy = { level, site: policy?.site, summary: policy?.summary };
+          }
+          // Refresh the guard's view of the site policy on every nav so
+          // requires_human / prohibited triggers always reflect the
+          // origin the agent is currently on (whether policy or not).
+          this.guard?.setSitePolicy(policy);
+        }
+        return out;
       }
       case 'click':      await this.harness.click(args as never);                              return { ok: true };
       case 'type':       await this.harness.type(args as never);                               return { ok: true };
@@ -275,6 +305,14 @@ export class HorizonBridgeServer {
         const name = String(args.name ?? '');
         if (!host || !name) throw new Error('domainSkillRemove: host + name required');
         return { ok: await this.domainSkills.remove(host, name) };
+      }
+      // ─── Agent Policy v1 (spec § 4) ─────────────────────────────
+      case 'getAgentPolicy': {
+        if (!this.policyResolver) return { level: 0, origin: null, policy: null };
+        const url = await this.harness.getUrl();
+        const origin = AgentPolicyResolver.originOf(url);
+        const policy = await this.policyResolver.resolve(url);
+        return { level: computeConformanceLevel(policy), origin, policy };
       }
       // ─── Conversation maintenance ───────────────────────────────
       case 'compact': {

@@ -31,6 +31,7 @@ import { DomainSkills } from './services/DomainSkills';
 import { SkillsLibrary } from './services/SkillsLibrary';
 import { AiActionGuard, type ActionPolicy, type ActionPrompt } from './services/AiActionGuard';
 import { ActionRecorder } from './services/ActionRecorder';
+import { AgentPolicyResolver } from './services/AgentPolicyResolver';
 // translateText / translatePage / restorePage are imported by
 // .electron/ipc/main-handlers.ts where their IPC handlers live.
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
@@ -75,6 +76,7 @@ let domainSkills: DomainSkills;
 let skillsLibrary: SkillsLibrary;
 let aiActionGuard: AiActionGuard;
 let actionRecorder: ActionRecorder;
+let agentPolicyResolver: AgentPolicyResolver;
 
 // Single shared browser harness + Pi session for the AI panel POC.
 // Lazy-init on first ai:start because spawning Pi is expensive.
@@ -95,6 +97,27 @@ function aiSessionKindFor(tm: TabManager): AiSessionKind {
   return tm.isIncognito() ? 'incognito' : 'default';
 }
 /** XML-escape for use inside an attribute value (mention <page> tags). */
+/**
+ * Agent Policy v1 § 7 — identify agent-driven traffic via header.
+ * Spec wants `X-Horizon-Agent: true` plus `(Agent: <model_id>)` in the
+ * User-Agent. We send the canonical header always (gated by setting);
+ * the User-Agent suffix is left to a future enhancement so we don't
+ * accidentally break sites that fingerprint UA strings strictly.
+ *
+ * Sites without an agent policy still see the signal — useful for
+ * telemetry / adoption metrics, and harmless (it's just an extra
+ * header field).
+ */
+function installAgentIdentificationHeader(s: Electron.Session): void {
+  s.webRequest.onBeforeSendHeaders((details, callback) => {
+    const enabled = (settingsManager?.get('aiAdvertiseAgent' as never) as boolean | undefined) ?? true;
+    if (!enabled) { callback({ requestHeaders: details.requestHeaders }); return; }
+    callback({
+      requestHeaders: { ...details.requestHeaders, 'X-Horizon-Agent': 'true' },
+    });
+  });
+}
+
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -119,6 +142,7 @@ async function ensurePiSession(ctx: WindowContext, harness: BrowserHarness): Pro
       // calls this from inside a turn it's running, so the active session
       // is unambiguously its own.
       (customInstructions) => activePiSession?.compact(customInstructions),
+      agentPolicyResolver,
     );
     bridgePort = await bridgeServer.listen();
   }
@@ -204,6 +228,7 @@ function initSingletons(): void {
   domainSkills = new DomainSkills(path.join(data, 'domain-skills'));
   skillsLibrary = new SkillsLibrary(path.join(__dirname, '../resources/pi-extension/skills'));
   actionRecorder = new ActionRecorder(path.join(data, 'action-workflows.json'));
+  agentPolicyResolver = new AgentPolicyResolver();
   aiActionGuard = new AiActionGuard(
     () => ((settingsManager.get('aiConfirmActions' as never) as ActionPolicy | undefined) ?? 'never'),
   );
@@ -615,6 +640,13 @@ app.whenReady().then(() => {
   const langs = settingsManager.get('spellcheckLanguages') as string[];
   applySpellcheckToSession(session.defaultSession, langs);
   applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
+  // Agent Policy v1 § 7: when the AI agent is driving a request, we
+  // identify ourselves so sites can serve agent-aware responses or
+  // differentiate analytics. The header rides on every outgoing
+  // request from each session — sites without an agent policy still
+  // see the signal (useful for adoption telemetry).
+  installAgentIdentificationHeader(session.defaultSession);
+  installAgentIdentificationHeader(session.fromPartition('incognito', { cache: false }));
   // Install the native application menu (macOS top-of-screen bar / Win
   // & Linux in-window menubar). Without this, Electron's default menu
   // is barely useful — no New Tab, no Reload, no Find, no DevTools.

@@ -1,6 +1,14 @@
 import { EventEmitter } from 'events';
+import type { AgentPolicy } from './agentPolicy';
+import { humanGateForTool, RESERVED_PROHIBITED_TRIGGERS } from './agentPolicy';
 
 export type ActionPolicy = 'never' | 'risky' | 'all';
+
+/** Decision the guard returns for a tool call. */
+export type ApprovalDecision =
+  | { kind: 'allow' }
+  | { kind: 'prompt'; reason?: string }
+  | { kind: 'deny'; reason: string };
 
 export interface ActionPrompt {
   id: string;
@@ -49,16 +57,76 @@ export class AiActionGuard extends EventEmitter {
   private pending = new Map<string, { resolve: (v: boolean) => void; timer: NodeJS.Timeout }>();
   private counter = 0;
 
+  /** Active site policy, if any. Updated by main on navigate. */
+  private sitePolicy: AgentPolicy | null = null;
+
   constructor(
     private policyFn: () => ActionPolicy,
     private readonly timeoutMs: number = 60_000,
   ) { super(); }
 
-  needsApproval(tool: string): boolean {
+  setSitePolicy(p: AgentPolicy | null): void { this.sitePolicy = p; }
+  getSitePolicy(): AgentPolicy | null { return this.sitePolicy; }
+
+  /**
+   * Three-state decision combining the user's `aiConfirmActions` policy
+   * with the active site policy (spec §§ 4.5–4.6):
+   *
+   *   - Site `prohibited` trigger matches → DENY (hard, no prompt).
+   *   - Site `requires_human` trigger matches → PROMPT (regardless of
+   *     the user's policy — site policy is more-restrictive-wins).
+   *   - Otherwise fall through to the user's `aiConfirmActions`.
+   *
+   * The legacy `needsApproval` API now returns true for both prompt
+   * and deny — callers that want the deny outcome up-front should use
+   * `evaluate()` instead.
+   */
+  evaluate(tool: string, args: Record<string, unknown>): ApprovalDecision {
+    // Site policy: prohibited triggers — hard deny.
+    if (this.sitePolicy?.prohibited) {
+      for (const p of this.sitePolicy.prohibited) {
+        if (this.prohibitionMatches(tool, args, p.trigger)) {
+          return { kind: 'deny', reason: `site policy prohibits: ${p.trigger}` };
+        }
+      }
+    }
+    // Site policy: requires_human triggers — force prompt.
+    const humanTrigger = humanGateForTool(tool, args, this.sitePolicy);
+    if (humanTrigger) return { kind: 'prompt', reason: `site requires human for ${humanTrigger}` };
+
+    // Fall back to user's confirmation policy.
     const p = this.policyFn();
-    if (p === 'never') return false;
-    if (p === 'all') return true;
-    return RISKY_TOOLS.has(tool);
+    if (p === 'never') return { kind: 'allow' };
+    if (p === 'all') return { kind: 'prompt' };
+    return RISKY_TOOLS.has(tool) ? { kind: 'prompt' } : { kind: 'allow' };
+  }
+
+  needsApproval(tool: string, args: Record<string, unknown> = {}): boolean {
+    return this.evaluate(tool, args).kind !== 'allow';
+  }
+
+  /** Map a tool call to spec-defined prohibition triggers (§ 4.6). */
+  private prohibitionMatches(tool: string, args: Record<string, unknown>, trigger: string): boolean {
+    // Auth-bypass: any navigate to a path heuristically auth-related when
+    // the agent has no session — the agent has no good way to know, so we
+    // leave this as a conservative no-op for now and let `requires_human`
+    // handle the cases that matter.
+    if (trigger === 'auth_bypass') return false;
+    // Captcha solving: the agent never invokes captcha-solve directly;
+    // detection lives in interaction-skills/captcha.md.
+    if (trigger === 'captcha_solving') return false;
+    // dark_pattern_acceptance — clicking cookie/consent banners. The
+    // dismiss_overlays tool is the most common offender.
+    if (trigger === 'dark_pattern_acceptance') {
+      if (tool === 'dismissOverlays') return true;
+    }
+    // scraping_pii — heuristic: evaluate / get_dom that grabs known
+    // PII-shaped attributes. Hard to detect rigorously; conservative no-op.
+    if (trigger === 'scraping_pii') return false;
+    // Unknown triggers — per spec § 4.6, treat unknown reserved-shaped
+    // ones as no-ops here. Vendor-specific triggers fall through.
+    if (!RESERVED_PROHIBITED_TRIGGERS.has(trigger)) return false;
+    return false;
   }
 
   /** Resolved with true (allow) / false (deny). Auto-denies on timeout. */

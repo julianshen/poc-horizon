@@ -229,6 +229,44 @@ describe('HorizonBridgeServer', () => {
     srv2.close();
   });
 
+  it('navigate response includes agentPolicy {level, site} when /agent.json exists', async () => {
+    const resolver = {
+      resolve: vi.fn(async () => ({
+        version: '1.0', site: 'Shop', summary: 'demo store', capabilities: { read: { allowed: true } },
+      })),
+      cached: vi.fn(),
+      clear: vi.fn(),
+    };
+    // (AgentPolicyResolver.originOf is a static method called by the route; it works on real URLs.)
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const resp = await sendRecv(sock, { id: 'n', tool: 'navigate', args: { url: 'https://shop.test/page' } });
+    expect(resp).toMatchObject({
+      ok: true,
+      result: { ok: true, agentPolicy: { level: 1, site: 'Shop', summary: 'demo store' } },
+    });
+    sock.destroy(); srv2.close();
+  });
+
+  it('getAgentPolicy returns conformance level + origin + the resolved policy', async () => {
+    const policy = {
+      version: '1.0', site: 'X', capabilities: { read: { allowed: true } },
+      actions: [{ name: 'a', endpoint: 'GET /a', auth: 'none' }],
+    };
+    const resolver = { resolve: vi.fn(async () => policy), cached: vi.fn(), clear: vi.fn() };
+    (harness.getUrl as ReturnType<typeof vi.fn>).mockResolvedValueOnce('https://x.test/');
+    const srv2 = new HorizonBridgeServer(harness, undefined, undefined, undefined, undefined, undefined, undefined, resolver as never);
+    const p2 = await srv2.listen();
+    const sock = await connectClient(p2);
+    const resp = await sendRecv(sock, { id: 'g', tool: 'getAgentPolicy', args: {} });
+    expect(resp).toMatchObject({
+      id: 'g', ok: true,
+      result: { level: 2, origin: 'https://x.test', policy: { site: 'X' } },
+    });
+    sock.destroy(); srv2.close();
+  });
+
   it('navigate response includes domainSkillsAvailable when notes exist for the host', async () => {
     // Stub domainSkills so we don't touch disk in this test.
     const ds = {

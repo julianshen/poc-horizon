@@ -116,6 +116,8 @@ export interface Settings {
   certificateOverrides: Record<string, { allow: boolean; errorTypes: string[] }>;
   /** Agent action confirmation policy. See shared/constants.ts. */
   aiConfirmActions?: 'never' | 'risky' | 'all';
+  /** Send X-Horizon-Agent header on outgoing requests. Agent Policy v1 § 7. */
+  aiAdvertiseAgent?: boolean;
 }
 
 export interface PasswordEntry {

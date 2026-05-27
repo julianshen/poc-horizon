@@ -46,6 +46,17 @@ Use plain `browser_screenshot` when you just need to *look* at the page (reading
 
 The compositor dispatches mouse events *through* iframes, shadow DOM, and cross-origin frames for free. Only fall back to selectors when the target has no visible geometry (hidden input, off-screen helper). `axtree` is a third option — same idea as marks but text-only (no image) when you don't need to *see* the page.
 
+### Read the site's agent policy before deep workflows
+
+If you're about to do anything beyond reading — clicking, typing, submitting — call `browser_get_agent_policy()` (or look at the `agentPolicy` field in the `browser_navigate` response). Sites that publish a Level 1+ policy at `/agent.json` declare what's allowed, what requires the user's nod, and what's off-limits. Examples:
+
+- `requires_human: [{trigger: "payment"}]` → the user must approve any checkout-shaped action; the safety guard already enforces this, but you should plan around it.
+- `prohibited: [{trigger: "captcha_solving"}]` → don't attempt it. Detect, surface to the user.
+- `actions: [{name: "search", endpoint: "GET /api/v1/search", ...}]` → prefer the structured endpoint over UI clicking.
+- `objectives: [{id: "add_to_cart", preferred_flow: "..."}]` → planning hint for your task decomposition.
+
+Sites without a policy → apply your own defaults: read freely, navigate within origin, ask before clicking/typing/eval.
+
 ### Always wait_for after navigate
 
 ```

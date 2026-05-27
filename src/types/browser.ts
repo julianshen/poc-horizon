@@ -111,6 +111,7 @@ export interface Settings {
   smoothScrolling: boolean;
   proxyType: 'system' | 'direct' | 'manual';
   proxyRules?: string;
+  proxyBypassRules?: string;
   spellcheck: boolean;
   spellcheckLanguages: string[];
   certificateOverrides: Record<string, { allow: boolean; errorTypes: string[] }>;

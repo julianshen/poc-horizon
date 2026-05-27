@@ -554,13 +554,22 @@ describe('IPC handlers', () => {
       s.settingsManager.get.mockImplementation((key: string) => {
         if (key === 'proxyType') return 'manual';
         if (key === 'proxyRules') return 'http=127.0.0.1:8080';
+        if (key === 'proxyBypassRules') return '<local>';
         return 'value';
       });
 
       invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' });
 
-      expect(defaultSetProxy).toHaveBeenCalledWith({ mode: 'fixed_servers', proxyRules: 'http=127.0.0.1:8080' });
-      expect(incognitoSetProxy).toHaveBeenCalledWith({ mode: 'fixed_servers', proxyRules: 'http=127.0.0.1:8080' });
+      expect(defaultSetProxy).toHaveBeenCalledWith({
+        mode: 'fixed_servers',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: '<local>',
+      });
+      expect(incognitoSetProxy).toHaveBeenCalledWith({
+        mode: 'fixed_servers',
+        proxyRules: 'http=127.0.0.1:8080',
+        proxyBypassRules: '<local>',
+      });
       expect(defaultResolveProxy).toHaveBeenCalledWith('https://example.com');
       expect(incognitoResolveProxy).toHaveBeenCalledWith('https://example.com');
     });

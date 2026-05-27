@@ -10,13 +10,16 @@ export interface ProxyConfig {
 /**
  * Build Electron proxy config from user settings.
  */
-export function proxyConfigFromSettings(settings: Pick<Settings, 'proxyType' | 'proxyRules'>): ProxyConfig {
+export function proxyConfigFromSettings(
+  settings: Pick<Settings, 'proxyType' | 'proxyRules' | 'proxyBypassRules'>
+): ProxyConfig {
   if (settings.proxyType === 'direct') return { mode: 'direct' };
   if (settings.proxyType === 'manual') {
     if (!settings.proxyRules) return { mode: 'system' };
     return {
       mode: 'fixed_servers',
       proxyRules: settings.proxyRules,
+      proxyBypassRules: settings.proxyBypassRules,
     };
   }
   return { mode: 'system' };
@@ -27,7 +30,7 @@ export function proxyConfigFromSettings(settings: Pick<Settings, 'proxyType' | '
  */
 export async function applyProxySettingsToSession(
   targetSession: Session,
-  settings: Pick<Settings, 'proxyType' | 'proxyRules'>
+  settings: Pick<Settings, 'proxyType' | 'proxyRules' | 'proxyBypassRules'>
 ): Promise<ProxyConfig> {
   const config = proxyConfigFromSettings(settings);
   await targetSession.setProxy(config);

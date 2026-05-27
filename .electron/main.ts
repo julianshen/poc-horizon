@@ -675,8 +675,9 @@ app.whenReady().then(() => {
   // Apply user-configured proxy to both core sessions.
   const proxyType = settingsManager.get('proxyType');
   const proxyRules = settingsManager.get('proxyRules');
-  void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules });
-  void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules });
+  const proxyBypassRules = settingsManager.get('proxyBypassRules');
+  void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules, proxyBypassRules });
+  void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules, proxyBypassRules });
   // Install the native application menu (macOS top-of-screen bar / Win
   // & Linux in-window menubar). Without this, Electron's default menu
   // is barely useful — no New Tab, no Reload, no Find, no DevTools.

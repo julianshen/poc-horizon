@@ -112,11 +112,12 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
       applySpellcheckToSession(session.defaultSession, langs);
       applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
     }
-    if (key === 'proxyType' || key === 'proxyRules') {
+    if (key === 'proxyType' || key === 'proxyRules' || key === 'proxyBypassRules') {
       const proxyType = settingsManager.get('proxyType');
       const proxyRules = settingsManager.get('proxyRules');
-      void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules });
-      void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules });
+      const proxyBypassRules = settingsManager.get('proxyBypassRules');
+      void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules, proxyBypassRules });
+      void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules, proxyBypassRules });
       void session.defaultSession.resolveProxy('https://example.com').catch(() => undefined);
       void session.fromPartition('incognito', { cache: false }).resolveProxy('https://example.com').catch(() => undefined);
     }

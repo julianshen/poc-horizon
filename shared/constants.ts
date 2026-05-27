@@ -48,6 +48,7 @@ export const DEFAULT_SETTINGS = {
   smoothScrolling: true,
   proxyType: 'system' as const,
   proxyRules: undefined as string | undefined,
+  proxyBypassRules: undefined as string | undefined,
   spellcheck: true,
   spellcheckLanguages: ['en-US'],
   certificateOverrides: {},

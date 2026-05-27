@@ -185,9 +185,13 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
     const controller = new AbortController();
     activeTranslations.set(tabId, controller);
 
+    // Stamp every progress event with the source tabId so the renderer
+    // (a single TranslationBar instance) can ignore events from background
+    // tabs while showing the active one.
     const onProgress = (translated: number, total: number) => {
       if (!context.window.isDestroyed() && !controller.signal.aborted) {
         context.window.webContents.send('translate:progress', {
+          tabId,
           translated,
           total,
           done: false,
@@ -199,6 +203,7 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
       const result = await translatePage(view.webContents, targetLang, onProgress, controller.signal);
       if (!context.window.isDestroyed() && !controller.signal.aborted) {
         context.window.webContents.send('translate:progress', {
+          tabId,
           translated: result.translated ?? 0,
           total: result.total ?? 0,
           done: true,
@@ -227,7 +232,17 @@ export function registerIpcHandlers(deps: IpcDeps, resolveContext: ContextResolv
 
   handle('translate:restore', async (event) => {
     const context = ctx(event);
-    const view = context.tabManager.getBrowserView(context.tabManager.getActiveTabId() ?? '');
+    const tabId = context.tabManager.getActiveTabId();
+    if (!tabId) return { restored: 0 };
+    // Abort any in-flight translation for this tab first — otherwise the
+    // controller's outstanding batches keep applying after restore and
+    // re-overwrite the original DOM text.
+    const controller = activeTranslations.get(tabId);
+    if (controller) {
+      controller.abort();
+      activeTranslations.delete(tabId);
+    }
+    const view = context.tabManager.getBrowserView(tabId);
     if (!view) return { restored: 0 };
     return restorePage(view.webContents);
   });

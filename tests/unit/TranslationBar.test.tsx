@@ -15,7 +15,7 @@ describe('TranslationBar', () => {
   });
 
   it('renders and fetches initial target language setting when showTranslationBar is true', async () => {
-    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     
     api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
@@ -38,7 +38,7 @@ describe('TranslationBar', () => {
   });
 
   it('changing target language calls settings:set', async () => {
-    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     
     api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
@@ -65,7 +65,7 @@ describe('TranslationBar', () => {
   });
 
   it('Translate button calls translate:page and shows progress bar', async () => {
-    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     
     api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
@@ -94,21 +94,21 @@ describe('TranslationBar', () => {
 
     // Simulate progress updates
     act(() => {
-      api().emit('translate:progress', { translated: 5, total: 10, done: false });
+      api().emit('translate:progress', { tabId: 'tab1', translated: 5, total: 10, done: false });
     });
 
     expect(screen.getByText('50%')).toBeTruthy();
 
     // Done event
     act(() => {
-      api().emit('translate:progress', { translated: 10, total: 10, done: true });
+      api().emit('translate:progress', { tabId: 'tab1', translated: 10, total: 10, done: true });
     });
 
     expect(screen.getByText('Show Original')).toBeTruthy();
   });
 
   it('Show Original button calls translate:restore', async () => {
-    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     
     api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
@@ -132,7 +132,7 @@ describe('TranslationBar', () => {
 
     // Done event
     act(() => {
-      api().emit('translate:progress', { translated: 10, total: 10, done: true });
+      api().emit('translate:progress', { tabId: 'tab1', translated: 10, total: 10, done: true });
     });
 
     const restoreBtn = screen.getByRole('button', { name: 'Show Original' });
@@ -145,7 +145,7 @@ describe('TranslationBar', () => {
   });
 
   it('Cancel button during translation calls translate:cancel', async () => {
-    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     
     api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });
@@ -174,8 +174,40 @@ describe('TranslationBar', () => {
     });
   });
 
+  it('ignores progress events with a tabId other than the active one', async () => {
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'settings:get' && payload?.key === 'translateTargetLang') return Promise.resolve('English');
+      if (channel === 'translate:page') return Promise.resolve({ ok: true, translated: 10, total: 10 });
+      return Promise.resolve(undefined);
+    });
+    render(<TranslationBar />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    fireEvent.click(screen.getByRole('button', { name: 'Translate' }));
+    // Background tab's progress should NOT affect our UI.
+    act(() => api().emit('translate:progress', { tabId: 'other-tab', translated: 5, total: 10, done: false }));
+    expect(screen.queryByText('50%')).toBeNull();
+    // Our tab's progress should.
+    act(() => api().emit('translate:progress', { tabId: 'tab1', translated: 5, total: 10, done: false }));
+    expect(screen.getByText('50%')).toBeTruthy();
+  });
+
+  it('Escape key (window-level) closes the bar', async () => {
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
+    api().invoke.mockImplementation((channel: string, payload: unknown) => {
+      api().invokes.push({ channel, payload });
+      if (channel === 'settings:get' && payload?.key === 'translateTargetLang') return Promise.resolve('English');
+      return Promise.resolve(undefined);
+    });
+    render(<TranslationBar />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(useBrowserStore.getState().showTranslationBar).toBe(false);
+  });
+
   it('Close button hides TranslationBar via toggleOverlay', async () => {
-    useBrowserStore.setState({ ...initialState, showTranslationBar: true });
+    useBrowserStore.setState({ ...initialState, showTranslationBar: true, activeTabId: 'tab1' });
     
     api().invoke.mockImplementation((channel: string, payload: unknown) => {
       api().invokes.push({ channel, payload });

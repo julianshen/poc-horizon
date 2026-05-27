@@ -31,8 +31,8 @@ import { DomainSkills } from './services/DomainSkills';
 import { SkillsLibrary } from './services/SkillsLibrary';
 import { AiActionGuard, type ActionPolicy, type ActionPrompt } from './services/AiActionGuard';
 import { ActionRecorder } from './services/ActionRecorder';
-import { translateText } from './services/LlmTranslator';
-import { translatePage, restorePage } from './services/pageTranslator';
+// translateText / translatePage / restorePage are imported by
+// .electron/ipc/main-handlers.ts where their IPC handlers live.
 import { HorizonBridgeServer } from './services/HorizonBridgeServer';
 import type { AgentEvent } from '../src/types/ai';
 import type { Tab } from '../src/types/browser';
@@ -374,40 +374,10 @@ function registerHandlers(): void {
   );
   ipcMain.handle(IPC_CHANNELS.WORKFLOW_DELETE, (_event, { id }: { id: string }) => workflowsManager.delete(id));
 
-  // ─── Translation ──────────────────────────────────────────────────
-  ipcMain.handle(IPC_CHANNELS.TRANSLATE_PAGE, async (event, payload: { targetLang: string }) => {
-    const ctx = resolve(event);
-    const active = ctx.tabManager.getActiveTabId();
-    if (!active) return { ok: false, error: 'No active tab' };
-    const view = ctx.tabManager.getBrowserView(active);
-    if (!view) return { ok: false, error: 'Active tab has no BrowserView' };
-    const chromeWc = ctx.window.webContents;
-    const result = await translatePage(view.webContents, payload.targetLang, (translated, total) => {
-      if (!chromeWc.isDestroyed()) {
-        chromeWc.send(IPC_CHANNELS.TRANSLATE_PROGRESS, { translated, total, done: false });
-      }
-    });
-    if (!chromeWc.isDestroyed()) {
-      chromeWc.send(IPC_CHANNELS.TRANSLATE_PROGRESS, {
-        translated: result.translated ?? 0, total: result.total ?? 0, done: true,
-      });
-    }
-    return result;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.TRANSLATE_RESTORE, async (event) => {
-    const ctx = resolve(event);
-    const active = ctx.tabManager.getActiveTabId();
-    if (!active) return { ok: false, error: 'No active tab' };
-    const view = ctx.tabManager.getBrowserView(active);
-    if (!view) return { ok: false, error: 'Active tab has no BrowserView' };
-    return await restorePage(view.webContents);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.TRANSLATE_SELECTION, async (_event, { text, targetLang }: { text: string; targetLang: string }) => {
-    const translated = await translateText(text, targetLang);
-    return { ok: translated !== null, translated };
-  });
+  // Translation handlers (translate:page / translate:cancel / translate:restore
+  // / translate:selection) are registered in .electron/ipc/main-handlers.ts —
+  // they own AbortController-backed cancellation + per-tab signal tracking.
+  // Don't re-register here; Electron throws on duplicate channel handlers.
 
   ipcMain.handle(IPC_CHANNELS.AI_PASTE_TO_PAGE, async (event, payload: { text: string }) => {
     const ctx = resolve(event);

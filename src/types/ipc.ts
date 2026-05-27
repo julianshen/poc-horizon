@@ -168,7 +168,7 @@ export interface IpcChannels {
    *  (used by the right-click "Translate selection" overlay). */
   'translate:selection': { text: string; targetLang: string };
   /** Main → Renderer: progress updates while a page translation runs. */
-  'translate:progress': { translated: number; total: number; done: boolean };
+  'translate:progress': { tabId: string; translated: number; total: number; done: boolean };
   // Saved workflows.
   'workflow:list': Record<string, never>;
   'workflow:create': { name: string; prompt: string; attach: 'activeTab' | 'allTabs' | 'none' };

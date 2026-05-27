@@ -22,7 +22,9 @@ export function useMenuCommands(): void {
           }
           break;
         case 'translate:restore':
-          if (useBrowserStore.getState().showTranslationBar) {
+          // Ensure the bar is visible so the user can see the restored
+          // state (and can re-translate without re-opening the menu).
+          if (!useBrowserStore.getState().showTranslationBar) {
             toggleOverlay('showTranslationBar');
           }
           void window.horizonAPI.invoke('translate:restore');

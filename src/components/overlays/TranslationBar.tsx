@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useBrowserStore } from '../../stores/browserStore';
 
 const POPULAR_LANGUAGES = [
@@ -22,10 +22,21 @@ export const TranslationBar: React.FC = () => {
     setTranslationProgress,
     toggleOverlay,
   } = useBrowserStore();
+  const activeTabId = useBrowserStore((s) => s.activeTabId);
 
   const [targetLang, setTargetLang] = useState('English');
   const [status, setStatus] = useState<'idle' | 'translating' | 'done' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Monotonic request id. Bumped on every translate / cancel / restore /
+  // close. Stale promise resolutions check this before applying state —
+  // if the seq they captured no longer matches, their tab/operation is
+  // gone and the resolution must be ignored. Otherwise quickly clicking
+  // "Translate" twice leaves the first promise alive to overwrite UI.
+  const requestSeq = useRef(0);
+  // Which tab the last user-initiated translation was for. Used to decide
+  // whether the current bar state is "ours" when the active tab changes.
+  const lastTranslatedTabId = useRef<string | null>(null);
 
   // Fetch initial setting
   useEffect(() => {
@@ -39,17 +50,31 @@ export const TranslationBar: React.FC = () => {
       .catch(() => {});
   }, [showTranslationBar]);
 
-  // Subscribe to progress events
+  // Switching tabs while a translation is in flight on a different tab:
+  // the bar's local state belongs to the old tab. Reset to idle so the
+  // user sees a clean control surface on the new tab; the old tab keeps
+  // translating in the background (its progress events get filtered out
+  // below).
+  useEffect(() => {
+    if (lastTranslatedTabId.current && activeTabId !== lastTranslatedTabId.current) {
+      setStatus('idle');
+      setErrorMsg('');
+      setTranslationProgress(null);
+    }
+  }, [activeTabId, setTranslationProgress]);
+
+  // Subscribe to progress events — filter to the currently-displayed tab.
   useEffect(() => {
     if (!showTranslationBar) return;
-    const unsub = window.horizonAPI.on('translate:progress', (progress: { translated: number; total: number; done: boolean }) => {
+    const unsub = window.horizonAPI.on('translate:progress', (progress: { tabId: string; translated: number; total: number; done: boolean }) => {
+      if (progress.tabId !== activeTabId) return;
       setTranslationProgress({ translated: progress.translated, total: progress.total });
       if (progress.done) {
         setStatus('done');
       }
     });
     return unsub;
-  }, [showTranslationBar, setTranslationProgress]);
+  }, [showTranslationBar, activeTabId, setTranslationProgress]);
 
   const handleLanguageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = e.target.value;
@@ -58,23 +83,29 @@ export const TranslationBar: React.FC = () => {
   }, []);
 
   const handleTranslate = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    lastTranslatedTabId.current = activeTabId ?? null;
     setStatus('translating');
     setErrorMsg('');
     setTranslationProgress({ translated: 0, total: 100 });
     try {
       const res = (await window.horizonAPI.invoke('translate:page', { targetLang })) as { ok: boolean; error?: string };
+      if (seq !== requestSeq.current) return;  // superseded by a newer click
       if (res && !res.ok) {
         setStatus('error');
         setErrorMsg(res.error || 'Translation failed');
       }
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setStatus('error');
       setErrorMsg((err as Error).message || 'Translation failed');
     }
-  }, [targetLang, setTranslationProgress]);
+  }, [targetLang, activeTabId, setTranslationProgress]);
 
   const handleRestore = useCallback(async () => {
+    requestSeq.current++;
     setStatus('idle');
+    setErrorMsg('');
     setTranslationProgress(null);
     try {
       await window.horizonAPI.invoke('translate:restore');
@@ -85,6 +116,7 @@ export const TranslationBar: React.FC = () => {
   }, [setTranslationProgress]);
 
   const handleCancel = useCallback(async () => {
+    requestSeq.current++;
     setStatus('idle');
     setTranslationProgress(null);
     try {
@@ -96,16 +128,23 @@ export const TranslationBar: React.FC = () => {
   }, [setTranslationProgress]);
 
   const close = useCallback(() => {
+    requestSeq.current++;
     toggleOverlay('showTranslationBar');
+    setStatus('idle');
+    setErrorMsg('');
     setTranslationProgress(null);
   }, [toggleOverlay, setTranslationProgress]);
 
-  const onKey = useCallback(
-    (e: React.KeyboardEvent) => {
+  // Window-level Escape listener — the onKeyDown on the bar's container
+  // never fires reliably because the container isn't focused.
+  useEffect(() => {
+    if (!showTranslationBar) return;
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
-    },
-    [close]
-  );
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showTranslationBar, close]);
 
   if (!showTranslationBar) return null;
 
@@ -116,8 +155,8 @@ export const TranslationBar: React.FC = () => {
   return (
     <div
       className="absolute top-3 right-20 z-50 fade-in flex items-center gap-3 p-2 pl-4"
-      onKeyDown={onKey}
-      tabIndex={-1}
+      role="dialog"
+      aria-label="Translation"
       style={{
         background: 'var(--surface-overlay)',
         backdropFilter: 'saturate(180%) blur(20px)',

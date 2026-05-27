@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS = {
   downloadPath: '', // resolved at runtime
   askWhereToSave: false,
   downloadNotifications: true,
-  theme: 'system' as const,
+  theme: 'dia' as const,
   accentColor: '', // empty = use preset default
   showBookmarksBar: true,
   showStatusBar: true,

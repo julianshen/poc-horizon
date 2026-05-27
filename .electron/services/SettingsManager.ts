@@ -13,6 +13,13 @@ export class SettingsManager {
     try {
       const data = fs.readFileSync(this.settingsPath, 'utf-8');
       const parsed = JSON.parse(data);
+      // Theme migration: legacy values → named presets
+      if (parsed.theme === 'light') parsed.theme = 'dia';
+      if (parsed.theme === 'dark') parsed.theme = 'midnight';
+      const validThemes: string[] = ['system', 'dia', 'midnight', 'ocean', 'forest'];
+      if (parsed.theme && !validThemes.includes(parsed.theme)) {
+        parsed.theme = DEFAULT_SETTINGS.theme;
+      }
       if (parsed.schemaVersion !== DEFAULT_SETTINGS.schemaVersion) {
         return { ...DEFAULT_SETTINGS, ...parsed, schemaVersion: DEFAULT_SETTINGS.schemaVersion };
       }

@@ -2,7 +2,7 @@ export const APP_NAME = 'Horizon';
 export const APP_VERSION = '1.0.0';
 
 export const DEFAULT_SETTINGS = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   startupBehavior: 'restore' as const,
   startupPages: ['https://duckduckgo.com'],
   defaultSearchEngine: 'duckduckgo' as const,
@@ -10,7 +10,7 @@ export const DEFAULT_SETTINGS = {
   askWhereToSave: false,
   downloadNotifications: true,
   theme: 'system' as const,
-  accentColor: '#1a73e8',
+  accentColor: '', // empty = use preset default
   showBookmarksBar: true,
   showStatusBar: true,
   fontSize: 16,

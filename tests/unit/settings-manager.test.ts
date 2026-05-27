@@ -73,3 +73,42 @@ describe('SettingsManager', () => {
     expect(sm.getAll()).toEqual(DEFAULT_SETTINGS);
   });
 });
+
+describe('SettingsManager theme migration', () => {
+  it("migrates legacy 'light' to 'dia'", () => {
+    writeFileSync(
+      settingsPath(),
+      JSON.stringify({ schemaVersion: 1, theme: 'light' })
+    );
+    const sm = new SettingsManager(settingsPath());
+    expect(sm.get('theme')).toBe('dia');
+    expect(sm.get('schemaVersion')).toBe(DEFAULT_SETTINGS.schemaVersion);
+  });
+
+  it("migrates legacy 'dark' to 'midnight'", () => {
+    writeFileSync(
+      settingsPath(),
+      JSON.stringify({ schemaVersion: 1, theme: 'dark' })
+    );
+    const sm = new SettingsManager(settingsPath());
+    expect(sm.get('theme')).toBe('midnight');
+  });
+
+  it("keeps 'system' unchanged", () => {
+    writeFileSync(
+      settingsPath(),
+      JSON.stringify({ schemaVersion: 1, theme: 'system' })
+    );
+    const sm = new SettingsManager(settingsPath());
+    expect(sm.get('theme')).toBe('system');
+  });
+
+  it('resets invalid theme values to default', () => {
+    writeFileSync(
+      settingsPath(),
+      JSON.stringify({ schemaVersion: 1, theme: 'invalid-theme' })
+    );
+    const sm = new SettingsManager(settingsPath());
+    expect(sm.get('theme')).toBe(DEFAULT_SETTINGS.theme);
+  });
+});

@@ -83,7 +83,7 @@ export interface Settings {
   downloadPath: string;
   askWhereToSave: boolean;
   downloadNotifications: boolean;
-  theme: 'light' | 'dark' | 'system';
+  theme: 'system' | 'dia' | 'midnight' | 'ocean' | 'forest';
   accentColor: string;
   showBookmarksBar: boolean;
   showStatusBar: boolean;

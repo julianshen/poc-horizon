@@ -19,6 +19,7 @@ import { scheduleAutoUpdate } from './services/autoUpdateScheduler';
 import { TabSessionStore } from './services/TabSessionStore';
 import { PermissionBroker, PermissionDecision } from './services/PermissionBroker';
 import { applySpellcheckToSession } from './services/spellcheck';
+import { applyProxySettingsToSession } from './services/proxy';
 import { installAppMenu } from './services/appMenu';
 import { BrowserHarness } from './services/BrowserHarness';
 import { PiSession } from './services/PiSession';
@@ -667,11 +668,15 @@ app.whenReady().then(() => {
   applySpellcheckToSession(session.fromPartition('incognito', { cache: false }), langs);
   // Agent Policy v1 § 7: when the AI agent is driving a request, we
   // identify ourselves so sites can serve agent-aware responses or
-  // differentiate analytics. The header rides on every outgoing
-  // request from each session — sites without an agent policy still
-  // see the signal (useful for adoption telemetry).
+  // differentiate analytics. Gated to AI-active sessions inside the
+  // helper so normal browsing doesn't carry the header.
   installAgentIdentificationHeader(session.defaultSession);
   installAgentIdentificationHeader(session.fromPartition('incognito', { cache: false }));
+  // Apply user-configured proxy to both core sessions.
+  const proxyType = settingsManager.get('proxyType');
+  const proxyRules = settingsManager.get('proxyRules');
+  void applyProxySettingsToSession(session.defaultSession, { proxyType, proxyRules });
+  void applyProxySettingsToSession(session.fromPartition('incognito', { cache: false }), { proxyType, proxyRules });
   // Install the native application menu (macOS top-of-screen bar / Win
   // & Linux in-window menubar). Without this, Electron's default menu
   // is barely useful — no New Tab, no Reload, no Find, no DevTools.

@@ -4,6 +4,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // `registerIpcHandlers` module imports `electron`, so we mock the
 // module before importing the SUT.
 const handlers = new Map<string, (event: unknown, payload: unknown) => unknown>();
+const defaultSetProxy = vi.fn().mockResolvedValue(undefined);
+const defaultResolveProxy = vi.fn().mockResolvedValue('DIRECT');
+const incognitoSetProxy = vi.fn().mockResolvedValue(undefined);
+const incognitoResolveProxy = vi.fn().mockResolvedValue('DIRECT');
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -12,6 +16,16 @@ vi.mock('electron', () => ({
     },
   },
   BrowserWindow: class {},
+  session: {
+    defaultSession: {
+      setProxy: defaultSetProxy,
+      resolveProxy: defaultResolveProxy,
+    },
+    fromPartition: vi.fn().mockReturnValue({
+      setProxy: incognitoSetProxy,
+      resolveProxy: incognitoResolveProxy,
+    }),
+  },
 }));
 
 vi.mock('../../.electron/services/pageTranslator', () => ({
@@ -134,6 +148,10 @@ let s: Services;
 
 beforeEach(() => {
   handlers.clear();
+  defaultSetProxy.mockClear();
+  defaultResolveProxy.mockClear();
+  incognitoSetProxy.mockClear();
+  incognitoResolveProxy.mockClear();
   s = makeFakeServices();
   registerIpcHandlers(
     {
@@ -528,6 +546,23 @@ describe('IPC handlers', () => {
       await inFlight;
       expect(observedSignal?.aborted).toBe(true);
       expect(res).toEqual({ restored: 5 });
+    });
+  });
+
+  describe('settings', () => {
+    it('settings:set for proxyType updates proxy for default and incognito sessions', () => {
+      s.settingsManager.get.mockImplementation((key: string) => {
+        if (key === 'proxyType') return 'manual';
+        if (key === 'proxyRules') return 'http=127.0.0.1:8080';
+        return 'value';
+      });
+
+      invoke(IPC_CHANNELS.SETTINGS_SET, { key: 'proxyType', value: 'manual' });
+
+      expect(defaultSetProxy).toHaveBeenCalledWith({ mode: 'fixed_servers', proxyRules: 'http=127.0.0.1:8080' });
+      expect(incognitoSetProxy).toHaveBeenCalledWith({ mode: 'fixed_servers', proxyRules: 'http=127.0.0.1:8080' });
+      expect(defaultResolveProxy).toHaveBeenCalledWith('https://example.com');
+      expect(incognitoResolveProxy).toHaveBeenCalledWith('https://example.com');
     });
   });
 });

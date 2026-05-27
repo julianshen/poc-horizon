@@ -21,6 +21,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useMenuCommands } from './hooks/useMenuCommands';
 import { useLlmsTxtGuide } from './hooks/useLlmsTxtGuide';
 import { useAskFromSelection } from './hooks/useAskFromSelection';
+import { useTheme } from './hooks/useTheme';
 
 const App: React.FC = () => {
   useTabs();
@@ -28,6 +29,7 @@ const App: React.FC = () => {
   useMenuCommands();
   useLlmsTxtGuide();
   useAskFromSelection();
+  useTheme();
 
   const { tabs, activeTabId, showAI } = useBrowserStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);

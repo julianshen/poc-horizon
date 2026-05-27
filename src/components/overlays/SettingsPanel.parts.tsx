@@ -51,14 +51,47 @@ export const Select: React.FC<SelectProps> = ({ value, onChange, options }) => (
   </select>
 );
 
-export const TextInput: React.FC<{ value: string; onChange: (v: string) => void; placeholder?: string }> = ({ value, onChange, placeholder }) => (
-  <input
-    type="text" value={value} placeholder={placeholder}
-    onChange={(e) => onChange(e.target.value)}
-    className="h-8 px-2 rounded-md text-sm outline-none w-64"
-    style={{ background: 'var(--omnibox-bg)', color: 'var(--chrome-fg)', border: '1px solid var(--chrome-border)' }}
-  />
-);
+/**
+ * Text input with local-state buffering. Commits to onChange on blur
+ * and on Enter — NOT on every keystroke. Settings persistence is a
+ * writeFileSync + IPC roundtrip + (for proxy) session.setProxy +
+ * resolveProxy probe; per-keystroke commits would jank the UI and
+ * thrash disk. Two seams to commit on cover the common cases:
+ *   - blur: user clicks away or tabs out
+ *   - Enter: user explicitly confirms in place
+ * Escape reverts to the last committed value.
+ */
+export const TextInput: React.FC<{ value: string; onChange: (v: string) => void; placeholder?: string }> = ({ value, onChange, placeholder }) => {
+  const [draft, setDraft] = React.useState(value);
+  // Mirror draft in a ref so commit() reads the latest value without
+  // re-binding on every keystroke (avoids stale-closure issues when
+  // commit fires from event handlers that captured an older `draft`).
+  const draftRef = React.useRef(draft);
+  // Resync the draft when the upstream value changes externally
+  // (e.g. settings reload, different field reused).
+  React.useEffect(() => { setDraft(value); draftRef.current = value; }, [value]);
+  const commit = React.useCallback(() => {
+    if (draftRef.current !== value) onChange(draftRef.current);
+  }, [value, onChange]);
+  const onChangeInternal = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDraft(e.target.value);
+    draftRef.current = e.target.value;
+  }, []);
+  const onKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { commit(); e.currentTarget.blur(); }
+    else if (e.key === 'Escape') { setDraft(value); draftRef.current = value; e.currentTarget.blur(); }
+  }, [commit, value]);
+  return (
+    <input
+      type="text" value={draft} placeholder={placeholder}
+      onChange={onChangeInternal}
+      onBlur={commit}
+      onKeyDown={onKeyDown}
+      className="h-8 px-2 rounded-md text-sm outline-none w-64"
+      style={{ background: 'var(--omnibox-bg)', color: 'var(--chrome-fg)', border: '1px solid var(--chrome-border)' }}
+    />
+  );
+};
 
 export const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({
   label,
@@ -69,6 +102,7 @@ export const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: b
     <span>{label}</span>
     <span
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       tabIndex={0}
       onClick={() => onChange(!checked)}

@@ -56,21 +56,29 @@ export const WorkflowsPopover: React.FC<Props> = ({
 
   const remove = useCallback(
     async (id: string) => {
-      await window.horizonAPI.invoke("workflow:delete", { id });
-      await refresh();
+      try {
+        await window.horizonAPI.invoke("workflow:delete", { id });
+        await refresh();
+      } catch (err) {
+        console.error("Failed to delete workflow:", err);
+      }
     },
     [refresh],
   );
 
   const save = useCallback(async () => {
     if (!savingName?.trim() || !lastPrompt) return;
-    await window.horizonAPI.invoke("workflow:create", {
-      name: savingName.trim(),
-      prompt: lastPrompt,
-      attach: lastAttach,
-    });
-    setSavingName(null);
-    await refresh();
+    try {
+      await window.horizonAPI.invoke("workflow:create", {
+        name: savingName.trim(),
+        prompt: lastPrompt,
+        attach: lastAttach,
+      });
+      setSavingName(null);
+      await refresh();
+    } catch (err) {
+      console.error("Failed to create workflow:", err);
+    }
   }, [savingName, lastPrompt, lastAttach, refresh]);
 
   return (

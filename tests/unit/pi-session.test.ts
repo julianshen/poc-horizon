@@ -409,4 +409,26 @@ describe("PiSession", () => {
     expect(turnEndEvents.length).toBe(1);
     expect(session.isRunning).toBe(false);
   });
+
+  it("does not clear running state or emit turn_end when a non-turn command (e.g. set_auto_compaction) fails", async () => {
+    void session.startTurn("go");
+    expect(session.isRunning).toBe(true);
+    emit({
+      type: "response",
+      command: "set_auto_compaction",
+      success: false,
+      error: "compaction not supported",
+    });
+    // It should emit the error event
+    expect(
+      events.some(
+        (e) =>
+          e.type === "error" && e.message.includes("compaction not supported"),
+      ),
+    ).toBe(true);
+    // But it should NOT emit turn_end
+    expect(events.some((e) => e.type === "turn_end")).toBe(false);
+    // And it should still be running
+    expect(session.isRunning).toBe(true);
+  });
 });

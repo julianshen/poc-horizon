@@ -44,3 +44,9 @@
 - [x] Test: consecutive `turn_end` and `agent_end` does not emit duplicate error events
 - [x] Fix: `PiSession.ts` command `response` failure handling
 - [x] Fix: `PiSession.ts` `agent_end` and `turn_end` error handling
+
+## Phase 6: Address PR review comments
+
+- [x] Fix: Wrap `workflow:delete` in try-catch inside `WorkflowsPopover.tsx`
+- [x] Test: `PiSession.ts` command failures for non-turn commands do not clear `this.running` or emit `turn_end`
+- [x] Fix: `PiSession.ts` command response error handler filters for `prompt`, `steer`, `follow_up` commands

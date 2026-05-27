@@ -376,7 +376,10 @@ export class PiSession extends EventEmitter {
             type: "error",
             message: `Pi command failed: ${String(msg.error ?? "unknown")}`,
           });
-          if (this.running) {
+          if (
+            this.running &&
+            ["prompt", "steer", "follow_up"].includes(msg.command as string)
+          ) {
             this.emitEvent({ type: "turn_end", reason: "error" });
             this.running = false;
           }

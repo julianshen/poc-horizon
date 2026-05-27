@@ -36,10 +36,34 @@ export const SettingsPanel: React.FC = () => {
               onChange={(v) => update('theme', v as Settings['theme'])}
               options={[
                 ['system', 'Match system'],
-                ['light', 'Light'],
-                ['dark', 'Dark'],
+                ['dia', 'Dia'],
+                ['midnight', 'Midnight'],
+                ['ocean', 'Ocean'],
+                ['forest', 'Forest'],
               ]}
             />
+          </Field>
+          <Field label="Accent color">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={settings?.accentColor || '#d44d7a'}
+                onChange={(e) => update('accentColor', e.target.value)}
+                className="w-8 h-8 rounded cursor-pointer"
+              />
+              {settings?.accentColor ? (
+                <button
+                  className="text-xs underline"
+                  onClick={() => update('accentColor', '')}
+                >
+                  Reset to default
+                </button>
+              ) : (
+                <span className="text-xs" style={{ color: 'var(--chrome-fg-subtle)' }}>
+                  Using preset default
+                </span>
+              )}
+            </div>
           </Field>
           <Toggle
             label="Show bookmarks bar"

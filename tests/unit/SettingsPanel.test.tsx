@@ -16,7 +16,7 @@ describe('SettingsPanel', () => {
 
   it('loads settings:getAll on open and renders known fields', async () => {
     api().invoke.mockResolvedValue({
-      theme: 'dark',
+      theme: 'midnight',
       defaultSearchEngine: 'google',
       showBookmarksBar: false,
       blockThirdPartyCookies: true,
@@ -36,10 +36,10 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel />);
     await waitFor(() => expect(screen.getByText('Theme')).toBeTruthy());
     const select = screen.getAllByRole('combobox')[0];
-    fireEvent.change(select, { target: { value: 'dark' } });
+    fireEvent.change(select, { target: { value: 'midnight' } });
     expect(api().invoke.mock.calls).toContainEqual([
       'settings:set',
-      { key: 'theme', value: 'dark' },
+      { key: 'theme', value: 'midnight' },
     ]);
   });
 
@@ -88,8 +88,8 @@ describe('SettingsPanel', () => {
     expect(screen.getByDisplayValue('http=127.0.0.1:8080')).toBeTruthy();
   });
 
-  it('hides rules/bypass inputs when proxyType is system or direct', async () => {
-    api().invoke.mockResolvedValue({ proxyType: 'direct', proxyRules: '', proxyBypassRules: '' });
+  it.each(['direct', 'system'] as const)('hides rules/bypass inputs when proxyType is %s', async (type) => {
+    api().invoke.mockResolvedValue({ proxyType: type, proxyRules: '', proxyBypassRules: '' });
     act(() => useBrowserStore.setState({ showSettings: true }));
     render(<SettingsPanel />);
     await waitFor(() => expect(screen.getByText('Proxy type')).toBeTruthy());
@@ -97,15 +97,42 @@ describe('SettingsPanel', () => {
     expect(screen.queryByText('Bypass rules')).toBeNull();
   });
 
-  it('changing the proxy-rules input dispatches settings:set', async () => {
+  it('proxy-rules input commits on BLUR (not on every keystroke) to avoid IPC thrash', async () => {
     api().invoke.mockResolvedValue({ proxyType: 'manual', proxyRules: '', proxyBypassRules: '' });
     act(() => useBrowserStore.setState({ showSettings: true }));
     render(<SettingsPanel />);
     await waitFor(() => expect(screen.getByText('Proxy rules')).toBeTruthy());
     const rulesInput = screen.getByPlaceholderText(/http=127/) as HTMLInputElement;
+    // Type 3 characters — must NOT fire settings:set yet.
+    fireEvent.change(rulesInput, { target: { value: 'h' } });
+    fireEvent.change(rulesInput, { target: { value: 'ht' } });
     fireEvent.change(rulesInput, { target: { value: 'http=10.0.0.1:3128' } });
+    expect(api().invoke.mock.calls.some((c) => c[0] === 'settings:set' && (c[1] as { key: string }).key === 'proxyRules')).toBe(false);
+    // Blur commits the final value with one IPC call.
+    fireEvent.blur(rulesInput);
     expect(api().invoke.mock.calls).toContainEqual([
       'settings:set', { key: 'proxyRules', value: 'http=10.0.0.1:3128' },
+    ]);
+  });
+
+  it('proxy-rules input commits on Enter and reverts on Escape', async () => {
+    api().invoke.mockResolvedValue({ proxyType: 'manual', proxyRules: 'http=old:8080', proxyBypassRules: '' });
+    act(() => useBrowserStore.setState({ showSettings: true }));
+    render(<SettingsPanel />);
+    await waitFor(() => expect(screen.getByText('Proxy rules')).toBeTruthy());
+    const rulesInput = screen.getByDisplayValue('http=old:8080') as HTMLInputElement;
+    // Edit + Escape → no IPC, draft reverts.
+    await act(async () => { fireEvent.change(rulesInput, { target: { value: 'http=garbage' } }); });
+    await act(async () => { fireEvent.keyDown(rulesInput, { key: 'Escape' }); });
+    expect(api().invoke.mock.calls.some((c) => c[0] === 'settings:set' && (c[1] as { key: string }).key === 'proxyRules')).toBe(false);
+    // Wait for the Escape-driven revert to actually paint, then re-query.
+    await waitFor(() => expect((screen.getByPlaceholderText(/http=127/) as HTMLInputElement).value).toBe('http=old:8080'));
+    const rulesInput2 = screen.getByPlaceholderText(/http=127/) as HTMLInputElement;
+    // Edit + Enter → one IPC commit.
+    await act(async () => { fireEvent.change(rulesInput2, { target: { value: 'http=new:9090' } }); });
+    await act(async () => { fireEvent.keyDown(rulesInput2, { key: 'Enter' }); });
+    expect(api().invoke.mock.calls).toContainEqual([
+      'settings:set', { key: 'proxyRules', value: 'http=new:9090' },
     ]);
   });
 });

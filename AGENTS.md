@@ -24,14 +24,14 @@ Every feature, bugfix, and refactor MUST follow the TDD cycle:
 
 ### 1.3 Test Granularity
 
-| Code Type | Test Type | Example |
-|-----------|-----------|---------|
-| Pure functions | Unit test | `url.ts`, `format.ts` |
-| React hooks | Unit + integration | `useTabs.ts`, `useNavigation.ts` |
-| React components | Unit (RTL) | `Omnibox.tsx`, `Tab.tsx` |
-| IPC handlers | Integration test | `main-handlers.ts` |
-| Service managers | Integration test | `TabManager.ts`, `BookmarkManager.ts` |
-| Full user flows | E2E test | Tab creation → navigation → bookmarking |
+| Code Type        | Test Type          | Example                                 |
+| ---------------- | ------------------ | --------------------------------------- |
+| Pure functions   | Unit test          | `url.ts`, `format.ts`                   |
+| React hooks      | Unit + integration | `useTabs.ts`, `useNavigation.ts`        |
+| React components | Unit (RTL)         | `Omnibox.tsx`, `Tab.tsx`                |
+| IPC handlers     | Integration test   | `main-handlers.ts`                      |
+| Service managers | Integration test   | `TabManager.ts`, `BookmarkManager.ts`   |
+| Full user flows  | E2E test           | Tab creation → navigation → bookmarking |
 
 ### 1.4 Test File Placement
 
@@ -72,12 +72,12 @@ describe('url utils', () => {
 
 ### 2.1 Minimum Coverage Thresholds
 
-| Metric | Minimum | Target |
-|--------|---------|--------|
-| Lines | 90% | 95% |
-| Functions | 90% | 95% |
-| Branches | 90% | 95% |
-| Statements | 90% | 95% |
+| Metric     | Minimum | Target |
+| ---------- | ------- | ------ |
+| Lines      | 90%     | 95%    |
+| Functions  | 90%     | 95%    |
+| Branches   | 90%     | 95%    |
+| Statements | 90%     | 95%    |
 
 > **Effective 2026-05-23:** the minimum across all four metrics is **90%**. Previously 80%/85%/75%/80%. Critical paths (§2.2) remain 95%+.
 
@@ -130,12 +130,15 @@ interface Tab {
 }
 
 const TabState = {
-  LOADING: 'loading',
-  COMPLETE: 'complete',
+  LOADING: "loading",
+  COMPLETE: "complete",
 } as const;
 
 // Bad
-enum TabState { LOADING, COMPLETE }
+enum TabState {
+  LOADING,
+  COMPLETE,
+}
 ```
 
 ### 3.2 React
@@ -155,7 +158,7 @@ interface TabProps {
 
 export const Tab: React.FC<TabProps> = React.memo(({ tab, isActive }) => {
   const activate = useCallback(() => {
-    window.horizonAPI.invoke('tab:activate', { tabId: tab.id });
+    window.horizonAPI.invoke("tab:activate", { tabId: tab.id });
   }, [tab.id]);
 
   return <div onClick={activate}>{tab.title}</div>;
@@ -164,25 +167,25 @@ export const Tab: React.FC<TabProps> = React.memo(({ tab, isActive }) => {
 
 ### 3.3 Naming Conventions
 
-| Category | Convention | Example |
-|----------|-----------|---------|
-| Files (components) | PascalCase | `TabBar.tsx`, `Omnibox.tsx` |
-| Files (hooks) | camelCase, `use` prefix | `useTabs.ts`, `useNavigation.ts` |
-| Files (services) | PascalCase | `TabManager.ts`, `HistoryManager.ts` |
-| Files (utils) | camelCase | `url.ts`, `format.ts` |
-| Constants | SCREAMING_SNAKE_CASE | `DEFAULT_SETTINGS`, `APP_NAME` |
-| Types/Interfaces | PascalCase | `Tab`, `HistoryEntry` |
-| IPC Channels | SCREAMING_SNAKE_CASE | `TAB_CREATE`, `NAVIGATION_GO` |
-| Boolean props | `is`/`has`/`can` prefix | `isLoading`, `canGoBack` |
+| Category           | Convention              | Example                              |
+| ------------------ | ----------------------- | ------------------------------------ |
+| Files (components) | PascalCase              | `TabBar.tsx`, `Omnibox.tsx`          |
+| Files (hooks)      | camelCase, `use` prefix | `useTabs.ts`, `useNavigation.ts`     |
+| Files (services)   | PascalCase              | `TabManager.ts`, `HistoryManager.ts` |
+| Files (utils)      | camelCase               | `url.ts`, `format.ts`                |
+| Constants          | SCREAMING_SNAKE_CASE    | `DEFAULT_SETTINGS`, `APP_NAME`       |
+| Types/Interfaces   | PascalCase              | `Tab`, `HistoryEntry`                |
+| IPC Channels       | SCREAMING_SNAKE_CASE    | `TAB_CREATE`, `NAVIGATION_GO`        |
+| Boolean props      | `is`/`has`/`can` prefix | `isLoading`, `canGoBack`             |
 
 ### 3.4 File Size Limits
 
-| File Type | Max Lines | Action if Exceeded |
-|-----------|-----------|-------------------|
-| Component | 200 | Split into sub-components |
-| Hook | 150 | Extract helper functions |
-| Service | 300 | Extract into smaller services |
-| Test | 200 | Split by behavior/scenario |
+| File Type | Max Lines | Action if Exceeded            |
+| --------- | --------- | ----------------------------- |
+| Component | 200       | Split into sub-components     |
+| Hook      | 150       | Extract helper functions      |
+| Service   | 300       | Extract into smaller services |
+| Test      | 200       | Split by behavior/scenario    |
 
 ---
 
@@ -200,35 +203,35 @@ export const Tab: React.FC<TabProps> = React.memo(({ tab, isActive }) => {
 
 ### 4.2 Types
 
-| Type | Use When |
-|------|----------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
+| Type       | Use When                                                |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | New feature or capability                               |
+| `fix`      | Bug fix                                                 |
 | `refactor` | Code change that neither fixes a bug nor adds a feature |
-| `test` | Adding or updating tests |
-| `docs` | Documentation changes only |
-| `chore` | Build, tooling, dependency updates |
-| `perf` | Performance improvement |
-| `security` | Security-related fix |
+| `test`     | Adding or updating tests                                |
+| `docs`     | Documentation changes only                              |
+| `chore`    | Build, tooling, dependency updates                      |
+| `perf`     | Performance improvement                                 |
+| `security` | Security-related fix                                    |
 
 ### 4.3 Scopes
 
-| Scope | Description |
-|-------|-------------|
-| `main` | Electron main process |
+| Scope      | Description            |
+| ---------- | ---------------------- |
+| `main`     | Electron main process  |
 | `renderer` | React renderer process |
-| `ipc` | IPC channels/handlers |
-| `tab` | Tab management |
-| `nav` | Navigation |
-| `bookmark` | Bookmarks |
-| `history` | History |
-| `download` | Downloads |
-| `settings` | Settings |
-| `password` | Password manager |
-| `autofill` | Autofill |
-| `ui` | UI components |
-| `test` | Tests |
-| `build` | Build/packaging |
+| `ipc`      | IPC channels/handlers  |
+| `tab`      | Tab management         |
+| `nav`      | Navigation             |
+| `bookmark` | Bookmarks              |
+| `history`  | History                |
+| `download` | Downloads              |
+| `settings` | Settings               |
+| `password` | Password manager       |
+| `autofill` | Autofill               |
+| `ui`       | UI components          |
+| `test`     | Tests                  |
+| `build`    | Build/packaging        |
 
 ### 4.4 Examples
 
@@ -269,12 +272,12 @@ perf(renderer): memoize Tab component to reduce re-renders
 ```typescript
 // Good — validated, typed IPC
 ipcMain.handle(IPC_CHANNELS.TAB_CREATE, (_event, { url }: { url?: string }) => {
-  if (url && typeof url !== 'string') throw new Error('Invalid URL');
+  if (url && typeof url !== "string") throw new Error("Invalid URL");
   return tabManager.createTab(url);
 });
 
 // Bad — no validation, untyped
-ipcMain.handle('tab:create', (event, data) => {
+ipcMain.handle("tab:create", (event, data) => {
   return tabManager.createTab(data.url);
 });
 ```
@@ -328,7 +331,7 @@ ipcMain.handle('tab:create', (event, data) => {
  */
 export function normalizeUrl(input: string): string {
   // If input contains no dots and no scheme, treat as search query
-  if (!input.includes('.') && !input.includes('://')) {
+  if (!input.includes(".") && !input.includes("://")) {
     return buildSearchUrl(input);
   }
   // ...
@@ -402,12 +405,12 @@ todo list
 
 ### 10.2 Task Lifecycle
 
-| Status | Meaning |
-|--------|---------|
-| `pending` | Task defined, not started |
+| Status        | Meaning                   |
+| ------------- | ------------------------- |
+| `pending`     | Task defined, not started |
 | `in_progress` | Currently being worked on |
-| `completed` | Done, tested, committed |
-| `deleted` | Cancelled or superseded |
+| `completed`   | Done, tested, committed   |
+| `deleted`     | Cancelled or superseded   |
 
 ### 10.3 Task Granularity
 
@@ -421,30 +424,30 @@ todo list
 
 ### 11.1 Electron Gotchas
 
-| Issue | Solution |
-|-------|----------|
+| Issue                                                 | Solution                                                                                     |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `better-sqlite3` fails to bundle with `electron-vite` | Use JSON storage for dev; add `better-sqlite3` to `rollup.external` for native module builds |
-| `setWindowOpenHandler` on `session` throws | Use `webContents.setWindowOpenHandler()` on the BrowserWindow's webContents instead |
-| `webContents.canGoBack()` is deprecated | Use `webContents.navigationHistory.canGoBack()` (Electron 28+) |
-| `app.requestSingleInstanceLock()` | Call before any other `app` API calls |
-| `protocol.registerFileProtocol` | Must be called after `app.whenReady()` |
-| Native modules with Vite bundling | Add to `rollupOptions.external` in `vite.main.config.ts` |
+| `setWindowOpenHandler` on `session` throws            | Use `webContents.setWindowOpenHandler()` on the BrowserWindow's webContents instead          |
+| `webContents.canGoBack()` is deprecated               | Use `webContents.navigationHistory.canGoBack()` (Electron 28+)                               |
+| `app.requestSingleInstanceLock()`                     | Call before any other `app` API calls                                                        |
+| `protocol.registerFileProtocol`                       | Must be called after `app.whenReady()`                                                       |
+| Native modules with Vite bundling                     | Add to `rollupOptions.external` in `vite.main.config.ts`                                     |
 
 ### 11.2 Build Issues
 
-| Issue | Solution |
-|-------|----------|
-| `npm install` peer dep conflicts with `electron-vite` | Use `--legacy-peer-deps` flag |
-| Vite dev server fails to start | Ensure `index.html` exists at project root with correct script src |
-| Preload build missing types | Ensure `tsconfig.preload.json` includes the preload file |
+| Issue                                                 | Solution                                                           |
+| ----------------------------------------------------- | ------------------------------------------------------------------ |
+| `npm install` peer dep conflicts with `electron-vite` | Use `--legacy-peer-deps` flag                                      |
+| Vite dev server fails to start                        | Ensure `index.html` exists at project root with correct script src |
+| Preload build missing types                           | Ensure `tsconfig.preload.json` includes the preload file           |
 
 ### 11.3 IPC Patterns
 
-| Anti-Pattern | Correct Pattern |
-|--------------|-----------------|
+| Anti-Pattern                                             | Correct Pattern                                                             |
+| -------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Emitting events from TabManager without window reference | Store `BrowserWindow` reference in service and use `win.webContents.send()` |
-| Calling `ipcRenderer.invoke` directly in renderer | Use `window.horizonAPI.invoke()` via contextBridge |
-| No cleanup for IPC listeners | Always return unsubscribe function from `window.horizonAPI.on()` |
+| Calling `ipcRenderer.invoke` directly in renderer        | Use `window.horizonAPI.invoke()` via contextBridge                          |
+| No cleanup for IPC listeners                             | Always return unsubscribe function from `window.horizonAPI.on()`            |
 
 ### 11.4 Security Reminders
 
@@ -495,5 +498,5 @@ The following will be rejected in code review:
 
 ---
 
-*Last updated: 2026-05-23*
-*Version: 1.1*
+_Last updated: 2026-05-23_
+_Version: 1.1_

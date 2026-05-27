@@ -68,31 +68,31 @@
 
 ### 4.2 Key Design Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| BrowserView vs. webview tag | `BrowserView` | Better performance, true multi-tab isolation, closer to Chrome's model |
-| Primary window model | Single window + stacked BrowserViews | Fastest dev velocity; used by Arc, Brave, and most Electron browsers |
-| Multi-window support | Future (v1.1+) | WindowManager architecture supports multiple windows; v1.0 focuses on single-window polish |
-| Single-instance lock | Yes | `app.requestSingleInstanceLock()` prevents multiple Horizon processes. Second launch focuses existing window or opens new tab with URL |
-| React for chrome UI | Yes | Largest ecosystem, best hiring pool, component model fits browser chrome |
-| Zustand for state | Yes | Lightweight, no boilerplate, works well with IPC-synced state |
-| Vite for build | Yes | Fast HMR, fast production builds, native ESM |
-| electron-builder for packaging | Yes | Mature, supports all target platforms, auto-updater integration |
-| No custom protocol handler for web content | Yes | Use `https://`, `http://`, `file://` natively; `horizon://` for internal pages only |
+| Decision                                   | Choice                               | Rationale                                                                                                                              |
+| ------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| BrowserView vs. webview tag                | `BrowserView`                        | Better performance, true multi-tab isolation, closer to Chrome's model                                                                 |
+| Primary window model                       | Single window + stacked BrowserViews | Fastest dev velocity; used by Arc, Brave, and most Electron browsers                                                                   |
+| Multi-window support                       | Future (v1.1+)                       | WindowManager architecture supports multiple windows; v1.0 focuses on single-window polish                                             |
+| Single-instance lock                       | Yes                                  | `app.requestSingleInstanceLock()` prevents multiple Horizon processes. Second launch focuses existing window or opens new tab with URL |
+| React for chrome UI                        | Yes                                  | Largest ecosystem, best hiring pool, component model fits browser chrome                                                               |
+| Zustand for state                          | Yes                                  | Lightweight, no boilerplate, works well with IPC-synced state                                                                          |
+| Vite for build                             | Yes                                  | Fast HMR, fast production builds, native ESM                                                                                           |
+| electron-builder for packaging             | Yes                                  | Mature, supports all target platforms, auto-updater integration                                                                        |
+| No custom protocol handler for web content | Yes                                  | Use `https://`, `http://`, `file://` natively; `horizon://` for internal pages only                                                    |
 
 ### 4.3 Internal Pages (`horizon://` Protocol)
 
 The browser registers a custom `horizon://` protocol for internal pages that cannot be served over HTTP:
 
-| Page | URL | Content |
-|------|-----|---------|
-| New Tab | `horizon://newtab` | Search box, bookmarks bar, getting-started guide |
-| Error (generic) | `horizon://error` | Error message, retry button, details |
-| Error (certificate) | `horizon://error/certificate` | Cert details, override option, warning |
-| Error (offline) | `horizon://error/offline` | Offline message, auto-reload on reconnect |
-| Error (crash) | `horizon://error/crashed` | Crash message, reload button |
-| Settings | `horizon://settings` | (Alternative entry point; normally shown as overlay) |
-| About | `horizon://about` | Version, credits, update check |
+| Page                | URL                           | Content                                              |
+| ------------------- | ----------------------------- | ---------------------------------------------------- |
+| New Tab             | `horizon://newtab`            | Search box, bookmarks bar, getting-started guide     |
+| Error (generic)     | `horizon://error`             | Error message, retry button, details                 |
+| Error (certificate) | `horizon://error/certificate` | Cert details, override option, warning               |
+| Error (offline)     | `horizon://error/offline`     | Offline message, auto-reload on reconnect            |
+| Error (crash)       | `horizon://error/crashed`     | Crash message, reload button                         |
+| Settings            | `horizon://settings`          | (Alternative entry point; normally shown as overlay) |
+| About               | `horizon://about`             | Version, credits, update check                       |
 
 **Implementation:** Electron `protocol.handle('horizon://', ...)` serves static HTML generated at build time or rendered from templates in the main process. These pages run in a separate `BrowserView` with `nodeIntegration: false` and `contextIsolation: true`, same as regular web content.
 
@@ -219,20 +219,20 @@ horizon/
 
 ## 6. Tech Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Electron | Chromium runtime | ^33.0.0 |
-| React | UI framework | ^19.0.0 |
-| TypeScript | Language | ^5.7.0 |
-| Tailwind CSS | Styling | ^3.4.0 |
-| Zustand | State management | ^5.0.0 |
-| Vite | Build tool | ^6.0.0 |
-| electron-vite | Electron + Vite integration | ^2.0.0 |
-| electron-builder | Packaging & distribution | ^25.0.0 |
-| Vitest | Unit/integration testing | ^2.0.0 |
-| Playwright | E2E testing | ^1.49.0 |
-| ESLint | Linting | ^9.0.0 |
-| Prettier | Code formatting | ^3.4.0 |
+| Layer            | Technology                  | Version |
+| ---------------- | --------------------------- | ------- |
+| Electron         | Chromium runtime            | ^33.0.0 |
+| React            | UI framework                | ^19.0.0 |
+| TypeScript       | Language                    | ^5.7.0  |
+| Tailwind CSS     | Styling                     | ^3.4.0  |
+| Zustand          | State management            | ^5.0.0  |
+| Vite             | Build tool                  | ^6.0.0  |
+| electron-vite    | Electron + Vite integration | ^2.0.0  |
+| electron-builder | Packaging & distribution    | ^25.0.0 |
+| Vitest           | Unit/integration testing    | ^2.0.0  |
+| Playwright       | E2E testing                 | ^1.49.0 |
+| ESLint           | Linting                     | ^9.0.0  |
+| Prettier         | Code formatting             | ^3.4.0  |
 
 ---
 
@@ -258,113 +258,114 @@ window.horizonAPI.on(channel, callback)
 
 ### 7.2 Renderer → Main (invoke)
 
-| Channel | Payload | Returns | Description |
-|---------|---------|---------|-------------|
-| `tab:create` | `{ url?: string, index?: number }` | `Tab` | Create new tab |
-| `tab:close` | `{ tabId: string }` | `void` | Close tab |
-| `tab:activate` | `{ tabId: string }` | `void` | Switch to tab |
-| `tab:reorder` | `{ fromIndex: number, toIndex: number }` | `void` | Reorder tabs |
-| `tab:pin` | `{ tabId: string }` | `Tab` | Toggle pin state |
-| `tab:duplicate` | `{ tabId: string }` | `Tab` | Duplicate tab |
-| `tab:hibernate` | `{ tabId: string }` | `void` | Free tab memory |
-| `tab:wake` | `{ tabId: string }` | `void` | Restore hibernated tab |
-| `tab:mute` | `{ tabId: string }` | `void` | Mute tab audio |
-| `tab:unmute` | `{ tabId: string }` | `void` | Unmute tab audio |
-| `navigation:go` | `{ tabId: string, url: string }` | `void` | Navigate to URL |
-| `navigation:back` | `{ tabId: string }` | `void` | Go back |
-| `navigation:forward` | `{ tabId: string }` | `void` | Go forward |
-| `navigation:reload` | `{ tabId: string, hard?: boolean }` | `void` | Reload page |
-| `navigation:stop` | `{ tabId: string }` | `void` | Stop loading |
-| `zoom:set` | `{ tabId: string, level: number }` | `number` | Set zoom (0.25-5.0) |
-| `zoom:reset` | `{ tabId: string }` | `number` | Reset zoom to 1.0 |
-| `find:start` | `{ tabId: string, text: string, caseSensitive?: boolean }` | `FindResult` | Start find |
-| `find:next` | `{ tabId: string, forward?: boolean }` | `FindResult` | Find next/prev |
-| `find:stop` | `{ tabId: string }` | `void` | Stop find session |
-| `bookmark:add` | `{ url: string, title: string, parentId?: string }` | `Bookmark` | Add bookmark |
-| `bookmark:remove` | `{ bookmarkId: string }` | `void` | Remove bookmark |
-| `bookmark:move` | `{ bookmarkId: string, parentId: string, index: number }` | `Bookmark` | Move bookmark |
-| `bookmark:update` | `{ bookmarkId: string, changes: Partial<Bookmark> }` | `Bookmark` | Edit bookmark |
-| `bookmark:getTree` | `{}` | `Bookmark[]` | Get full tree |
-| `history:clear` | `{ range?: 'all' \| 'hour' \| 'day' \| 'week' \| 'month' }` | `number` | Clear history. Returns count of deleted entries. |
-| `history:search` | `{ query: string, limit?: number }` | `HistoryEntry[]` | Search history |
-| `history:getRecent` | `{ limit?: number }` | `HistoryEntry[]` | Recent history |
-| `download:pause` | `{ downloadId: string }` | `void` | Pause download |
-| `download:resume` | `{ downloadId: string }` | `void` | Resume download |
-| `download:cancel` | `{ downloadId: string }` | `void` | Cancel download |
-| `download:open` | `{ downloadId: string }` | `void` | Open downloaded file |
-| `download:showInFolder` | `{ downloadId: string }` | `void` | Show in file manager |
-| `download:clearCompleted` | `{}` | `void` | Clear completed from list |
-| `download:retry` | `{ downloadId: string }` | `void` | Retry failed download by re-queuing the original URL as a new download item |
-| `settings:get` | `{ key: string }` | `any` | Get setting |
-| `settings:getAll` | `{}` | `Settings` | Get all settings |
-| `settings:set` | `{ key: string, value: any }` | `void` | Set setting |
-| `settings:reset` | `{ key?: string }` | `void` | Reset to default |
-| `password:getAll` | `{}` | `PasswordEntry[]` | List saved passwords |
-| `password:save` | `{ entry: PasswordEntry }` | `void` | Save password |
-| `password:remove` | `{ origin: string, username: string }` | `void` | Delete password |
-| `password:getForOrigin` | `{ origin: string }` | `PasswordEntry[]` | Get for site |
-| `window:minimize` | `{}` | `void` | Minimize window |
-| `window:maximize` | `{}` | `void` | Maximize/restore |
-| `window:close` | `{}` | `void` | Close window |
-| `window:setFullscreen` | `{ fullscreen: boolean }` | `void` | Toggle fullscreen |
-| `app:quit` | `{}` | `void` | Quit application |
-| `app:getVersion` | `{}` | `string` | App version |
-| `devtools:toggle` | `{ tabId: string }` | `void` | Toggle DevTools |
-| `devtools:open` | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'undocked' }` | `void` | Open DevTools |
-| `print:start` | `{ tabId: string }` | `void` | Open system print dialog (user chooses printer, PDF, etc.) |
-| `print:toPDF` | `{ tabId: string, outputPath: string, options?: { marginsType?: number, pageSize?: string, printBackground?: boolean } }` | `string` (path) | Save page as PDF to `outputPath`. Errors: disk-full, permission-denied → rejected promise |
-| `permission:respond` | `{ origin: string, permission: PermissionType, allow: boolean }` | `void` | Respond to permission prompt |
-| `contentSetting:set` | `{ origin: string, setting: ContentSettingType, value: 'allow' | 'block' | 'ask' }` | `void` | Set per-site content setting |
-| `contextMenu:clicked` | `{ itemId: string }` | `void` | Context menu item selected |
-| `omnibox:getSuggestions` | `{ query: string, maxResults?: number }` | `Suggestion[]` | Get omnibox suggestions |
-| `autofill:detectFields` | `{ tabId: string, fields: FormField[] }` | `AutofillMatch[]` | Match form fields to saved data |
-| `autofill:fillField` | `{ tabId: string, fieldId: string, value: string }` | `void` | Fill a form field via webContents |
-| `autofill:getAddresses` | `{}` | `SavedAddress[]` | List saved addresses |
-| `autofill:saveAddress` | `{ address: SavedAddress }` | `SavedAddress` | Save address |
-| `autofill:removeAddress` | `{ addressId: string }` | `void` | Remove address |
-| `bookmark:import` | `{ format: 'netscape-html', data: string }` | `Bookmark[]` | Import bookmarks from HTML |
-| `bookmark:export` | `{ format: 'netscape-html' }` | `string` | Export bookmarks to HTML |
-| `app:checkForUpdates` | `{}` | `{ version?: string, updateAvailable: boolean }` | Manually check for updates |
-| `window:create` | `{ url?: string }` | `BrowserWindow` | Create new window (v1.1+) - see Appendix C |
+| Channel                   | Payload                                                                                                                   | Returns                                          | Description                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- | ------ | ---------------------------- |
+| `tab:create`              | `{ url?: string, index?: number }`                                                                                        | `Tab`                                            | Create new tab                                                                            |
+| `tab:close`               | `{ tabId: string }`                                                                                                       | `void`                                           | Close tab                                                                                 |
+| `tab:activate`            | `{ tabId: string }`                                                                                                       | `void`                                           | Switch to tab                                                                             |
+| `tab:reorder`             | `{ fromIndex: number, toIndex: number }`                                                                                  | `void`                                           | Reorder tabs                                                                              |
+| `tab:pin`                 | `{ tabId: string }`                                                                                                       | `Tab`                                            | Toggle pin state                                                                          |
+| `tab:duplicate`           | `{ tabId: string }`                                                                                                       | `Tab`                                            | Duplicate tab                                                                             |
+| `tab:hibernate`           | `{ tabId: string }`                                                                                                       | `void`                                           | Free tab memory                                                                           |
+| `tab:wake`                | `{ tabId: string }`                                                                                                       | `void`                                           | Restore hibernated tab                                                                    |
+| `tab:mute`                | `{ tabId: string }`                                                                                                       | `void`                                           | Mute tab audio                                                                            |
+| `tab:unmute`              | `{ tabId: string }`                                                                                                       | `void`                                           | Unmute tab audio                                                                          |
+| `navigation:go`           | `{ tabId: string, url: string }`                                                                                          | `void`                                           | Navigate to URL                                                                           |
+| `navigation:back`         | `{ tabId: string }`                                                                                                       | `void`                                           | Go back                                                                                   |
+| `navigation:forward`      | `{ tabId: string }`                                                                                                       | `void`                                           | Go forward                                                                                |
+| `navigation:reload`       | `{ tabId: string, hard?: boolean }`                                                                                       | `void`                                           | Reload page                                                                               |
+| `navigation:stop`         | `{ tabId: string }`                                                                                                       | `void`                                           | Stop loading                                                                              |
+| `zoom:set`                | `{ tabId: string, level: number }`                                                                                        | `number`                                         | Set zoom (0.25-5.0)                                                                       |
+| `zoom:reset`              | `{ tabId: string }`                                                                                                       | `number`                                         | Reset zoom to 1.0                                                                         |
+| `find:start`              | `{ tabId: string, text: string, caseSensitive?: boolean }`                                                                | `FindResult`                                     | Start find                                                                                |
+| `find:next`               | `{ tabId: string, forward?: boolean }`                                                                                    | `FindResult`                                     | Find next/prev                                                                            |
+| `find:stop`               | `{ tabId: string }`                                                                                                       | `void`                                           | Stop find session                                                                         |
+| `bookmark:add`            | `{ url: string, title: string, parentId?: string }`                                                                       | `Bookmark`                                       | Add bookmark                                                                              |
+| `bookmark:remove`         | `{ bookmarkId: string }`                                                                                                  | `void`                                           | Remove bookmark                                                                           |
+| `bookmark:move`           | `{ bookmarkId: string, parentId: string, index: number }`                                                                 | `Bookmark`                                       | Move bookmark                                                                             |
+| `bookmark:update`         | `{ bookmarkId: string, changes: Partial<Bookmark> }`                                                                      | `Bookmark`                                       | Edit bookmark                                                                             |
+| `bookmark:getTree`        | `{}`                                                                                                                      | `Bookmark[]`                                     | Get full tree                                                                             |
+| `history:clear`           | `{ range?: 'all' \| 'hour' \| 'day' \| 'week' \| 'month' }`                                                               | `number`                                         | Clear history. Returns count of deleted entries.                                          |
+| `history:search`          | `{ query: string, limit?: number }`                                                                                       | `HistoryEntry[]`                                 | Search history                                                                            |
+| `history:getRecent`       | `{ limit?: number }`                                                                                                      | `HistoryEntry[]`                                 | Recent history                                                                            |
+| `download:pause`          | `{ downloadId: string }`                                                                                                  | `void`                                           | Pause download                                                                            |
+| `download:resume`         | `{ downloadId: string }`                                                                                                  | `void`                                           | Resume download                                                                           |
+| `download:cancel`         | `{ downloadId: string }`                                                                                                  | `void`                                           | Cancel download                                                                           |
+| `download:open`           | `{ downloadId: string }`                                                                                                  | `void`                                           | Open downloaded file                                                                      |
+| `download:showInFolder`   | `{ downloadId: string }`                                                                                                  | `void`                                           | Show in file manager                                                                      |
+| `download:clearCompleted` | `{}`                                                                                                                      | `void`                                           | Clear completed from list                                                                 |
+| `download:retry`          | `{ downloadId: string }`                                                                                                  | `void`                                           | Retry failed download by re-queuing the original URL as a new download item               |
+| `settings:get`            | `{ key: string }`                                                                                                         | `any`                                            | Get setting                                                                               |
+| `settings:getAll`         | `{}`                                                                                                                      | `Settings`                                       | Get all settings                                                                          |
+| `settings:set`            | `{ key: string, value: any }`                                                                                             | `void`                                           | Set setting                                                                               |
+| `settings:reset`          | `{ key?: string }`                                                                                                        | `void`                                           | Reset to default                                                                          |
+| `password:getAll`         | `{}`                                                                                                                      | `PasswordEntry[]`                                | List saved passwords                                                                      |
+| `password:save`           | `{ entry: PasswordEntry }`                                                                                                | `void`                                           | Save password                                                                             |
+| `password:remove`         | `{ origin: string, username: string }`                                                                                    | `void`                                           | Delete password                                                                           |
+| `password:getForOrigin`   | `{ origin: string }`                                                                                                      | `PasswordEntry[]`                                | Get for site                                                                              |
+| `window:minimize`         | `{}`                                                                                                                      | `void`                                           | Minimize window                                                                           |
+| `window:maximize`         | `{}`                                                                                                                      | `void`                                           | Maximize/restore                                                                          |
+| `window:close`            | `{}`                                                                                                                      | `void`                                           | Close window                                                                              |
+| `window:setFullscreen`    | `{ fullscreen: boolean }`                                                                                                 | `void`                                           | Toggle fullscreen                                                                         |
+| `app:quit`                | `{}`                                                                                                                      | `void`                                           | Quit application                                                                          |
+| `app:getVersion`          | `{}`                                                                                                                      | `string`                                         | App version                                                                               |
+| `devtools:toggle`         | `{ tabId: string }`                                                                                                       | `void`                                           | Toggle DevTools                                                                           |
+| `devtools:open`           | `{ tabId: string, mode?: 'right' \| 'bottom' \| 'undocked' }`                                                             | `void`                                           | Open DevTools                                                                             |
+| `print:start`             | `{ tabId: string }`                                                                                                       | `void`                                           | Open system print dialog (user chooses printer, PDF, etc.)                                |
+| `print:toPDF`             | `{ tabId: string, outputPath: string, options?: { marginsType?: number, pageSize?: string, printBackground?: boolean } }` | `string` (path)                                  | Save page as PDF to `outputPath`. Errors: disk-full, permission-denied → rejected promise |
+| `permission:respond`      | `{ origin: string, permission: PermissionType, allow: boolean }`                                                          | `void`                                           | Respond to permission prompt                                                              |
+| `contentSetting:set`      | `{ origin: string, setting: ContentSettingType, value: 'allow'                                                            | 'block'                                          | 'ask' }`                                                                                  | `void` | Set per-site content setting |
+| `contextMenu:clicked`     | `{ itemId: string }`                                                                                                      | `void`                                           | Context menu item selected                                                                |
+| `omnibox:getSuggestions`  | `{ query: string, maxResults?: number }`                                                                                  | `Suggestion[]`                                   | Get omnibox suggestions                                                                   |
+| `autofill:detectFields`   | `{ tabId: string, fields: FormField[] }`                                                                                  | `AutofillMatch[]`                                | Match form fields to saved data                                                           |
+| `autofill:fillField`      | `{ tabId: string, fieldId: string, value: string }`                                                                       | `void`                                           | Fill a form field via webContents                                                         |
+| `autofill:getAddresses`   | `{}`                                                                                                                      | `SavedAddress[]`                                 | List saved addresses                                                                      |
+| `autofill:saveAddress`    | `{ address: SavedAddress }`                                                                                               | `SavedAddress`                                   | Save address                                                                              |
+| `autofill:removeAddress`  | `{ addressId: string }`                                                                                                   | `void`                                           | Remove address                                                                            |
+| `bookmark:import`         | `{ format: 'netscape-html', data: string }`                                                                               | `Bookmark[]`                                     | Import bookmarks from HTML                                                                |
+| `bookmark:export`         | `{ format: 'netscape-html' }`                                                                                             | `string`                                         | Export bookmarks to HTML                                                                  |
+| `app:checkForUpdates`     | `{}`                                                                                                                      | `{ version?: string, updateAvailable: boolean }` | Manually check for updates                                                                |
+| `window:create`           | `{ url?: string }`                                                                                                        | `BrowserWindow`                                  | Create new window (v1.1+) - see Appendix C                                                |
 
 ### 7.3 Main → Renderer (on/send)
 
-| Channel | Payload | Description |
-|---------|---------|-------------|
-| `tab:created` | `Tab` | New tab created |
-| `tab:closed` | `{ tabId: string }` | Tab closed |
-| `tab:activated` | `{ tabId: string }` | Tab became active |
-| `tab:updated` | `Partial<Tab>` | Tab property changed |
-| `tab:reordered` | `{ tabIds: string[] }` | Tabs reordered |
-| `navigation:state` | `{ tabId: string, canGoBack: boolean, canGoForward: boolean, isLoading: boolean, url: string }` | Navigation state change |
-| `load:started` | `{ tabId: string, url: string }` | Page load started |
-| `load:progress` | `{ tabId: string, percent: number }` | Load progress (0-100) |
-| `load:finished` | `{ tabId: string, url: string }` | Page load complete |
-| `load:failed` | `{ tabId: string, errorCode: number, errorDescription: string, validatedURL: string }` | Page load failed |
-| `page:title` | `{ tabId: string, title: string }` | Page title changed |
-| `page:favicon` | `{ tabId: string, faviconUrl: string }` | Favicon URL changed |
-| `download:created` | `DownloadItem` | Download started |
-| `download:updated` | `Partial<DownloadItem>` | Download progress update |
-| `download:completed` | `{ downloadId: string }` | Download finished |
-| `download:failed` | `{ downloadId: string, error: string }` | Download error |
-| `settings:changed` | `{ key: string, value: any }` | Setting changed externally |
-| `zoom:changed` | `{ tabId: string, level: number }` | Zoom level changed |
-| `find:result` | `{ requestId: number, matches: number, activeMatchOrdinal: number, selectionArea?: { x: number, y: number, width: number, height: number } }` | Find result |
-| `fullscreen:changed` | `{ isFullscreen: boolean }` | Fullscreen state changed |
-| `keyboard:shortcut` | `{ accelerator: string }` | Global shortcut triggered |
-| `contextMenu:show` | `{ x: number, y: number, items: ContextMenuItem[] }` | Show custom context menu |
-| `certificate:error` | `{ url: string, error: string, certificate?: CertificateInfo }` | SSL certificate error |
-| `permission:request` | `{ origin: string, permission: PermissionType }` | Permission prompt needed |
-| `app:updateAvailable` | `{ version: string }` | Auto-update available |
-| `autofill:showDropdown` | `{ tabId: string, fieldId: string, suggestions: AutofillMatch[], position: { x: number, y: number, width: number, height: number } }` | Show autofill dropdown at given coordinates
-| `window:created` | `{ windowId: string }` | New window created (v1.1+) - see Appendix C |
-| `app:updateDownloaded` | `{ version: string }` | Update ready to install |
-| `tab:hibernated` | `{ tabId: string }` | Tab was hibernated |
-| `tab:woken` | `{ tabId: string }` | Tab was restored from hibernation |
+| Channel                 | Payload                                                                                                                                       | Description                                 |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `tab:created`           | `Tab`                                                                                                                                         | New tab created                             |
+| `tab:closed`            | `{ tabId: string }`                                                                                                                           | Tab closed                                  |
+| `tab:activated`         | `{ tabId: string }`                                                                                                                           | Tab became active                           |
+| `tab:updated`           | `Partial<Tab>`                                                                                                                                | Tab property changed                        |
+| `tab:reordered`         | `{ tabIds: string[] }`                                                                                                                        | Tabs reordered                              |
+| `navigation:state`      | `{ tabId: string, canGoBack: boolean, canGoForward: boolean, isLoading: boolean, url: string }`                                               | Navigation state change                     |
+| `load:started`          | `{ tabId: string, url: string }`                                                                                                              | Page load started                           |
+| `load:progress`         | `{ tabId: string, percent: number }`                                                                                                          | Load progress (0-100)                       |
+| `load:finished`         | `{ tabId: string, url: string }`                                                                                                              | Page load complete                          |
+| `load:failed`           | `{ tabId: string, errorCode: number, errorDescription: string, validatedURL: string }`                                                        | Page load failed                            |
+| `page:title`            | `{ tabId: string, title: string }`                                                                                                            | Page title changed                          |
+| `page:favicon`          | `{ tabId: string, faviconUrl: string }`                                                                                                       | Favicon URL changed                         |
+| `download:created`      | `DownloadItem`                                                                                                                                | Download started                            |
+| `download:updated`      | `Partial<DownloadItem>`                                                                                                                       | Download progress update                    |
+| `download:completed`    | `{ downloadId: string }`                                                                                                                      | Download finished                           |
+| `download:failed`       | `{ downloadId: string, error: string }`                                                                                                       | Download error                              |
+| `settings:changed`      | `{ key: string, value: any }`                                                                                                                 | Setting changed externally                  |
+| `zoom:changed`          | `{ tabId: string, level: number }`                                                                                                            | Zoom level changed                          |
+| `find:result`           | `{ requestId: number, matches: number, activeMatchOrdinal: number, selectionArea?: { x: number, y: number, width: number, height: number } }` | Find result                                 |
+| `fullscreen:changed`    | `{ isFullscreen: boolean }`                                                                                                                   | Fullscreen state changed                    |
+| `keyboard:shortcut`     | `{ accelerator: string }`                                                                                                                     | Global shortcut triggered                   |
+| `contextMenu:show`      | `{ x: number, y: number, items: ContextMenuItem[] }`                                                                                          | Show custom context menu                    |
+| `certificate:error`     | `{ url: string, error: string, certificate?: CertificateInfo }`                                                                               | SSL certificate error                       |
+| `permission:request`    | `{ origin: string, permission: PermissionType }`                                                                                              | Permission prompt needed                    |
+| `app:updateAvailable`   | `{ version: string }`                                                                                                                         | Auto-update available                       |
+| `autofill:showDropdown` | `{ tabId: string, fieldId: string, suggestions: AutofillMatch[], position: { x: number, y: number, width: number, height: number } }`         | Show autofill dropdown at given coordinates |
+| `window:created`        | `{ windowId: string }`                                                                                                                        | New window created (v1.1+) - see Appendix C |
+| `app:updateDownloaded`  | `{ version: string }`                                                                                                                         | Update ready to install                     |
+| `tab:hibernated`        | `{ tabId: string }`                                                                                                                           | Tab was hibernated                          |
+| `tab:woken`             | `{ tabId: string }`                                                                                                                           | Tab was restored from hibernation           |
 
 ### 7.4 State Flow Patterns
 
 **Tab Creation:**
+
 ```
 User clicks "+" → Renderer: tab:create → Main: create BrowserView
 → Main: tab:created → Renderer: add to store → Main: tab:activated
@@ -372,6 +373,7 @@ User clicks "+" → Renderer: tab:create → Main: create BrowserView
 ```
 
 **Navigation:**
+
 ```
 User types URL → Renderer: navigation:go → Main: webContents.loadURL()
 → BrowserView events → Main: load:started → Renderer: show spinner
@@ -380,6 +382,7 @@ User types URL → Renderer: navigation:go → Main: webContents.loadURL()
 ```
 
 **Settings Change:**
+
 ```
 User toggles setting → Renderer: settings:set → Main: write to settings.json
 → Main: settings:changed (broadcast) → All renderers: update local state
@@ -393,27 +396,27 @@ User toggles setting → Renderer: settings:set → Main: write to settings.json
 
 ```typescript
 interface Tab {
-  id: string;                    // UUID v4
-  url: string;                   // Current URL
-  title: string;                 // Page title (or URL if empty)
-  favicon?: string;              // Data URL of cached favicon
+  id: string; // UUID v4
+  url: string; // Current URL
+  title: string; // Page title (or URL if empty)
+  favicon?: string; // Data URL of cached favicon
   isLoading: boolean;
-  loadProgress: number;          // 0-100
+  loadProgress: number; // 0-100
   canGoBack: boolean;
   canGoForward: boolean;
   isPinned: boolean;
   isMuted: boolean;
   isActive: boolean;
-  isHibernated: boolean;         // BrowserView destroyed, state preserved
-  zoomLevel: number;             // 0.25-5.0, default 1.0
-  createdAt: number;             // timestamp
-  lastAccessedAt: number;        // timestamp
-  errorState?: TabErrorState;    // If load/crash occurred
-  historyStack?: { url: string, title: string }[];  // Back/forward entries for session restore. Populated on hibernation and app quit only (not on every navigation).
+  isHibernated: boolean; // BrowserView destroyed, state preserved
+  zoomLevel: number; // 0.25-5.0, default 1.0
+  createdAt: number; // timestamp
+  lastAccessedAt: number; // timestamp
+  errorState?: TabErrorState; // If load/crash occurred
+  historyStack?: { url: string; title: string }[]; // Back/forward entries for session restore. Populated on hibernation and app quit only (not on every navigation).
 }
 
 interface TabErrorState {
-  type: 'load-failed' | 'crashed' | 'unresponsive';
+  type: "load-failed" | "crashed" | "unresponsive";
   errorCode?: number;
   errorDescription?: string;
   validatedURL?: string;
@@ -424,14 +427,14 @@ interface TabErrorState {
 
 ```typescript
 interface Bookmark {
-  id: string;                    // UUID
-  parentId?: string;             // null = root
-  index: number;                 // Position within parent
+  id: string; // UUID
+  parentId?: string; // null = root
+  index: number; // Position within parent
   title: string;
-  url?: string;                  // undefined = folder
+  url?: string; // undefined = folder
   dateAdded: number;
   dateModified?: number;
-  children?: Bookmark[];         // Populated for folders
+  children?: Bookmark[]; // Populated for folders
 }
 ```
 
@@ -457,7 +460,7 @@ interface DownloadItem {
   url: string;
   totalBytes: number;
   receivedBytes: number;
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
+  state: "progressing" | "completed" | "cancelled" | "interrupted";
   startTime: number;
   endTime?: number;
   savePath: string;
@@ -470,21 +473,21 @@ interface DownloadItem {
 ```typescript
 interface Settings {
   // General
-  startupBehavior: 'new-tab' | 'restore' | 'specific-pages';
+  startupBehavior: "new-tab" | "restore" | "specific-pages";
   startupPages: string[];
-  defaultSearchEngine: string;   // 'google', 'duckduckgo', 'bing', etc.
+  defaultSearchEngine: string; // 'google', 'duckduckgo', 'bing', etc.
   downloadPath: string;
   askWhereToSave: boolean;
   downloadNotifications: boolean;
 
   // Appearance
-  theme: 'light' | 'dark' | 'system';
-  accentColor: string;           // hex color
+  theme: "light" | "dark" | "system";
+  accentColor: string; // hex color
   showBookmarksBar: boolean;
-  showStatusBar: boolean;        // default true
-  fontSize: number;              // 12-24
-  minimumFontSize: number;       // 6-24
-  pageZoom: number;              // default zoom for new tabs
+  showStatusBar: boolean; // default true
+  fontSize: number; // 12-24
+  minimumFontSize: number; // 6-24
+  pageZoom: number; // default zoom for new tabs
 
   // Privacy
   blockThirdPartyCookies: boolean;
@@ -498,52 +501,61 @@ interface Settings {
   };
   doNotTrack: boolean;
   // Permissions (per-origin overrides stored separately)
-  defaultPermissions: Record<PermissionType, 'allow' | 'block' | 'ask'>;
-  permissionOverrides: Record<string, Record<PermissionType, 'allow' | 'block' | 'ask'>>;  // origin → permission → decision
-  contentSettings: Record<string, Record<ContentSettingType, 'allow' | 'block' | 'ask'>>;  // origin → setting → decision
+  defaultPermissions: Record<PermissionType, "allow" | "block" | "ask">;
+  permissionOverrides: Record<
+    string,
+    Record<PermissionType, "allow" | "block" | "ask">
+  >; // origin → permission → decision
+  contentSettings: Record<
+    string,
+    Record<ContentSettingType, "allow" | "block" | "ask">
+  >; // origin → setting → decision
 
   // Tabs
-  autoHibernate: boolean;         // default true
-  hibernationTimeoutMinutes: number;  // default 30
-  maxActiveTabs: number;          // default 20
-  confirmCloseMultipleTabs: boolean;  // default true
+  autoHibernate: boolean; // default true
+  hibernationTimeoutMinutes: number; // default 30
+  maxActiveTabs: number; // default 20
+  confirmCloseMultipleTabs: boolean; // default true
 
   // Advanced
-  hardwareAcceleration: boolean;  // default true
-  smoothScrolling: boolean;       // default true
-  proxyType: 'system' | 'direct' | 'manual';  // default 'system'
-  proxyRules?: string;            // e.g., "http=proxy:8080;https=proxy:8080"
-  spellcheck: boolean;            // default true
-  spellcheckLanguages: string[];  // default ['en-US']
+  hardwareAcceleration: boolean; // default true
+  smoothScrolling: boolean; // default true
+  proxyType: "system" | "direct" | "manual"; // default 'system'
+  proxyRules?: string; // e.g., "http=proxy:8080;https=proxy:8080"
+  spellcheck: boolean; // default true
+  spellcheckLanguages: string[]; // default ['en-US']
 
   // Security
-  certificateOverrides: Record<string, { allow: boolean, errorTypes: CertificateErrorType[] }>;  // origin → decision + which errors are allowed
+  certificateOverrides: Record<
+    string,
+    { allow: boolean; errorTypes: CertificateErrorType[] }
+  >; // origin → decision + which errors are allowed
 }
 
 type CertificateErrorType =
-  | 'expired'
-  | 'self-signed'
-  | 'wrong-hostname'
-  | 'authority-invalid';
+  | "expired"
+  | "self-signed"
+  | "wrong-hostname"
+  | "authority-invalid";
 
 type PermissionType =
-  | 'geolocation'
-  | 'camera'
-  | 'microphone'
-  | 'notifications'
-  | 'midi'
-  | 'midiSysex'
-  | 'pointerLock'
-  | 'fullscreen'
-  | 'openExternal'
-  | 'display-capture';
+  | "geolocation"
+  | "camera"
+  | "microphone"
+  | "notifications"
+  | "midi"
+  | "midiSysex"
+  | "pointerLock"
+  | "fullscreen"
+  | "openExternal"
+  | "display-capture";
 
 type ContentSettingType =
-  | 'popup'
-  | 'javascript'
-  | 'images'
-  | 'cookies'
-  | 'plugins';
+  | "popup"
+  | "javascript"
+  | "images"
+  | "cookies"
+  | "plugins";
 ```
 
 ### 8.6 Additional Interfaces (Referenced in IPC)
@@ -557,7 +569,7 @@ interface FindResult {
 }
 
 interface Suggestion {
-  type: 'url' | 'history' | 'bookmark' | 'search';
+  type: "url" | "history" | "bookmark" | "search";
   title: string;
   url?: string;
   query?: string;
@@ -567,14 +579,14 @@ interface Suggestion {
 interface ContextMenuItem {
   id: string;
   label: string;
-  type?: 'normal' | 'separator';
+  type?: "normal" | "separator";
   enabled?: boolean;
   accelerator?: string;
 }
 
 interface FormField {
   id: string;
-  type: 'text' | 'email' | 'password' | 'tel' | 'number' | 'select';
+  type: "text" | "email" | "password" | "tel" | "number" | "select";
   name: string;
   placeholder?: string;
   autocomplete?: string;
@@ -584,14 +596,14 @@ interface AutofillMatch {
   fieldId: string;
   value: string;
   label: string;
-  type: 'address' | 'password';
+  type: "address" | "password";
 }
 
 interface PasswordEntry {
   id: string;
   origin: string;
   username: string;
-  password: string;              // AES-256-GCM encrypted
+  password: string; // AES-256-GCM encrypted
   createdAt: number;
   lastUsedAt?: number;
 }
@@ -615,21 +627,25 @@ interface CertificateInfo {
 The Omnibox combines URL display, editing, and a suggestion dropdown.
 
 **States:**
+
 - **Display mode:** Shows human-readable URL (hide scheme for https, show lock icon, highlight domain)
 - **Edit mode:** Full URL editable, dropdown with suggestions
 
 **Suggestion ranking:**
+
 1. Direct URL match (typed URL completion from history)
 2. History entries matching query (frecency-ranked)
 3. Bookmark matches
 4. Search suggestions from default engine (if query is not URL-like)
 
 **Security indicators:**
+
 - 🔒 Secure (HTTPS, valid cert)
 - ⚠️ Not secure (HTTP)
 - 🛡️ Dangerous (certificate error, malware warning)
 
 **Keyboard navigation:**
+
 - `Ctrl+L` / `Cmd+L` - Focus omnibox, select all
 - `Esc` - Cancel editing, revert to display mode
 - `↓/↑` - Navigate suggestion dropdown
@@ -640,6 +656,7 @@ The Omnibox combines URL display, editing, and a suggestion dropdown.
 Service responsible for generating omnibox suggestions. Runs in the main process with direct access to HistoryManager, BookmarkManager, and search engine configuration.
 
 **Algorithm:**
+
 1. If query is empty → return top 5 frecency-ranked history URLs
 2. If query looks like a URL (contains `.` or `://`) → return direct match + history URLs starting with query
 3. Otherwise → return history matches (frecency-ranked, max 3) + bookmark matches (max 2) + search suggestion from default engine (1 item)
@@ -651,6 +668,7 @@ Service responsible for generating omnibox suggestions. Runs in the main process
 ### 9.2 TabBar
 
 **Features:**
+
 - Horizontal scroll when tabs overflow viewport
 - Drag-to-reorder (HTML5 DnD with visual indicators)
 - Right-click context menu: reload, duplicate, pin, mute, close, close others, close to the right
@@ -660,6 +678,7 @@ Service responsible for generating omnibox suggestions. Runs in the main process
 - Hover on tab shows full title as tooltip
 
 **Hibernation:**
+
 - Inactive tabs after N minutes can be hibernated
 - Configurable via settings: `autoHibernate` (boolean, default true), `hibernationTimeoutMinutes` (number, default 30), `maxActiveTabs` (number, default 20)
 - Hibernated tab: BrowserView destroyed, state serialized, favicon retained
@@ -670,6 +689,7 @@ Service responsible for generating omnibox suggestions. Runs in the main process
 Manages the DOM area where BrowserViews are visually embedded.
 
 **Bounds calculation:**
+
 ```
 contentX = 0
 contentY = titleBarHeight + tabBarHeight + toolbarHeight
@@ -678,6 +698,7 @@ contentHeight = windowHeight - contentY - (showStatusBar ? statusBarHeight : 0)
 ```
 
 **BrowserView management:**
+
 - Active tab: `browserView.setBounds(contentAreaBounds)`, `browserView.setAutoResize({ width: true, height: true })`
 - Inactive non-hibernated tabs: `browserView.setBounds({ x: 0, y: 0, width: 0, height: 0 })` (hidden but alive)
 - Hibernated tabs: BrowserView destroyed entirely; recreated on wake
@@ -701,96 +722,97 @@ Slide-in panel (right side, ~400px wide) with accordion sections:
 
 ### 10.1 Tabs
 
-| Feature | Behavior |
-|---------|----------|
-| New tab | Opens with new-tab page (configurable: blank, homepage, recently closed) |
-| Close tab | If last tab, close window (or create new tab, configurable) |
-| Close window with multiple tabs | Prompt to confirm (configurable) |
-| Restore closed tab | `Ctrl+Shift+T` / `Cmd+Shift+T`, restores full back/forward history |
-| Duplicate tab | Clone current URL and history stack |
-| Pin tab | Shrinks to favicon, moves to left, persists across sessions |
-| Mute tab | Mutes all audio from tab's webContents |
-| Tab drag | Reorder within window; future: drag to new window |
-| Tab hibernation | Auto-hibernate after inactivity; manual hibernate option |
+| Feature                         | Behavior                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| New tab                         | Opens with new-tab page (configurable: blank, homepage, recently closed) |
+| Close tab                       | If last tab, close window (or create new tab, configurable)              |
+| Close window with multiple tabs | Prompt to confirm (configurable)                                         |
+| Restore closed tab              | `Ctrl+Shift+T` / `Cmd+Shift+T`, restores full back/forward history       |
+| Duplicate tab                   | Clone current URL and history stack                                      |
+| Pin tab                         | Shrinks to favicon, moves to left, persists across sessions              |
+| Mute tab                        | Mutes all audio from tab's webContents                                   |
+| Tab drag                        | Reorder within window; future: drag to new window                        |
+| Tab hibernation                 | Auto-hibernate after inactivity; manual hibernate option                 |
 
 ### 10.2 Navigation
 
-| Feature | Behavior |
-|---------|----------|
-| Back/Forward | Standard web history per tab |
-| Reload | Soft reload (F5); hard reload (`Ctrl+Shift+R`) bypasses cache |
-| Stop | Immediately aborts loading |
-| Home | Navigates to configured homepage |
-| New-tab page | Shows frequently visited sites, bookmarks bar, search box |
+| Feature      | Behavior                                                      |
+| ------------ | ------------------------------------------------------------- |
+| Back/Forward | Standard web history per tab                                  |
+| Reload       | Soft reload (F5); hard reload (`Ctrl+Shift+R`) bypasses cache |
+| Stop         | Immediately aborts loading                                    |
+| Home         | Navigates to configured homepage                              |
+| New-tab page | Shows frequently visited sites, bookmarks bar, search box     |
 
 ### 10.3 Bookmarks
 
-| Feature | Behavior |
-|---------|----------|
-| Add bookmark | `Ctrl+D` / `Cmd+D`, dialog with folder selection, edit title/URL |
-| Bookmark bar | Toggle visibility, shows bookmarks from "Bookmarks Bar" folder |
-| Bookmark manager | Full tree view, search, drag-and-drop organization |
-| Import/Export | Netscape HTML format (Chrome/Firefox compatible) |
-| Folders | Nested folders, rename, delete (with contents) |
+| Feature          | Behavior                                                         |
+| ---------------- | ---------------------------------------------------------------- |
+| Add bookmark     | `Ctrl+D` / `Cmd+D`, dialog with folder selection, edit title/URL |
+| Bookmark bar     | Toggle visibility, shows bookmarks from "Bookmarks Bar" folder   |
+| Bookmark manager | Full tree view, search, drag-and-drop organization               |
+| Import/Export    | Netscape HTML format (Chrome/Firefox compatible)                 |
+| Folders          | Nested folders, rename, delete (with contents)                   |
 
 ### 10.4 History
 
-| Feature | Behavior |
-|---------|----------|
-| Recording | Every navigation recorded with URL, title, timestamp |
-| History page | Grouped by date, searchable, deletable by item or range |
-| Clear history | By range: last hour, day, week, month, or all |
-| Omnibox integration | Typed history contributes to URL suggestions |
+| Feature             | Behavior                                                |
+| ------------------- | ------------------------------------------------------- |
+| Recording           | Every navigation recorded with URL, title, timestamp    |
+| History page        | Grouped by date, searchable, deletable by item or range |
+| Clear history       | By range: last hour, day, week, month, or all           |
+| Omnibox integration | Typed history contributes to URL suggestions            |
 
 ### 10.5 Downloads
 
-| Feature | Behavior |
-|---------|----------|
-| Start download | Auto-download or prompt for location (configurable) |
-| Download bar | Part of StatusBar. Shows download progress, file name, and actions when active downloads exist. Hidden when no active downloads.
-| Download page | Full list with status, speed, time remaining |
-| Actions | Open, show in folder, pause, resume, cancel, retry |
-| Safety | Block dangerous file types (.exe, .dmg, .sh) via extension blacklist |
+| Feature        | Behavior                                                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Start download | Auto-download or prompt for location (configurable)                                                                              |
+| Download bar   | Part of StatusBar. Shows download progress, file name, and actions when active downloads exist. Hidden when no active downloads. |
+| Download page  | Full list with status, speed, time remaining                                                                                     |
+| Actions        | Open, show in folder, pause, resume, cancel, retry                                                                               |
+| Safety         | Block dangerous file types (.exe, .dmg, .sh) via extension blacklist                                                             |
 
 ### 10.6 Find in Page
 
-| Feature | Behavior |
-|---------|----------|
-| Open | `Ctrl+F` / `Cmd+F` |
-| Search | Real-time highlighting as user types |
-| Navigation | `Enter` next, `Shift+Enter` previous |
-| Counter | "3/12" match indicator |
-| Case sensitive | Toggle option |
-| Close | `Esc` or close button |
+| Feature        | Behavior                             |
+| -------------- | ------------------------------------ |
+| Open           | `Ctrl+F` / `Cmd+F`                   |
+| Search         | Real-time highlighting as user types |
+| Navigation     | `Enter` next, `Shift+Enter` previous |
+| Counter        | "3/12" match indicator               |
+| Case sensitive | Toggle option                        |
+| Close          | `Esc` or close button                |
 
 ### 10.7 Password Manager
 
-| Feature | Behavior |
-|---------|----------|
-| Auto-save | Prompt to save on form submission (configurable) |
-| Auto-fill | Fill username/password on recognized login forms |
-| Storage | System keychain when available (macOS Keychain, Windows Credential Manager / DPAPI, Linux libsecret/Secret Service). Fallback: AES-256-GCM encrypted JSON file secured with OS-specific entropy. |
-| Management | View, search, edit, delete saved passwords |
-| Master password | Deferred to v1.2. OS keychain + AES fallback is sufficient for v1.0. |
+| Feature         | Behavior                                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Auto-save       | Prompt to save on form submission (configurable)                                                                                                                                                 |
+| Auto-fill       | Fill username/password on recognized login forms                                                                                                                                                 |
+| Storage         | System keychain when available (macOS Keychain, Windows Credential Manager / DPAPI, Linux libsecret/Secret Service). Fallback: AES-256-GCM encrypted JSON file secured with OS-specific entropy. |
+| Management      | View, search, edit, delete saved passwords                                                                                                                                                       |
+| Master password | Deferred to v1.2. OS keychain + AES fallback is sufficient for v1.0.                                                                                                                             |
 
 ### 10.8 Autofill
 
-| Feature | Behavior |
-|---------|----------|
-| Address autofill | Save addresses (name, street, city, postal code, country, phone, email). Detect form fields by heuristics (input type, name attribute, autocomplete attribute). Suggest matching addresses in dropdown. |
-| Password autofill | See Password Manager (Section 10.7) |
-| Form detection | Heuristic-based field type detection; respect `autocomplete` HTML attributes |
-| Trigger | Dropdown appears on focus of recognized field; arrow keys + Enter to select |
-| Payment autofill | Deferred to v1.2 |
+| Feature           | Behavior                                                                                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Address autofill  | Save addresses (name, street, city, postal code, country, phone, email). Detect form fields by heuristics (input type, name attribute, autocomplete attribute). Suggest matching addresses in dropdown. |
+| Password autofill | See Password Manager (Section 10.7)                                                                                                                                                                     |
+| Form detection    | Heuristic-based field type detection; respect `autocomplete` HTML attributes                                                                                                                            |
+| Trigger           | Dropdown appears on focus of recognized field; arrow keys + Enter to select                                                                                                                             |
+| Payment autofill  | Deferred to v1.2                                                                                                                                                                                        |
 
 **Data Models:**
+
 ```typescript
 interface SavedAddress {
   id: string;
-  label: string;                 // e.g., "Home", "Work"
+  label: string; // e.g., "Home", "Work"
   name: string;
   organization?: string;
-  street: string[];              // Line 1, Line 2, etc.
+  street: string[]; // Line 1, Line 2, etc.
   city: string;
   state?: string;
   postalCode: string;
@@ -803,6 +825,7 @@ interface SavedAddress {
 ```
 
 **IPC Channels:**
+
 - `autofill:getAddresses` → returns `SavedAddress[]`
 - `autofill:saveAddress` → saves address
 - `autofill:removeAddress` → removes address
@@ -812,6 +835,7 @@ interface SavedAddress {
 
 **Dropdown Positioning:**
 The autofill dropdown is a React overlay positioned absolutely within the renderer window. Coordinates are transformed from BrowserView content-space to window-space:
+
 1. BrowserView executes JS to get field bounding rect: `element.getBoundingClientRect()`
 2. Result sent to main via `autofill:detectFields`
 3. Main process converts BrowserView coordinates to window coordinates (adds BrowserView's own bounds offset)
@@ -820,39 +844,39 @@ The autofill dropdown is a React overlay positioned absolutely within the render
 
 ### 10.9 Zoom
 
-| Feature | Behavior |
-|---------|----------|
-| Zoom in/out | `Ctrl++/Ctrl+-` or menu |
-| Reset zoom | `Ctrl+0` |
-| Per-tab | Each tab has independent zoom level |
-| Default zoom | Configurable in settings |
+| Feature      | Behavior                            |
+| ------------ | ----------------------------------- |
+| Zoom in/out  | `Ctrl++/Ctrl+-` or menu             |
+| Reset zoom   | `Ctrl+0`                            |
+| Per-tab      | Each tab has independent zoom level |
+| Default zoom | Configurable in settings            |
 
 ### 10.10 Print
 
-| Feature | Behavior |
-|---------|----------|
-| Print dialog | `Ctrl+P` opens system print dialog |
-| Print to PDF | Available through system print dialog |
-| Print preview | Via system dialog (OS-dependent) |
+| Feature       | Behavior                              |
+| ------------- | ------------------------------------- |
+| Print dialog  | `Ctrl+P` opens system print dialog    |
+| Print to PDF  | Available through system print dialog |
+| Print preview | Via system dialog (OS-dependent)      |
 
 ### 10.11 DevTools
 
-| Feature | Behavior |
-|---------|----------|
-| Toggle | `Ctrl+Shift+I` / `Cmd+Option+I` or F12 |
-| Mode | Dock right, bottom, or undocked (detached window) |
-| Per-tab | Each tab has its own DevTools instance |
+| Feature | Behavior                                          |
+| ------- | ------------------------------------------------- |
+| Toggle  | `Ctrl+Shift+I` / `Cmd+Option+I` or F12            |
+| Mode    | Dock right, bottom, or undocked (detached window) |
+| Per-tab | Each tab has its own DevTools instance            |
 
 ### 10.12 Pop-ups, Dialogs, and File Pickers
 
-| Feature | Behavior |
-|---------|----------|
-| `window.open()` | Blocked by default. User can allow per-site via settings. If allowed, opens in new tab (not new BrowserWindow in v1.0). |
-| `beforeunload` | Show native confirmation dialog when user attempts to close/refresh tab with unsaved changes. |
-| Alert/Confirm/Prompt | Native OS dialog, modal to the BrowserView. |
-| File picker (upload) | Native OS file picker. Renderer forwards `showOpenDialog` result to BrowserView. |
-| Color picker | Native OS color picker (on supported platforms) or HTML fallback. |
-| Date picker | BrowserView native HTML date picker (no custom overlay). |
+| Feature              | Behavior                                                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `window.open()`      | Blocked by default. User can allow per-site via settings. If allowed, opens in new tab (not new BrowserWindow in v1.0). |
+| `beforeunload`       | Show native confirmation dialog when user attempts to close/refresh tab with unsaved changes.                           |
+| Alert/Confirm/Prompt | Native OS dialog, modal to the BrowserView.                                                                             |
+| File picker (upload) | Native OS file picker. Renderer forwards `showOpenDialog` result to BrowserView.                                        |
+| Color picker         | Native OS color picker (on supported platforms) or HTML fallback.                                                       |
+| Date picker          | BrowserView native HTML date picker (no custom overlay).                                                                |
 
 ---
 
@@ -861,12 +885,14 @@ The autofill dropdown is a React overlay positioned absolutely within the render
 ### 11.1 Page Load Failures
 
 When `did-fail-load` fires:
+
 1. Map error code to human message
 2. Inject custom error page into BrowserView
 3. Send `load:failed` to renderer
 4. Renderer shows error UI with: message, retry button, details expander
 
 **Error codes handled:**
+
 - `ERR_NAME_NOT_RESOLVED` → DNS lookup failed
 - `ERR_CONNECTION_REFUSED` → Server refused connection
 - `ERR_CONNECTION_TIMED_OUT` → Connection timed out
@@ -879,6 +905,7 @@ When `did-fail-load` fires:
 ### 11.2 Renderer Crashes
 
 On `render-process-gone` or `crashed`:
+
 1. Log crash reason and URL
 2. Show "This page crashed" overlay in BrowserView
 3. Offer "Reload page" button
@@ -887,6 +914,7 @@ On `render-process-gone` or `crashed`:
 ### 11.3 Unresponsive Tabs
 
 On `unresponsive` (after ~30s):
+
 1. Show "Page unresponsive" dialog
 2. Options: "Wait" (extend timeout) or "Kill page" (force reload)
 3. If killed: show crashed state
@@ -900,6 +928,7 @@ On `unresponsive` (after ~30s):
 ### 11.5 Session Restore
 
 On app quit/crash:
+
 1. Serialize `{ tabs: [...], activeTabId, windowBounds }` to `session.json`
    - Each tab includes `url`, `title`, `historyStack`, `zoomLevel`, `isPinned`
 2. On next launch (if `startupBehavior: 'restore'`):
@@ -922,26 +951,27 @@ On app quit/crash:
 
 ### 11.7 Corrupted / Unreadable Local Files
 
-| File | Behavior |
-|------|----------|
-| `settings.json` corrupted | Reset to defaults, log warning, show one-time notification |
-| `bookmarks.json` corrupted | Show empty bookmarks, offer import from backup |
-| `session.json` corrupted | Fall back to new-tab startup |
-| `history.db` corrupted | Delete and recreate empty database |
-| Schema version mismatch | Migrate if possible; reset with backup if migration fails |
+| File                       | Behavior                                                   |
+| -------------------------- | ---------------------------------------------------------- |
+| `settings.json` corrupted  | Reset to defaults, log warning, show one-time notification |
+| `bookmarks.json` corrupted | Show empty bookmarks, offer import from backup             |
+| `session.json` corrupted   | Fall back to new-tab startup                               |
+| `history.db` corrupted     | Delete and recreate empty database                         |
+| Schema version mismatch    | Migrate if possible; reset with backup if migration fails  |
 
 ### 11.8 Disk Space & Resource Limits
 
-| Scenario | Behavior |
-|----------|----------|
-| Disk full during download | Pause download, show "insufficient disk space" error, allow retry after cleanup |
-| Favicon cache > 100MB | LRU eviction; keep most recent 500 favicons |
+| Scenario                        | Behavior                                                                                                                                      |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Disk full during download       | Pause download, show "insufficient disk space" error, allow retry after cleanup                                                               |
+| Favicon cache > 100MB           | LRU eviction; keep most recent 500 favicons                                                                                                   |
 | Memory pressure (macOS/Windows) | Unimplemented in v1.0. Electron lacks cross-platform memory pressure API. Future: use `process.memoryUsage()` thresholds or OS-specific APIs. |
-| History > 90 days old | Auto-prune on app launch (configurable retention) |
+| History > 90 days old           | Auto-prune on app launch (configurable retention)                                                                                             |
 
 ### 11.9 Auto-reload on Reconnect
 
 When connection is restored after being offline:
+
 - Only the currently-active tab auto-reloads if it was showing an offline error page
 - If the user has navigated elsewhere (typed a new URL, switched tabs, or interacted with the page), no auto-reload occurs
 - Form data is not preserved across the reload; user is warned if they have unsaved form data
@@ -952,13 +982,13 @@ When connection is restored after being offline:
 
 ### 12.1 Sandboxing
 
-| Setting | Value |
-|---------|-------|
-| `nodeIntegration` | `false` (renderer has no Node access) |
-| `contextIsolation` | `true` (preload is isolated from page JS) |
-| `sandbox` | `true` (BrowserViews run in sandbox) |
-| `webSecurity` | `true` (CORS enforced) |
-| `allowRunningInsecureContent` | `false` |
+| Setting                       | Value                                     |
+| ----------------------------- | ----------------------------------------- |
+| `nodeIntegration`             | `false` (renderer has no Node access)     |
+| `contextIsolation`            | `true` (preload is isolated from page JS) |
+| `sandbox`                     | `true` (BrowserViews run in sandbox)      |
+| `webSecurity`                 | `true` (CORS enforced)                    |
+| `allowRunningInsecureContent` | `false`                                   |
 
 ### 12.2 Preload Script Security
 
@@ -984,31 +1014,31 @@ form-action 'none';
 
 ### 12.4 Permission Model
 
-| Permission | Default | Prompt Behavior |
-|------------|---------|-----------------|
-| Geolocation | Block | Prompt per-origin |
-| Camera | Block | Prompt per-origin |
-| Microphone | Block | Prompt per-origin |
-| Notifications | Block | Prompt per-origin |
-| MIDI | Block | Prompt per-origin |
-| MIDI Sysex | Block | Prompt per-origin |
-| Pointer Lock | Ask | Prompt per-origin |
-| Fullscreen | Allow | Auto-allow (UI handles exit) |
-| Open External | Ask | Prompt per-protocol |
-| Display Capture | Block | Prompt per-origin |
+| Permission      | Default | Prompt Behavior              |
+| --------------- | ------- | ---------------------------- |
+| Geolocation     | Block   | Prompt per-origin            |
+| Camera          | Block   | Prompt per-origin            |
+| Microphone      | Block   | Prompt per-origin            |
+| Notifications   | Block   | Prompt per-origin            |
+| MIDI            | Block   | Prompt per-origin            |
+| MIDI Sysex      | Block   | Prompt per-origin            |
+| Pointer Lock    | Ask     | Prompt per-origin            |
+| Fullscreen      | Allow   | Auto-allow (UI handles exit) |
+| Open External   | Ask     | Prompt per-protocol          |
+| Display Capture | Block   | Prompt per-origin            |
 
 User choices are persisted in `contentSettings` (for content settings like popups, JS, images) and `defaultPermissions` (for permission prompts like geolocation, camera). Both are stored per-origin in the Settings schema and honored across sessions.
 
 ### 12.5 Certificate Handling
 
-| Scenario | Behavior |
-|----------|----------|
-| Valid HTTPS | Normal browsing, show lock icon |
-| Expired cert | Warning interstitial, allow with explicit override |
-| Self-signed | Warning interstitial, allow with explicit override |
-| Wrong hostname | Warning interstitial |
-| Revoked cert | Hard block (no override) |
-| HSTS violation | Hard block |
+| Scenario       | Behavior                                           |
+| -------------- | -------------------------------------------------- |
+| Valid HTTPS    | Normal browsing, show lock icon                    |
+| Expired cert   | Warning interstitial, allow with explicit override |
+| Self-signed    | Warning interstitial, allow with explicit override |
+| Wrong hostname | Warning interstitial                               |
+| Revoked cert   | Hard block (no override)                           |
+| HSTS violation | Hard block                                         |
 
 Overrides stored per-origin in settings.
 
@@ -1026,6 +1056,7 @@ Overrides stored per-origin in settings.
 ### 13.1 Unit Tests (Vitest)
 
 **Coverage targets:**
+
 - `url.ts` - normalize, extractDomain, isValidURL, etc.
 - `search-engine.ts` - query parsing, engine selection
 - `format.ts` - date, file size, duration formatting
@@ -1037,6 +1068,7 @@ Overrides stored per-origin in settings.
 ### 13.2 Integration Tests (Vitest + Mocked Electron)
 
 **Coverage targets:**
+
 - IPC channel contracts (renderer sends → main receives correctly)
 - Tab state machine transitions
 - Settings persistence round-trip
@@ -1047,6 +1079,7 @@ Overrides stored per-origin in settings.
 ### 13.3 E2E Tests (Playwright + Electron)
 
 **Coverage targets:**
+
 - App launch and basic smoke test
 - Tab creation, switching, closing
 - Navigation to real and test URLs
@@ -1057,12 +1090,14 @@ Overrides stored per-origin in settings.
 - Screenshot comparison for visual regression
 
 **Test infrastructure:**
+
 - Local Express server serving test pages with known content
 - Test fixtures for bookmarks, history, settings
 - Screenshot baselines per platform (critical chrome elements only: tab bar, omnibox)
 
 **IPC Contract Tests:**
 Every IPC channel defined in Section 7 must have at least one integration test:
+
 - Renderer → Main: verify payload schema, error handling, and return values
 - Main → Renderer: verify event emission and payload structure
 - Cross-cutting: verify no channel name collisions, all channels are bidirectionally symmetric
@@ -1095,6 +1130,7 @@ tests/
 **Tagline:** "Explore without limits"
 
 **Design principles:**
+
 1. **Familiar yet fresh** - Chrome users feel at home, but distinct visual identity
 2. **Content-first** - Chrome stays minimal; web content is the star
 3. **Responsive chrome** - UI adapts to window size, fullscreen, and theme
@@ -1117,7 +1153,7 @@ tests/
   --overlay-bg: #ffffff;
 
   /* Accent colors */
-  --accent-primary: #1a73e8;      /* Horizon blue */
+  --accent-primary: #1a73e8; /* Horizon blue */
   --accent-hover: #1557b0;
   --accent-light: #e8f0fe;
 
@@ -1128,8 +1164,9 @@ tests/
   --info: #1a73e8;
 
   /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
   --font-size-base: 13px;
   --font-size-sm: 11px;
   --font-size-lg: 15px;
@@ -1185,12 +1222,12 @@ tests/
 
 ### 14.4 Responsive Behavior
 
-| Window Width | Behavior |
-|-------------|----------|
-| < 600px | Compact mode: hide toolbar labels, show icons only |
-| < 400px | Minimum size; tab titles truncate to favicon only |
-| Fullscreen | Auto-hide chrome (toolbar + tab bar) on idle, show on mouse-move-top |
-| Maximized | Use system title bar (Windows), traffic lights hidden (macOS) |
+| Window Width | Behavior                                                             |
+| ------------ | -------------------------------------------------------------------- |
+| < 600px      | Compact mode: hide toolbar labels, show icons only                   |
+| < 400px      | Minimum size; tab titles truncate to favicon only                    |
+| Fullscreen   | Auto-hide chrome (toolbar + tab bar) on idle, show on mouse-move-top |
+| Maximized    | Use system title bar (Windows), traffic lights hidden (macOS)        |
 
 ---
 
@@ -1198,15 +1235,15 @@ tests/
 
 ### 15.1 Target Formats
 
-| Platform | Format | Notes |
-|----------|--------|-------|
-| macOS | DMG | Signed + notarized |
-| macOS | ZIP | For direct distribution |
-| Windows | NSIS (.exe) | Installer with auto-update |
-| Windows | Portable (.exe) | No installer |
-| Linux | AppImage | Universal, no dependencies |
-| Linux | deb | Debian/Ubuntu |
-| Linux | rpm | Fedora/openSUSE |
+| Platform | Format          | Notes                      |
+| -------- | --------------- | -------------------------- |
+| macOS    | DMG             | Signed + notarized         |
+| macOS    | ZIP             | For direct distribution    |
+| Windows  | NSIS (.exe)     | Installer with auto-update |
+| Windows  | Portable (.exe) | No installer               |
+| Linux    | AppImage        | Universal, no dependencies |
+| Linux    | deb             | Debian/Ubuntu              |
+| Linux    | rpm             | Fedora/openSUSE            |
 
 ### 15.2 Auto-Update
 
@@ -1216,23 +1253,25 @@ tests/
 - Silent download, prompt to install on next restart
 
 **Error Handling:**
+
 - Download failure: Retry up to 3 times with exponential backoff; show "Update failed" toast if all retries exhausted
 - Signature verification failure: Discard update, show security warning, do not prompt to install
 - Installation failure: Log error, show "Update failed" notification, retry on next check cycle
 - Offline during update check: Skip silently, retry on next scheduled check
 
 **Update Notification UI:**
+
 - `app:updateAvailable` → subtle dot/badge on Settings menu icon + toast notification "Update available"
 - `app:updateDownloaded` → modal dialog "Restart to update" with "Restart Now" / "Later" buttons
 - User can check for updates manually via Settings → About → "Check for updates"
 
 ### 15.3 Code Signing
 
-| Platform | Certificate |
-|----------|-------------|
-| macOS | Apple Developer ID |
-| Windows | EV Code Signing Certificate |
-| Linux | GPG signing for packages |
+| Platform | Certificate                 |
+| -------- | --------------------------- |
+| macOS    | Apple Developer ID          |
+| Windows  | EV Code Signing Certificate |
+| Linux    | GPG signing for packages    |
 
 ---
 
@@ -1240,24 +1279,24 @@ tests/
 
 The following channels are defined for forward-compatibility but not implemented in v1.0:
 
-| Direction | Channel | Payload | Description |
-|-----------|---------|---------|-------------|
-| Renderer → Main | `window:create` | `{ url?: string }` | Create additional BrowserWindow |
-| Main → Renderer | `window:created` | `{ windowId: string }` | New window created |
+| Direction       | Channel          | Payload                | Description                     |
+| --------------- | ---------------- | ---------------------- | ------------------------------- |
+| Renderer → Main | `window:create`  | `{ url?: string }`     | Create additional BrowserWindow |
+| Main → Renderer | `window:created` | `{ windowId: string }` | New window created              |
 
 ---
 
 ## 16. Performance Targets
 
-| Metric | Target |
-|--------|--------|
-| Cold start (first window) | < 2 seconds |
-| New tab creation | < 100ms |
-| Tab switch | < 50ms |
-| Window resize | < 16ms (60fps) |
-| Memory per tab | ~50-100MB reported (Chromium baseline; monitored, not guaranteed) |
-| Hibernated tab memory | ~0MB (BrowserView destroyed) |
-| Max tabs before hibernation | 20 active (configurable) |
+| Metric                      | Target                                                            |
+| --------------------------- | ----------------------------------------------------------------- |
+| Cold start (first window)   | < 2 seconds                                                       |
+| New tab creation            | < 100ms                                                           |
+| Tab switch                  | < 50ms                                                            |
+| Window resize               | < 16ms (60fps)                                                    |
+| Memory per tab              | ~50-100MB reported (Chromium baseline; monitored, not guaranteed) |
+| Hibernated tab memory       | ~0MB (BrowserView destroyed)                                      |
+| Max tabs before hibernation | 20 active (configurable)                                          |
 
 ---
 
@@ -1276,6 +1315,7 @@ The following channels are defined for forward-compatibility but not implemented
 ## 18. Internationalization (Future)
 
 Architecture prepared for i18n:
+
 - All user-facing strings externalized
 - Locale files in `resources/locales/`
 - `navigator.language` detection
@@ -1285,14 +1325,14 @@ Architecture prepared for i18n:
 
 ## 19. Future Roadmap (Post-v1)
 
-| Version | Features |
-|---------|----------|
-| v1.1 | Tab groups, vertical tabs option, reader mode |
-| v1.2 | Extension API (basic: toolbar icons, content scripts) |
-| v1.3 | Full WebExtension API parity |
-| v2.0 | Cloud sync (accounts, encrypted sync server) |
-| v2.1 | Mobile companion (iOS/Android WebView-based) |
-| v2.2 | Built-in VPN/proxy, advanced privacy tools |
+| Version | Features                                              |
+| ------- | ----------------------------------------------------- |
+| v1.1    | Tab groups, vertical tabs option, reader mode         |
+| v1.2    | Extension API (basic: toolbar icons, content scripts) |
+| v1.3    | Full WebExtension API parity                          |
+| v2.0    | Cloud sync (accounts, encrypted sync server)          |
+| v2.1    | Mobile companion (iOS/Android WebView-based)          |
+| v2.2    | Built-in VPN/proxy, advanced privacy tools            |
 
 ---
 
@@ -1310,55 +1350,55 @@ The following open questions have been resolved for v1.0:
 
 ## Appendix A: Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl/Cmd + T` | New tab |
-| `Ctrl/Cmd + W` | Close tab |
-| `Ctrl/Cmd + Shift + T` | Reopen closed tab |
-| `Ctrl/Cmd + L` | Focus omnibox |
-| `Ctrl/Cmd + R` | Reload |
-| `Ctrl/Cmd + Shift + R` | Hard reload |
-| `Alt + ←` / `Alt + →` | Back / Forward |
-| `Ctrl/Cmd + D` | Bookmark page |
-| `Ctrl/Cmd + Shift + B` | Toggle bookmarks bar |
-| `Ctrl/Cmd + H` | Open history |
-| `Ctrl/Cmd + J` | Open downloads |
-| `Ctrl/Cmd + F` | Find in page |
-| `Ctrl/Cmd + +` | Zoom in |
-| `Ctrl/Cmd + -` | Zoom out |
-| `Ctrl/Cmd + 0` | Reset zoom |
-| `Ctrl/Cmd + P` | Print |
-| `Ctrl/Cmd + S` | Save page (MHTML snapshot, v1.1+) |
-| `F12` / `Ctrl/Cmd + Shift + I` | Toggle DevTools |
-| `Ctrl/Cmd + Shift + N` | New window (v1.1+) |
-| `Ctrl/Cmd + Shift + W` | Close window |
-| `Ctrl/Cmd + ,` | Open settings |
-| `Ctrl/Cmd + 1..8` | Switch to tab N |
-| `Ctrl/Cmd + 9` | Switch to last tab |
-| `Ctrl/Cmd + Tab` | Next tab |
-| `Ctrl/Cmd + Shift + Tab` | Previous tab |
-| `Ctrl/Cmd + Shift + Delete` | Clear browsing data |
-| `F11` | Toggle fullscreen |
-| `Esc` | Stop loading / close find / exit fullscreen |
+| Shortcut                       | Action                                      |
+| ------------------------------ | ------------------------------------------- |
+| `Ctrl/Cmd + T`                 | New tab                                     |
+| `Ctrl/Cmd + W`                 | Close tab                                   |
+| `Ctrl/Cmd + Shift + T`         | Reopen closed tab                           |
+| `Ctrl/Cmd + L`                 | Focus omnibox                               |
+| `Ctrl/Cmd + R`                 | Reload                                      |
+| `Ctrl/Cmd + Shift + R`         | Hard reload                                 |
+| `Alt + ←` / `Alt + →`          | Back / Forward                              |
+| `Ctrl/Cmd + D`                 | Bookmark page                               |
+| `Ctrl/Cmd + Shift + B`         | Toggle bookmarks bar                        |
+| `Ctrl/Cmd + H`                 | Open history                                |
+| `Ctrl/Cmd + J`                 | Open downloads                              |
+| `Ctrl/Cmd + F`                 | Find in page                                |
+| `Ctrl/Cmd + +`                 | Zoom in                                     |
+| `Ctrl/Cmd + -`                 | Zoom out                                    |
+| `Ctrl/Cmd + 0`                 | Reset zoom                                  |
+| `Ctrl/Cmd + P`                 | Print                                       |
+| `Ctrl/Cmd + S`                 | Save page (MHTML snapshot, v1.1+)           |
+| `F12` / `Ctrl/Cmd + Shift + I` | Toggle DevTools                             |
+| `Ctrl/Cmd + Shift + N`         | New window (v1.1+)                          |
+| `Ctrl/Cmd + Shift + W`         | Close window                                |
+| `Ctrl/Cmd + ,`                 | Open settings                               |
+| `Ctrl/Cmd + 1..8`              | Switch to tab N                             |
+| `Ctrl/Cmd + 9`                 | Switch to last tab                          |
+| `Ctrl/Cmd + Tab`               | Next tab                                    |
+| `Ctrl/Cmd + Shift + Tab`       | Previous tab                                |
+| `Ctrl/Cmd + Shift + Delete`    | Clear browsing data                         |
+| `F11`                          | Toggle fullscreen                           |
+| `Esc`                          | Stop loading / close find / exit fullscreen |
 
 ---
 
 ## Appendix B: File Permissions & Storage
 
-| Data Type | Location | Format | Rationale |
-|-----------|----------|--------|-----------|
-| Settings | `userData/settings.json` | JSON | Small, flat structure; fast reads/writes |
-| Bookmarks | `userData/bookmarks.json` | JSON | Tree structure; loaded once at startup; full-tree operations |
-| History | `userData/history.db` | SQLite | Large dataset; requires fast range queries, full-text search, and efficient pruning |
-| Passwords | `userData/passwords.json` (encrypted) | JSON + AES | Small dataset; sensitive; encrypted at rest with OS keychain or AES-256-GCM |
-| Downloads DB | `userData/downloads.json` | JSON | Small dataset; list operations; simple append/update |
-| Session | `userData/session.json` | JSON | Transient; simple read/write at startup/quit |
-| Favicon cache | `userData/favicons/` | PNG files | Binary assets; filesystem-native storage |
-| Cache | `userData/Cache/` | Chromium cache | Managed by Chromium; do not touch |
-| Cookies | `userData/Cookies` | SQLite (Chromium) | Managed by Chromium; do not touch |
+| Data Type     | Location                              | Format            | Rationale                                                                           |
+| ------------- | ------------------------------------- | ----------------- | ----------------------------------------------------------------------------------- |
+| Settings      | `userData/settings.json`              | JSON              | Small, flat structure; fast reads/writes                                            |
+| Bookmarks     | `userData/bookmarks.json`             | JSON              | Tree structure; loaded once at startup; full-tree operations                        |
+| History       | `userData/history.db`                 | SQLite            | Large dataset; requires fast range queries, full-text search, and efficient pruning |
+| Passwords     | `userData/passwords.json` (encrypted) | JSON + AES        | Small dataset; sensitive; encrypted at rest with OS keychain or AES-256-GCM         |
+| Downloads DB  | `userData/downloads.json`             | JSON              | Small dataset; list operations; simple append/update                                |
+| Session       | `userData/session.json`               | JSON              | Transient; simple read/write at startup/quit                                        |
+| Favicon cache | `userData/favicons/`                  | PNG files         | Binary assets; filesystem-native storage                                            |
+| Cache         | `userData/Cache/`                     | Chromium cache    | Managed by Chromium; do not touch                                                   |
+| Cookies       | `userData/Cookies`                    | SQLite (Chromium) | Managed by Chromium; do not touch                                                   |
 
 **Why SQLite only for History:** History is the only dataset that grows unbounded, requires complex queries (search by text, filter by date range, deduplication, frecency scoring), and needs efficient pruning. All other datasets are small enough for in-memory JSON with simple file I/O. IfBookmarks or Downloads grow unexpectedly, they can be migrated to SQLite without breaking changes.
 
 ---
 
-*End of Design Specification*
+_End of Design Specification_

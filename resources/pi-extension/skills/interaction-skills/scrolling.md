@@ -10,7 +10,7 @@ Modern sites embed scrollable regions (chat panels, feed columns, modal bodies) 
 browser_evaluate({ expression: "(() => { const el = document.elementFromPoint(400, 300); let s = el; while (s && getComputedStyle(s).overflowY === 'visible') s = s.parentElement; return s?.tagName + '#' + (s?.id || '') })()" })
 ```
 
-That returns the actual scroll container. To scroll *it*:
+That returns the actual scroll container. To scroll _it_:
 
 ```
 browser_evaluate({ expression: "document.querySelector('main.feed').scrollBy(0, 800)" })

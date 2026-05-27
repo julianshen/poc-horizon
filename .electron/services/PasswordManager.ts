@@ -1,5 +1,5 @@
-import fs from 'fs';
-import type { PasswordEntry } from '../../src/types/browser';
+import fs from "fs";
+import type { PasswordEntry } from "../../src/types/browser";
 
 export interface PasswordCrypto {
   encrypt(plain: string): string;
@@ -11,16 +11,19 @@ export class PasswordManager {
 
   constructor(
     private passwordsPath: string,
-    private crypto: PasswordCrypto
+    private crypto: PasswordCrypto,
   ) {
     this.passwords = this.load();
   }
 
   private load(): PasswordEntry[] {
     try {
-      const data = fs.readFileSync(this.passwordsPath, 'utf-8');
+      const data = fs.readFileSync(this.passwordsPath, "utf-8");
       const entries: PasswordEntry[] = JSON.parse(data);
-      return entries.map((e) => ({ ...e, password: this.crypto.decrypt(e.password) }));
+      return entries.map((e) => ({
+        ...e,
+        password: this.crypto.decrypt(e.password),
+      }));
     } catch {
       return [];
     }
@@ -40,7 +43,7 @@ export class PasswordManager {
 
   saveEntry(entry: PasswordEntry): void {
     const existing = this.passwords.findIndex(
-      (p) => p.origin === entry.origin && p.username === entry.username
+      (p) => p.origin === entry.origin && p.username === entry.username,
     );
     if (existing >= 0) {
       this.passwords[existing] = { ...entry, lastUsedAt: Date.now() };
@@ -51,7 +54,9 @@ export class PasswordManager {
   }
 
   remove(origin: string, username: string): void {
-    this.passwords = this.passwords.filter((p) => !(p.origin === origin && p.username === username));
+    this.passwords = this.passwords.filter(
+      (p) => !(p.origin === origin && p.username === username),
+    );
     this.save();
   }
 

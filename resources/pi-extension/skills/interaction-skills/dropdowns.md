@@ -22,7 +22,7 @@ browser_wait_for({ selector: "[role=option]" })
 
 ## Combobox (typeahead)
 
-Type into the input first, *then* click the suggestion:
+Type into the input first, _then_ click the suggestion:
 
 ```
 browser_click({ x: inputX, y: inputY })

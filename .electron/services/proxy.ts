@@ -1,8 +1,8 @@
-import { session, type Session } from 'electron';
-import type { Settings } from '../../src/types/browser';
+import { session, type Session } from "electron";
+import type { Settings } from "../../src/types/browser";
 
 export interface ProxyConfig {
-  mode: 'direct' | 'system' | 'fixed_servers';
+  mode: "direct" | "system" | "fixed_servers";
   proxyRules?: string;
   proxyBypassRules?: string;
 }
@@ -28,7 +28,7 @@ export interface ProxyApplyResult {
 /** Reference URL used for the diagnostic `resolveProxy` probe. Picked
  *  because it's stable, neutral, and unlikely to be in anyone's
  *  proxyBypassRules (so the probe actually tests proxy resolution). */
-const PROBE_URL = 'https://example.com';
+const PROBE_URL = "https://example.com";
 
 /**
  * Shared accessor for the incognito Electron session.
@@ -44,7 +44,7 @@ const PROBE_URL = 'https://example.com';
  * @returns The cached `Session` instance for the `incognito` partition.
  */
 export function getIncognitoSession(): Session {
-  return session.fromPartition('incognito', { cache: false });
+  return session.fromPartition("incognito", { cache: false });
 }
 
 /**
@@ -66,18 +66,18 @@ export function getIncognitoSession(): Session {
  * @returns A {@link ProxyConfig} suitable for `session.setProxy`.
  */
 export function proxyConfigFromSettings(
-  settings: Pick<Settings, 'proxyType' | 'proxyRules' | 'proxyBypassRules'>
+  settings: Pick<Settings, "proxyType" | "proxyRules" | "proxyBypassRules">,
 ): ProxyConfig {
-  if (settings.proxyType === 'direct') return { mode: 'direct' };
-  if (settings.proxyType === 'manual') {
-    if (!settings.proxyRules) return { mode: 'direct' };
+  if (settings.proxyType === "direct") return { mode: "direct" };
+  if (settings.proxyType === "manual") {
+    if (!settings.proxyRules) return { mode: "direct" };
     return {
-      mode: 'fixed_servers',
+      mode: "fixed_servers",
       proxyRules: settings.proxyRules,
       proxyBypassRules: settings.proxyBypassRules,
     };
   }
-  return { mode: 'system' };
+  return { mode: "system" };
 }
 
 /**
@@ -101,7 +101,7 @@ export function proxyConfigFromSettings(
  */
 export async function applyProxySettingsToSession(
   targetSession: Session,
-  settings: Pick<Settings, 'proxyType' | 'proxyRules' | 'proxyBypassRules'>
+  settings: Pick<Settings, "proxyType" | "proxyRules" | "proxyBypassRules">,
 ): Promise<ProxyApplyResult> {
   const config = proxyConfigFromSettings(settings);
   await targetSession.setProxy(config);
@@ -137,7 +137,7 @@ export async function applyProxySettingsToSession(
  * @throws If either session's `setProxy` rejects.
  */
 export async function applyProxySettingsToCoreSessions(
-  settings: Pick<Settings, 'proxyType' | 'proxyRules' | 'proxyBypassRules'>
+  settings: Pick<Settings, "proxyType" | "proxyRules" | "proxyBypassRules">,
 ): Promise<{ default: ProxyApplyResult; incognito: ProxyApplyResult }> {
   const [defaultResult, incognitoResult] = await Promise.all([
     applyProxySettingsToSession(session.defaultSession, settings),

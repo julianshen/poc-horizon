@@ -1,5 +1,5 @@
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import { promises as fs } from "fs";
+import * as path from "path";
 
 /**
  * Read-only access to the bundled SKILL.md + interaction-skills/*.md files
@@ -14,25 +14,28 @@ export class SkillsLibrary {
   constructor(private readonly root: string) {}
 
   async preamble(): Promise<string> {
-    return fs.readFile(path.join(this.root, 'SKILL.md'), 'utf8');
+    return fs.readFile(path.join(this.root, "SKILL.md"), "utf8");
   }
 
   async listInteractions(): Promise<string[]> {
     try {
-      const dir = path.join(this.root, 'interaction-skills');
+      const dir = path.join(this.root, "interaction-skills");
       const entries = await fs.readdir(dir);
-      return entries.filter((e) => e.endsWith('.md')).sort();
+      return entries.filter((e) => e.endsWith(".md")).sort();
     } catch {
       return [];
     }
   }
 
   async readInteraction(name: string): Promise<string | null> {
-    if (!name.endsWith('.md') || /[\\/]/.test(name) || name.startsWith('.')) {
+    if (!name.endsWith(".md") || /[\\/]/.test(name) || name.startsWith(".")) {
       throw new Error(`invalid skill name: ${name}`);
     }
     try {
-      return await fs.readFile(path.join(this.root, 'interaction-skills', name), 'utf8');
+      return await fs.readFile(
+        path.join(this.root, "interaction-skills", name),
+        "utf8",
+      );
     } catch {
       return null;
     }

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -25,7 +25,8 @@
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-inactive: transparent;
   --tab-bg-hover: rgba(0, 0, 0, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(20, 15, 10, 0.06), 0 0 0 0.5px rgba(20, 15, 10, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(20, 15, 10, 0.06), 0 0 0 0.5px rgba(20, 15, 10, 0.06);
 
   --toolbar-bg: transparent;
   --omnibox-bg: #ffffff;
@@ -34,8 +35,8 @@
 
   --accent-primary: #d44d7a;
   --accent-hover: #b73c66;
-  --accent-light: rgba(212, 77, 122, 0.10);
-  --accent-soft: rgba(212, 77, 122, 0.10);
+  --accent-light: rgba(212, 77, 122, 0.1);
+  --accent-soft: rgba(212, 77, 122, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #d44d7a 0%, #f4a5b5 100%);
 
@@ -46,9 +47,11 @@
   --insecure: #c0392b;
   --warning: #d28a1f;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  --font-display: 'Instrument Serif', Georgia, serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
+    sans-serif;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --font-size-base: 13px;
 
   --radius-sm: 8px;
@@ -58,8 +61,9 @@
 
   --shadow-sm: 0 1px 2px rgba(20, 15, 10, 0.04);
   --shadow-md: 0 4px 12px rgba(20, 15, 10, 0.06);
-  --shadow-lg: 0 12px 32px rgba(20, 15, 10, 0.10);
-  --shadow-card: 0 1px 2px rgba(20, 15, 10, 0.04), 0 12px 32px rgba(20, 15, 10, 0.06);
+  --shadow-lg: 0 12px 32px rgba(20, 15, 10, 0.1);
+  --shadow-card:
+    0 1px 2px rgba(20, 15, 10, 0.04), 0 12px 32px rgba(20, 15, 10, 0.06);
 
   --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 180ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -67,8 +71,8 @@
 
 [data-theme="midnight"] {
   --chrome-bg: #08090c;
-  --chrome-bg-top: rgba(8, 9, 12, 0.90);
-  --chrome-bg-chrome: rgba(13, 15, 20, 0.80);
+  --chrome-bg-top: rgba(8, 9, 12, 0.9);
+  --chrome-bg-chrome: rgba(13, 15, 20, 0.8);
   --chrome-fg: #f3f3f5;
   --chrome-fg-muted: #9a9ca8;
   --chrome-fg-subtle: #5d5f6b;
@@ -78,12 +82,18 @@
   --surface-2: #191b22;
   --surface-hover: #22242d;
   --surface-overlay: rgba(19, 21, 27, 0.85);
-  --tab-bg-active: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  --tab-bg-active: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
   --tab-bg-hover: rgba(255, 255, 255, 0.04);
-  --tab-shadow-active: 0 1px 0 rgba(255,255,255,0.06) inset, 0 0 0 0.5px rgba(255,255,255,0.14);
+  --tab-shadow-active:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 0 0.5px rgba(255, 255, 255, 0.14);
   --omnibox-bg: #13151b;
   --omnibox-bg-focus: #191b22;
-  --omnibox-ring: rgba(232, 163, 104, 0.20);
+  --omnibox-ring: rgba(232, 163, 104, 0.2);
   --accent-primary: #e8a368;
   --accent-soft: rgba(232, 163, 104, 0.14);
   --accent-light: rgba(232, 163, 104, 0.14);
@@ -108,13 +118,14 @@
   --surface-overlay: rgba(235, 241, 247, 0.92);
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-hover: rgba(0, 30, 60, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(10, 25, 40, 0.06), 0 0 0 0.5px rgba(10, 25, 40, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(10, 25, 40, 0.06), 0 0 0 0.5px rgba(10, 25, 40, 0.06);
   --omnibox-bg: #ffffff;
   --omnibox-bg-focus: #ffffff;
   --omnibox-ring: rgba(42, 130, 200, 0.18);
   --accent-primary: #2a82c8;
-  --accent-soft: rgba(42, 130, 200, 0.10);
-  --accent-light: rgba(42, 130, 200, 0.10);
+  --accent-soft: rgba(42, 130, 200, 0.1);
+  --accent-light: rgba(42, 130, 200, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #2a82c8 0%, #5eb8e8 100%);
   --ai-accent: #2a82c8;
@@ -136,13 +147,14 @@
   --surface-overlay: rgba(236, 240, 232, 0.92);
   --tab-bg-active: rgba(255, 255, 255, 0.9);
   --tab-bg-hover: rgba(20, 50, 15, 0.04);
-  --tab-shadow-active: 0 1px 3px rgba(15, 30, 12, 0.06), 0 0 0 0.5px rgba(15, 30, 12, 0.06);
+  --tab-shadow-active:
+    0 1px 3px rgba(15, 30, 12, 0.06), 0 0 0 0.5px rgba(15, 30, 12, 0.06);
   --omnibox-bg: #ffffff;
   --omnibox-bg-focus: #ffffff;
   --omnibox-ring: rgba(70, 150, 80, 0.18);
   --accent-primary: #469650;
-  --accent-soft: rgba(70, 150, 80, 0.10);
-  --accent-light: rgba(70, 150, 80, 0.10);
+  --accent-soft: rgba(70, 150, 80, 0.1);
+  --accent-light: rgba(70, 150, 80, 0.1);
   --accent-text: #ffffff;
   --accent-gradient: linear-gradient(135deg, #469650 0%, #82c860 100%);
   --ai-accent: #469650;
@@ -163,13 +175,27 @@ body {
   font-feature-settings: "cv11", "ss01";
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-button { font-family: inherit; }
-input, textarea, select { font-family: inherit; color: inherit; }
+button {
+  font-family: inherit;
+}
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: inherit;
+}
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: var(--chrome-border-strong);
   border-radius: var(--radius-pill);
@@ -188,30 +214,84 @@ input, textarea, select { font-family: inherit; color: inherit; }
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
   -webkit-app-region: no-drag;
 }
-.icon-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--chrome-fg); }
-.icon-btn:active:not(:disabled) { transform: scale(0.94); }
-.icon-btn:disabled { opacity: 0.3; cursor: default; }
-.icon-btn.ai { color: var(--ai-accent); }
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--chrome-fg);
+}
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.icon-btn.ai {
+  color: var(--ai-accent);
+}
 .icon-btn.ai.active {
   background: var(--accent-soft);
   color: var(--ai-accent);
 }
-.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .spinner {
-  width: 12px; height: 12px;
+  width: 12px;
+  height: 12px;
   border: 1.6px solid var(--chrome-border-strong);
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
 
-@keyframes fade-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-.fade-in { animation: fade-in var(--transition-base); }
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in {
+  animation: fade-in var(--transition-base);
+}
 
-@keyframes hz-bounce { 0%, 80%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
-.hz-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: inline-block; }
+@keyframes hz-bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.hz-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}

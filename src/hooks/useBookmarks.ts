@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { Bookmark } from '../types/browser';
+import { useCallback, useEffect, useState } from "react";
+import type { Bookmark } from "../types/browser";
 
 export function useBookmarks(): {
   bookmarks: Bookmark[];
@@ -12,10 +12,13 @@ export function useBookmarks(): {
 
   const refresh = useCallback(async () => {
     try {
-      const tree = (await window.horizonAPI.invoke('bookmark:getTree', {})) as Bookmark[];
+      const tree = (await window.horizonAPI.invoke(
+        "bookmark:getTree",
+        {},
+      )) as Bookmark[];
       setBookmarks(Array.isArray(tree) ? tree.filter((b) => !!b.url) : []);
     } catch (err) {
-      console.warn('[useBookmarks] refresh failed:', err);
+      console.warn("[useBookmarks] refresh failed:", err);
       setBookmarks([]);
     }
   }, []);
@@ -26,21 +29,24 @@ export function useBookmarks(): {
 
   const add = useCallback(
     async (url: string, title: string) => {
-      await window.horizonAPI.invoke('bookmark:add', { url, title });
+      await window.horizonAPI.invoke("bookmark:add", { url, title });
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
   const remove = useCallback(
     async (id: string) => {
-      await window.horizonAPI.invoke('bookmark:remove', { bookmarkId: id });
+      await window.horizonAPI.invoke("bookmark:remove", { bookmarkId: id });
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
-  const findByUrl = useCallback((url: string) => bookmarks.find((b) => b.url === url), [bookmarks]);
+  const findByUrl = useCallback(
+    (url: string) => bookmarks.find((b) => b.url === url),
+    [bookmarks],
+  );
 
   return { bookmarks, refresh, add, remove, findByUrl };
 }

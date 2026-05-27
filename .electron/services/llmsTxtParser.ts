@@ -50,16 +50,16 @@ export function parseLlmsTxt(text: string): ParsedLlmsTxt {
 
   for (const line of lines) {
     if (!sawTitle && H1_RE.test(line)) {
-      out.title = line.replace(H1_RE, '').trim();
+      out.title = line.replace(H1_RE, "").trim();
       sawTitle = true;
       continue;
     }
     if (!out.summary && QUOTE_RE.test(line)) {
-      out.summary = line.replace(QUOTE_RE, '').trim();
+      out.summary = line.replace(QUOTE_RE, "").trim();
       continue;
     }
     if (H2_RE.test(line)) {
-      currentSection = { name: line.replace(H2_RE, '').trim(), links: [] };
+      currentSection = { name: line.replace(H2_RE, "").trim(), links: [] };
       out.sections.push(currentSection);
       continue;
     }
@@ -68,7 +68,7 @@ export function parseLlmsTxt(text: string): ParsedLlmsTxt {
       const link: ParsedLlmsLink = { title: m[1].trim(), url: m[2].trim() };
       if (m[3]) link.description = m[3].trim();
       if (!currentSection) {
-        currentSection = { name: '', links: [] };
+        currentSection = { name: "", links: [] };
         out.sections.push(currentSection);
       }
       currentSection.links.push(link);

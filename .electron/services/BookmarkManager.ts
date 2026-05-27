@@ -1,6 +1,6 @@
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
-import type { Bookmark } from '../../src/types/browser';
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
+import type { Bookmark } from "../../src/types/browser";
 
 export class BookmarkManager {
   private bookmarks: Bookmark[];
@@ -11,7 +11,7 @@ export class BookmarkManager {
 
   private load(): Bookmark[] {
     try {
-      const data = fs.readFileSync(this.bookmarksPath, 'utf-8');
+      const data = fs.readFileSync(this.bookmarksPath, "utf-8");
       return JSON.parse(data);
     } catch {
       return [
@@ -19,7 +19,7 @@ export class BookmarkManager {
           id: uuidv4(),
           schemaVersion: 1,
           index: 0,
-          title: 'Bookmarks Bar',
+          title: "Bookmarks Bar",
           dateAdded: Date.now(),
           children: [],
         },
@@ -28,7 +28,10 @@ export class BookmarkManager {
   }
 
   private save(): void {
-    fs.writeFileSync(this.bookmarksPath, JSON.stringify(this.bookmarks, null, 2));
+    fs.writeFileSync(
+      this.bookmarksPath,
+      JSON.stringify(this.bookmarks, null, 2),
+    );
   }
 
   getTree(): Bookmark[] {
@@ -57,7 +60,7 @@ export class BookmarkManager {
 
   move(bookmarkId: string, parentId: string, index: number): Bookmark {
     const bookmark = this.bookmarks.find((b) => b.id === bookmarkId);
-    if (!bookmark) throw new Error('Bookmark not found');
+    if (!bookmark) throw new Error("Bookmark not found");
     bookmark.parentId = parentId;
     bookmark.index = index;
     this.save();
@@ -66,7 +69,7 @@ export class BookmarkManager {
 
   update(bookmarkId: string, changes: Partial<Bookmark>): Bookmark {
     const bookmark = this.bookmarks.find((b) => b.id === bookmarkId);
-    if (!bookmark) throw new Error('Bookmark not found');
+    if (!bookmark) throw new Error("Bookmark not found");
     Object.assign(bookmark, changes, { dateModified: Date.now() });
     this.save();
     return bookmark;
@@ -96,7 +99,7 @@ export class BookmarkManager {
     const links = this.bookmarks
       .filter((b) => b.url)
       .map((b) => `    <DT><A HREF="${b.url}">${b.title}</A>`)
-      .join('\n');
+      .join("\n");
     return `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
 <TITLE>Bookmarks</TITLE>

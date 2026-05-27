@@ -1,6 +1,6 @@
-import { session } from 'electron';
-import { shouldAutoAllow } from './permissionPolicy';
-import type { PermissionBroker } from './PermissionBroker';
+import { session } from "electron";
+import { shouldAutoAllow } from "./permissionPolicy";
+import type { PermissionBroker } from "./PermissionBroker";
 
 export class SessionManager {
   private ses = session.defaultSession;

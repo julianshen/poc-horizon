@@ -1,6 +1,6 @@
 # Network spying
 
-The CDP subscribe/collect pair is for watching what the page *does* in response to an action — not what it displays.
+The CDP subscribe/collect pair is for watching what the page _does_ in response to an action — not what it displays.
 
 ## Pattern: subscribe → act → collect
 
@@ -19,18 +19,18 @@ browser_cdp({ method: "Network.getResponseBody", params: { requestId: "..." } })
 
 ## Useful events to subscribe to
 
-| Method | Why |
-|---|---|
-| `Network.responseReceived` | What URLs got hit and with what status |
-| `Network.requestWillBeSent` | What request payloads went out (POST bodies) |
+| Method                           | Why                                          |
+| -------------------------------- | -------------------------------------------- |
+| `Network.responseReceived`       | What URLs got hit and with what status       |
+| `Network.requestWillBeSent`      | What request payloads went out (POST bodies) |
 | `Network.webSocketFrameReceived` | Live data: chat, stock tickers, push updates |
-| `Page.frameNavigated` | Confirm navigation actually happened |
-| `Page.javascriptDialogOpening` | Pre-arm before clicks that might `confirm()` |
-| `Runtime.consoleAPICalled` | Capture the page's own console output |
+| `Page.frameNavigated`            | Confirm navigation actually happened         |
+| `Page.javascriptDialogOpening`   | Pre-arm before clicks that might `confirm()` |
+| `Runtime.consoleAPICalled`       | Capture the page's own console output        |
 
 ## Buffers are capped
 
-200 events per method. If a chatty event fires faster than you collect, you keep the *latest* 200, not the first 200. Drain more often if you're watching something busy.
+200 events per method. If a chatty event fires faster than you collect, you keep the _latest_ 200, not the first 200. Drain more often if you're watching something busy.
 
 ## Subscriptions persist across turns
 

@@ -52,71 +52,71 @@ This document describes the AI agent layer that ships with Horizon. The browser 
 
 ### Perception
 
-| Tool | Returns | When |
-|---|---|---|
-| `screenshot` | PNG + viewport size | Reading content; verifying state after an action |
-| `screenshot_marked` | PNG + viewport + `marks[]` (numbered, reading-order) | About to click — pick a mark id, click its (x,y) |
-| `axtree` | Accessibility tree | Want names/roles/rects without an image (cheaper than screenshot for vision-less models) |
-| `get_dom` | Structured DOM snapshot | Need to traverse structure (rare) |
-| `describe_at` | Tag/id/classes/rect/text under a point | Inspecting what's there before clicking |
-| `reader_extract` | Mozilla Readability output | Reading articles — far cheaper than full DOM |
+| Tool                | Returns                                              | When                                                                                     |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `screenshot`        | PNG + viewport size                                  | Reading content; verifying state after an action                                         |
+| `screenshot_marked` | PNG + viewport + `marks[]` (numbered, reading-order) | About to click — pick a mark id, click its (x,y)                                         |
+| `axtree`            | Accessibility tree                                   | Want names/roles/rects without an image (cheaper than screenshot for vision-less models) |
+| `get_dom`           | Structured DOM snapshot                              | Need to traverse structure (rare)                                                        |
+| `describe_at`       | Tag/id/classes/rect/text under a point               | Inspecting what's there before clicking                                                  |
+| `reader_extract`    | Mozilla Readability output                           | Reading articles — far cheaper than full DOM                                             |
 
 `screenshot_marked` numbers in **reading order** by default: top-to-bottom rows, left-to-right within each row. Mark 1 is the top-left interactive element. "Click the third result" therefore means the third visually-appearing result. Pass `order: 'dom'` to override (rare).
 
 ### Input
 
-| Tool | Notes |
-|---|---|
-| `navigate({ url })` | Returns `{ ok, host, domainSkillsAvailable? }` — the auto-hint surfaces saved per-site notes in the same response |
-| `click({ x, y, button? })` | `Input.dispatchMouseEvent` — passes through iframes, shadow DOM, cross-origin |
-| `type({ text, delayMs? })` | One `Input.dispatchKeyEvent` per char into the focused element |
-| `scroll({ deltaX?, deltaY? })` | Mouse wheel event under the cursor |
+| Tool                           | Notes                                                                                                             |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `navigate({ url })`            | Returns `{ ok, host, domainSkillsAvailable? }` — the auto-hint surfaces saved per-site notes in the same response |
+| `click({ x, y, button? })`     | `Input.dispatchMouseEvent` — passes through iframes, shadow DOM, cross-origin                                     |
+| `type({ text, delayMs? })`     | One `Input.dispatchKeyEvent` per char into the focused element                                                    |
+| `scroll({ deltaX?, deltaY? })` | Mouse wheel event under the cursor                                                                                |
 
 ### Coordination
 
-| Tool | Notes |
-|---|---|
+| Tool                                                                | Notes                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `wait_for({ selector?, networkIdleMs?, urlContains?, timeoutMs? })` | The default wait after navigate or any navigation-triggering click |
-| `dismiss_overlays` | Strips cookie banners, GDPR walls, newsletter pop-ups |
+| `dismiss_overlays`                                                  | Strips cookie banners, GDPR walls, newsletter pop-ups              |
 
 ### Tabs
 
-| Tool | Returns |
-|---|---|
+| Tool                 | Returns                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
 | `tab_open({ url? })` | Creates + activates + returns `{id, url, title, isActive}`. Harness debugger re-attaches automatically |
-| `tab_switch({ id })` | Re-attach to the named tab |
-| `tab_close({ id })` | Close and return `{closed: bool}` |
-| `tab_list` | `[{id, url, title, isActive}, ...]` |
+| `tab_switch({ id })` | Re-attach to the named tab                                                                             |
+| `tab_close({ id })`  | Close and return `{closed: bool}`                                                                      |
+| `tab_list`           | `[{id, url, title, isActive}, ...]`                                                                    |
 
 ### JS helpers — persistent named snippets
 
 Stored in `userData/js-helpers.json`. Helpers are **expressions evaluating to a function**, not function bodies — `(x) => ...`, `async (...) => ...`, IIFEs returning a function all valid.
 
-| Tool | Notes |
-|---|---|
-| `save_helper({ name, expression, description? })` | Overwrites by name (refining is one call) |
-| `call_helper({ name, args? })` | Inlines the helper + calls `(helpers[name])(...args)` |
-| `list_helpers` | Names + descriptions |
-| `remove_helper({ name })` | Delete |
+| Tool                                              | Notes                                                 |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| `save_helper({ name, expression, description? })` | Overwrites by name (refining is one call)             |
+| `call_helper({ name, args? })`                    | Inlines the helper + calls `(helpers[name])(...args)` |
+| `list_helpers`                                    | Names + descriptions                                  |
+| `remove_helper({ name })`                         | Delete                                                |
 
 ### CDP
 
-| Tool | Notes |
-|---|---|
-| `cdp({ method, params? })` | Raw CDP — escape hatch when no higher-level tool fits |
-| `cdp_subscribe({ method })` | Auto-enables the matching domain; events buffer until `_collect` |
-| `cdp_collect({ method?, max? })` | Drains and returns; clears the bucket |
-| `cdp_unsubscribe({ method? })` | Specific method or omit for "all" |
+| Tool                             | Notes                                                            |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `cdp({ method, params? })`       | Raw CDP — escape hatch when no higher-level tool fits            |
+| `cdp_subscribe({ method })`      | Auto-enables the matching domain; events buffer until `_collect` |
+| `cdp_collect({ method?, max? })` | Drains and returns; clears the bucket                            |
+| `cdp_unsubscribe({ method? })`   | Specific method or omit for "all"                                |
 
 Subscriptions persist across harness `detach`/`reattach` — the agent doesn't lose interest between turns. Per-method ring buffer capped at 200 events.
 
 ### Skills library (bundled, read-only)
 
-| Tool | Returns |
-|---|---|
-| `skill_preamble` | Full `SKILL.md` body — the top-level playbook |
-| `skill_list_interactions` | Filenames of every bundled interaction skill |
-| `skill_read_interaction({ name })` | Body of one interaction skill |
+| Tool                               | Returns                                       |
+| ---------------------------------- | --------------------------------------------- |
+| `skill_preamble`                   | Full `SKILL.md` body — the top-level playbook |
+| `skill_list_interactions`          | Filenames of every bundled interaction skill  |
+| `skill_read_interaction({ name })` | Body of one interaction skill                 |
 
 13 interaction skills covering: scrolling, dropdowns, iframes, shadow-dom, dialogs, uploads, downloads, infinite-scroll, login-walls, captcha, network-spying, helpers, forms.
 
@@ -124,13 +124,13 @@ Subscriptions persist across harness `detach`/`reattach` — the agent doesn't l
 
 Stored in `userData/domain-skills/<host>/<name>.md`. Hosts normalized (`www.` stripped, lowercased). File names must end in `.md` with no path separators.
 
-| Tool | Notes |
-|---|---|
-| `domain_skill_list({ host })` | Filenames for one host |
-| `domain_skill_read({ host, name })` | Full `{name, host, body, bytes, updatedAt}` |
-| `domain_skill_save({ host, name, body })` | Overwrites by name |
-| `domain_skill_remove({ host, name })` | Delete |
-| `domain_skill_search({ query, limit? })` | Substring search across all hosts; returns matching files ranked by match count, recency for ties |
+| Tool                                      | Notes                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `domain_skill_list({ host })`             | Filenames for one host                                                                            |
+| `domain_skill_read({ host, name })`       | Full `{name, host, body, bytes, updatedAt}`                                                       |
+| `domain_skill_save({ host, name, body })` | Overwrites by name                                                                                |
+| `domain_skill_remove({ host, name })`     | Delete                                                                                            |
+| `domain_skill_search({ query, limit? })`  | Substring search across all hosts; returns matching files ranked by match count, recency for ties |
 
 `navigate` auto-hints `domainSkillsAvailable: [...]` when the host has saved notes.
 
@@ -138,13 +138,13 @@ Stored in `userData/domain-skills/<host>/<name>.md`. Hosts normalized (`www.` st
 
 Stored in `userData/action-workflows.json`. Side-effecting tool calls between `record_start` and `record_stop` are captured; read-only (`screenshot`, `axtree`, `get_dom`, `get_url`, `list_helpers`, …) and meta (`workflow*`) tools are filtered out.
 
-| Tool | Notes |
-|---|---|
-| `workflow_record_start({ name, description? })` | Begin capturing |
-| `workflow_record_stop` | Save and return the recording |
-| `workflow_run({ name, stepDelayMs? })` | Replay through the same dispatch path — same safety checks apply |
-| `workflow_list` | Names only |
-| `workflow_delete({ name })` | Delete |
+| Tool                                            | Notes                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| `workflow_record_start({ name, description? })` | Begin capturing                                                  |
+| `workflow_record_stop`                          | Save and return the recording                                    |
+| `workflow_run({ name, stepDelayMs? })`          | Replay through the same dispatch path — same safety checks apply |
+| `workflow_list`                                 | Names only                                                       |
+| `workflow_delete({ name })`                     | Delete                                                           |
 
 Replay stops on the first failed step (page state has diverged).
 
@@ -156,15 +156,16 @@ Replay stops on the first failed step (page state has diverged).
 
 `aiConfirmActions` setting controls the gate:
 
-| Value | Behavior |
-|---|---|
-| `never` (default) | Pass-through. No prompts. Preserves the POC user experience |
-| `risky` | Prompts for tools in the risky set: `click`, `type`, `scroll`, `navigate`, `evaluate`, raw `cdp`, `callHelper`, `saveHelper`, `removeHelper`, `domainSkillSave`, `domainSkillRemove`, `cdpSubscribe`, `cdpUnsubscribe` |
-| `all` | Prompts before every tool call |
+| Value             | Behavior                                                                                                                                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `never` (default) | Pass-through. No prompts. Preserves the POC user experience                                                                                                                                                            |
+| `risky`           | Prompts for tools in the risky set: `click`, `type`, `scroll`, `navigate`, `evaluate`, raw `cdp`, `callHelper`, `saveHelper`, `removeHelper`, `domainSkillSave`, `domainSkillRemove`, `cdpSubscribe`, `cdpUnsubscribe` |
+| `all`             | Prompts before every tool call                                                                                                                                                                                         |
 
 Read-only tools (`screenshot`, `axtree`, `get_dom`, `get_url`, list/read/search) **never** prompt under `risky` — they're cheap and reversible, and the agent makes hundreds of those calls per task.
 
 Flow:
+
 1. `bridge.dispatch(req)`
 2. `guard.needsApproval(req.tool)` — reads policy, returns bool
 3. If approval needed, `guard.request(tool, args)` returns `Promise<bool>`
@@ -177,13 +178,13 @@ Auto-deny on 60s timeout protects against a crashed renderer.
 
 ## Knowledge layers — and why they're separate
 
-| Layer | Source | Editable by | Loaded |
-|---|---|---|---|
-| `SKILL.md` | Bundled | Never (ships with binary) | Once per task via `skill_preamble` |
-| `interaction-skills/*.md` | Bundled | Never | On demand by name when the agent hits the mechanic |
-| `domain-skills/<host>/` | `userData/` | The agent itself, via `domain_skill_save` | Auto-hinted on navigate; explicit read on agent's choice |
-| `js-helpers.json` | `userData/` | The agent itself, via `save_helper` | Inlined per-call into `window.__horizon.helpers` |
-| `action-workflows.json` | `userData/` | The agent itself, via `workflow_record_*` | `workflow_run` replays through dispatch |
+| Layer                     | Source      | Editable by                               | Loaded                                                   |
+| ------------------------- | ----------- | ----------------------------------------- | -------------------------------------------------------- |
+| `SKILL.md`                | Bundled     | Never (ships with binary)                 | Once per task via `skill_preamble`                       |
+| `interaction-skills/*.md` | Bundled     | Never                                     | On demand by name when the agent hits the mechanic       |
+| `domain-skills/<host>/`   | `userData/` | The agent itself, via `domain_skill_save` | Auto-hinted on navigate; explicit read on agent's choice |
+| `js-helpers.json`         | `userData/` | The agent itself, via `save_helper`       | Inlined per-call into `window.__horizon.helpers`         |
+| `action-workflows.json`   | `userData/` | The agent itself, via `workflow_record_*` | `workflow_run` replays through dispatch                  |
 
 Bundled = generic knowledge that applies to every site; user-writable = learned knowledge specific to this user / this site / this task. The split mirrors browser-use/browser-harness's `interaction-skills/` vs `agent-workspace/domain-skills/` distinction, with one tweak: domain skills are always-on (no opt-in env flag) because in a single-user desktop browser there's no "audit before enabling" concern — the only contributor is the user's own agent.
 
@@ -202,6 +203,7 @@ Bundled = generic knowledge that applies to every site; user-writable = learned 
 ```
 
 Resource bundle:
+
 ```
 resources/pi-extension/
 ├── horizon-bridge.ts        — Pi extension registering all 26 tools
@@ -236,7 +238,7 @@ browser_navigate({ url })
   → AiActionGuard.setSitePolicy(policy) refreshes the active gate rules
 ```
 
-Per tool call the guard now makes a three-state decision: `allow` / `prompt` / `deny`. Site policy can only *raise* the bar (force prompt, or hard deny on `prohibited` triggers); it can't lower it past the user's `aiConfirmActions` setting. Most-restrictive-wins, as the spec requires.
+Per tool call the guard now makes a three-state decision: `allow` / `prompt` / `deny`. Site policy can only _raise_ the bar (force prompt, or hard deny on `prohibited` triggers); it can't lower it past the user's `aiConfirmActions` setting. Most-restrictive-wins, as the spec requires.
 
 The agent can also pull the full policy on demand via `browser_get_agent_policy`. Outgoing requests carry `X-Horizon-Agent: true` (toggleable via `aiAdvertiseAgent` setting) so sites can identify agent-driven traffic.
 

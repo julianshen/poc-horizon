@@ -25,17 +25,17 @@ function parseHex(hex: string): [number, number, number] | null {
 
 export function hexToRgba(hex: string, alpha: number): string {
   const rgb = parseHex(hex);
-  if (!rgb) return '';
+  if (!rgb) return "";
   const [r, g, b] = rgb;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function getContrastTextColor(hex: string): string {
   const rgb = parseHex(hex);
-  if (!rgb) return '';
+  if (!rgb) return "";
   const [r, g, b] = rgb;
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#1a1612' : '#ffffff';
+  return luminance > 0.5 ? "#1a1612" : "#ffffff";
 }
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -97,33 +97,34 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 
 export function lightenColor(hex: string, amount: number): string {
   const rgb = parseHex(hex);
-  if (!rgb) return '';
+  if (!rgb) return "";
   const [r, g, b] = rgb;
   const [h, s, l] = rgbToHsl(r, g, b);
   const newL = Math.min(100, l + amount);
   const [nr, ng, nb] = hslToRgb(h, s, newL);
 
-  const toHex = (v: number) => v.toString(16).padStart(2, '0');
+  const toHex = (v: number) => v.toString(16).padStart(2, "0");
   return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
 }
 
 export function buildAccentStyle(accentColor: string): string {
-  if (!accentColor) return '';
+  if (!accentColor) return "";
 
   const normalized = accentColor.trim().toLowerCase();
   const valid = /^#([0-9a-f]{6}|[0-9a-f]{3})$/.test(normalized);
-  if (!valid) return '';
+  if (!valid) return "";
 
-  const sixDigit = normalized.length === 4
-    ? `#${normalized[1]}${normalized[1]}${normalized[2]}${normalized[2]}${normalized[3]}${normalized[3]}`
-    : normalized;
+  const sixDigit =
+    normalized.length === 4
+      ? `#${normalized[1]}${normalized[1]}${normalized[2]}${normalized[2]}${normalized[3]}${normalized[3]}`
+      : normalized;
 
   const textColor = getContrastTextColor(sixDigit);
   const soft = hexToRgba(sixDigit, 0.1);
   const ring = hexToRgba(sixDigit, 0.2);
   const lightened = lightenColor(sixDigit, 15);
 
-  if (!textColor || !soft || !lightened) return '';
+  if (!textColor || !soft || !lightened) return "";
 
   return `:root, [data-theme] {
   --accent-primary: ${sixDigit};
@@ -136,11 +137,11 @@ export function buildAccentStyle(accentColor: string): string {
 }
 
 export function resolveTheme(
-  theme: 'system' | 'dia' | 'midnight' | 'ocean' | 'forest',
-  isDarkOS: boolean
-): 'dia' | 'midnight' | 'ocean' | 'forest' {
-  if (theme === 'system') {
-    return isDarkOS ? 'midnight' : 'dia';
+  theme: "system" | "dia" | "midnight" | "ocean" | "forest",
+  isDarkOS: boolean,
+): "dia" | "midnight" | "ocean" | "forest" {
+  if (theme === "system") {
+    return isDarkOS ? "midnight" : "dia";
   }
   return theme;
 }

@@ -4,7 +4,7 @@
 
 ## Pre-arm before the action
 
-Subscribe to the CDP event *before* the click that may trigger it:
+Subscribe to the CDP event _before_ the click that may trigger it:
 
 ```
 browser_cdp_subscribe({ method: "Page.javascriptDialogOpening" })

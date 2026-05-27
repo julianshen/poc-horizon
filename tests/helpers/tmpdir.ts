@@ -1,14 +1,14 @@
-import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { afterEach, beforeEach } from 'vitest';
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { afterEach, beforeEach } from "vitest";
 
 export interface TmpDir {
   path: (name: string) => string;
 }
 
 export function useTmpDir(prefix: string): TmpDir {
-  let dir = '';
+  let dir = "";
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), `${prefix}-`));
   });

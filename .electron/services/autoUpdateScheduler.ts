@@ -27,7 +27,10 @@ export const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
  */
 export function scheduleAutoUpdate(
   checker: UpdateChecker,
-  { intervalMs = FOUR_HOURS_MS, setInterval: scheduler = setInterval }: SchedulerOptions = {}
+  {
+    intervalMs = FOUR_HOURS_MS,
+    setInterval: scheduler = setInterval,
+  }: SchedulerOptions = {},
 ): unknown {
   checker.checkForUpdatesAndNotify();
   return scheduler(() => {

@@ -34,4 +34,4 @@ Many sites use a styled `<div>` dropzone over a hidden `<input type=file>`. The 
 
 ## After upload
 
-The file isn't *submitted* yet — that's a separate click on a "Submit" button. After setting the file, the page usually shows a preview; screenshot to verify before clicking submit.
+The file isn't _submitted_ yet — that's a separate click on a "Submit" button. After setting the file, the page usually shows a preview; screenshot to verify before clicking submit.

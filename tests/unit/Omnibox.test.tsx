@@ -1,122 +1,165 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import { Omnibox } from '@/components/chrome/Omnibox';
-import { useBrowserStore } from '@/stores/browserStore';
-import { setupRendererTest } from '../helpers/fakeHorizonAPI';
-import type { Tab } from '@/types/browser';
+import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { Omnibox } from "@/components/chrome/Omnibox";
+import { useBrowserStore } from "@/stores/browserStore";
+import { setupRendererTest } from "../helpers/fakeHorizonAPI";
+import type { Tab } from "@/types/browser";
 
 const tab = (url: string, overrides: Partial<Tab> = {}): Tab => ({
-  id: 't1', schemaVersion: 1, url, title: '', isLoading: false, loadProgress: 0,
-  canGoBack: false, canGoForward: false, isPinned: false, isMuted: false, isActive: true,
-  isHibernated: false, zoomLevel: 1, createdAt: 0, lastAccessedAt: 0,
+  id: "t1",
+  schemaVersion: 1,
+  url,
+  title: "",
+  isLoading: false,
+  loadProgress: 0,
+  canGoBack: false,
+  canGoForward: false,
+  isPinned: false,
+  isMuted: false,
+  isActive: true,
+  isHibernated: false,
+  zoomLevel: 1,
+  createdAt: 0,
+  lastAccessedAt: 0,
   ...overrides,
 });
 
-describe('Omnibox', () => {
+describe("Omnibox", () => {
   const { api } = setupRendererTest();
   const initialState = useBrowserStore.getState();
 
-  it('shows the active URL with the scheme stripped when not editing', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://example.com/path')] });
+  it("shows the active URL with the scheme stripped when not editing", () => {
+    useBrowserStore.setState({
+      ...initialState,
+      activeTabId: "t1",
+      tabs: [tab("https://example.com/path")],
+    });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
-    expect(input.value).toBe('example.com/path');
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    expect(input.value).toBe("example.com/path");
   });
 
-  it('shows a lock for https and a warning for non-https', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://example.com')] });
+  it("shows a lock for https and a warning for non-https", () => {
+    useBrowserStore.setState({
+      ...initialState,
+      activeTabId: "t1",
+      tabs: [tab("https://example.com")],
+    });
     const { container, rerender } = render(<Omnibox />);
-    const secureStroke = container.querySelector('svg')?.getAttribute('stroke');
-    expect(secureStroke).toBe('var(--secure)');
+    const secureStroke = container.querySelector("svg")?.getAttribute("stroke");
+    expect(secureStroke).toBe("var(--secure)");
 
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('http://insecure.example')] });
+    useBrowserStore.setState({
+      ...initialState,
+      activeTabId: "t1",
+      tabs: [tab("http://insecure.example")],
+    });
     rerender(<Omnibox />);
-    const warnStroke = container.querySelector('svg')?.getAttribute('stroke');
-    expect(warnStroke).toBe('var(--warning)');
+    const warnStroke = container.querySelector("svg")?.getAttribute("stroke");
+    expect(warnStroke).toBe("var(--warning)");
   });
 
-  it('switches to the editing buffer on focus and back on blur', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://example.com')] });
+  it("switches to the editing buffer on focus and back on blur", () => {
+    useBrowserStore.setState({
+      ...initialState,
+      activeTabId: "t1",
+      tabs: [tab("https://example.com")],
+    });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
+    const input = screen.getByRole("textbox") as HTMLInputElement;
 
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'something else' } });
-    expect(input.value).toBe('something else');
+    fireEvent.change(input, { target: { value: "something else" } });
+    expect(input.value).toBe("something else");
 
     fireEvent.blur(input);
-    expect(input.value).toBe('example.com');
+    expect(input.value).toBe("example.com");
   });
 
-  it('submitting a URL dispatches navigation:go with normalized URL', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', url: '' });
+  it("submitting a URL dispatches navigation:go with normalized URL", () => {
+    useBrowserStore.setState({ ...initialState, activeTabId: "t1", url: "" });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
+    const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'example.com' } });
-    fireEvent.submit(input.closest('form')!);
-    expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([
-      { channel: 'navigation:go', payload: { tabId: 't1', url: 'https://example.com' } },
+    fireEvent.change(input, { target: { value: "example.com" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(api().invokes.filter((i) => i.channel === "navigation:go")).toEqual([
+      {
+        channel: "navigation:go",
+        payload: { tabId: "t1", url: "https://example.com" },
+      },
     ]);
   });
 
-  it('submitting plain text routes through the default search engine', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', url: '' });
+  it("submitting plain text routes through the default search engine", () => {
+    useBrowserStore.setState({ ...initialState, activeTabId: "t1", url: "" });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
+    const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'how to test electron' } });
-    fireEvent.submit(input.closest('form')!);
-    const nav = api().invokes.find((i) => i.channel === 'navigation:go');
+    fireEvent.change(input, { target: { value: "how to test electron" } });
+    fireEvent.submit(input.closest("form")!);
+    const nav = api().invokes.find((i) => i.channel === "navigation:go");
     expect(nav?.payload).toMatchObject({
-      tabId: 't1',
-      url: expect.stringContaining('duckduckgo.com'),
+      tabId: "t1",
+      url: expect.stringContaining("duckduckgo.com"),
     });
   });
 
-  it('submitting is a no-op when there is no active tab', () => {
+  it("submitting is a no-op when there is no active tab", () => {
     useBrowserStore.setState({ ...initialState, activeTabId: null });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
+    const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'example.com' } });
-    fireEvent.submit(input.closest('form')!);
-    expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([]);
+    fireEvent.change(input, { target: { value: "example.com" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(api().invokes.filter((i) => i.channel === "navigation:go")).toEqual(
+      [],
+    );
   });
 
-  it('submitting empty input is a no-op', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1' });
+  it("submitting empty input is a no-op", () => {
+    useBrowserStore.setState({ ...initialState, activeTabId: "t1" });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
+    const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: '   ' } });
-    fireEvent.submit(input.closest('form')!);
-    expect(api().invokes.filter((i) => i.channel === 'navigation:go')).toEqual([]);
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.submit(input.closest("form")!);
+    expect(api().invokes.filter((i) => i.channel === "navigation:go")).toEqual(
+      [],
+    );
   });
 
-  it('reflects external tab URL changes while not editing', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://before.example')] });
+  it("reflects external tab URL changes while not editing", () => {
+    useBrowserStore.setState({
+      ...initialState,
+      activeTabId: "t1",
+      tabs: [tab("https://before.example")],
+    });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
-    expect(input.value).toBe('before.example');
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    expect(input.value).toBe("before.example");
 
     act(() => {
-      useBrowserStore.setState({ tabs: [tab('https://after.example')] });
+      useBrowserStore.setState({ tabs: [tab("https://after.example")] });
     });
-    expect(input.value).toBe('after.example');
+    expect(input.value).toBe("after.example");
   });
 
-  it('does not overwrite the editing buffer with external URL changes', () => {
-    useBrowserStore.setState({ ...initialState, activeTabId: 't1', tabs: [tab('https://before.example')] });
+  it("does not overwrite the editing buffer with external URL changes", () => {
+    useBrowserStore.setState({
+      ...initialState,
+      activeTabId: "t1",
+      tabs: [tab("https://before.example")],
+    });
     render(<Omnibox />);
-    const input = screen.getByRole('textbox') as HTMLInputElement;
+    const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'user typing' } });
+    fireEvent.change(input, { target: { value: "user typing" } });
 
     act(() => {
-      useBrowserStore.setState({ tabs: [tab('https://surprise-nav.example')] });
+      useBrowserStore.setState({ tabs: [tab("https://surprise-nav.example")] });
     });
-    expect(input.value).toBe('user typing');
+    expect(input.value).toBe("user typing");
   });
 });

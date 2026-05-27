@@ -42,9 +42,9 @@ browser_screenshot_marked() → pick a mark id → click its (x, y) → screensh
 
 **Marks are numbered in reading order by default** — top-to-bottom rows, left-to-right within each row, like a human scans the page. Mark 1 is the top-left interactive element; numbers grow toward the bottom-right. So "click the third result" really does mean the third visually-appearing result, not whatever the DOM happens to put third. Pass `order: 'dom'` if you specifically want document order (rare; only useful when aligning with `browser_get_dom`).
 
-Use plain `browser_screenshot` when you just need to *look* at the page (reading content, verifying state). Use `screenshot_marked` when the next step is to click.
+Use plain `browser_screenshot` when you just need to _look_ at the page (reading content, verifying state). Use `screenshot_marked` when the next step is to click.
 
-The compositor dispatches mouse events *through* iframes, shadow DOM, and cross-origin frames for free. Only fall back to selectors when the target has no visible geometry (hidden input, off-screen helper). `axtree` is a third option — same idea as marks but text-only (no image) when you don't need to *see* the page.
+The compositor dispatches mouse events _through_ iframes, shadow DOM, and cross-origin frames for free. Only fall back to selectors when the target has no visible geometry (hidden input, off-screen helper). `axtree` is a third option — same idea as marks but text-only (no image) when you don't need to _see_ the page.
 
 ### Read the site's agent policy before deep workflows
 
@@ -72,7 +72,7 @@ The navigate call returns when the request is committed, not when the page is in
 
 ### Record action sequences for deterministic replay
 
-A helper is a snippet you call inside the page. A **workflow** is a sequence of *tool calls* the agent will replay later — perfect for "export my order history monthly", "post the daily standup", "download yesterday's report."
+A helper is a snippet you call inside the page. A **workflow** is a sequence of _tool calls_ the agent will replay later — perfect for "export my order history monthly", "post the daily standup", "download yesterday's report."
 
 ```
 browser_workflow_record_start({ name: "amazon-orders-export" })
@@ -105,7 +105,7 @@ browser_save_helper({ name: "extract_amazon_prices",
 
 Helpers persist to disk and survive restarts. Call them with `browser_call_helper({ name, args })`. The next time you're on the same site you can skip the discovery loop.
 
-### Observe what the page *does*, not just what it shows
+### Observe what the page _does_, not just what it shows
 
 When you take an action and want to know what network calls fired, use the CDP subscription pattern:
 
@@ -159,7 +159,7 @@ Per-site notes you've accumulated live in **`domain-skills/<host>/`**, stored in
 
 If that list is non-empty, **read every entry before inventing an approach**. The agent (you, on previous turns) left those notes for a reason — usually a quirk specific to that site.
 
-When you're on a *new* site but suspect you've handled a similar problem before (captcha, infinite scroll, login wall), search across all saved notes with `browser_domain_skill_search({ query: "captcha" })` — it scans every host's files and returns the best matches.
+When you're on a _new_ site but suspect you've handled a similar problem before (captcha, infinite scroll, login wall), search across all saved notes with `browser_domain_skill_search({ query: "captcha" })` — it scans every host's files and returns the best matches.
 
 To add a new one when you discover a quirk worth remembering:
 

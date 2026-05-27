@@ -29,11 +29,20 @@ export interface TabGroup {
   color: TabGroupColor;
 }
 
-export const TAB_GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan'] as const;
+export const TAB_GROUP_COLORS = [
+  "grey",
+  "blue",
+  "red",
+  "yellow",
+  "green",
+  "pink",
+  "purple",
+  "cyan",
+] as const;
 export type TabGroupColor = (typeof TAB_GROUP_COLORS)[number];
 
 export interface TabErrorState {
-  type: 'load-failed' | 'crashed' | 'unresponsive';
+  type: "load-failed" | "crashed" | "unresponsive";
   errorCode?: number;
   errorDescription?: string;
   validatedURL?: string;
@@ -60,7 +69,7 @@ export interface HistoryEntry {
   typedCount: number;
 }
 
-export type HistoryClearRange = 'hour' | 'day' | 'week' | 'month';
+export type HistoryClearRange = "hour" | "day" | "week" | "month";
 
 export interface DownloadItem {
   id: string;
@@ -68,7 +77,7 @@ export interface DownloadItem {
   url: string;
   totalBytes: number;
   receivedBytes: number;
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
+  state: "progressing" | "completed" | "cancelled" | "interrupted";
   startTime: number;
   endTime?: number;
   savePath: string;
@@ -77,13 +86,13 @@ export interface DownloadItem {
 
 export interface Settings {
   schemaVersion: number;
-  startupBehavior: 'new-tab' | 'restore' | 'specific-pages';
+  startupBehavior: "new-tab" | "restore" | "specific-pages";
   startupPages: string[];
   defaultSearchEngine: string;
   downloadPath: string;
   askWhereToSave: boolean;
   downloadNotifications: boolean;
-  theme: 'system' | 'dia' | 'midnight' | 'ocean' | 'forest';
+  theme: "system" | "dia" | "midnight" | "ocean" | "forest";
   accentColor: string;
   showBookmarksBar: boolean;
   showStatusBar: boolean;
@@ -100,23 +109,29 @@ export interface Settings {
     formData: boolean;
   };
   doNotTrack: boolean;
-  defaultPermissions: Record<string, 'allow' | 'block' | 'ask'>;
-  permissionOverrides: Record<string, Record<string, 'allow' | 'block' | 'ask'>>;
-  contentSettings: Record<string, Record<string, 'allow' | 'block' | 'ask'>>;
+  defaultPermissions: Record<string, "allow" | "block" | "ask">;
+  permissionOverrides: Record<
+    string,
+    Record<string, "allow" | "block" | "ask">
+  >;
+  contentSettings: Record<string, Record<string, "allow" | "block" | "ask">>;
   autoHibernate: boolean;
   hibernationTimeoutMinutes: number;
   maxActiveTabs: number;
   confirmCloseMultipleTabs: boolean;
   hardwareAcceleration: boolean;
   smoothScrolling: boolean;
-  proxyType: 'system' | 'direct' | 'manual';
+  proxyType: "system" | "direct" | "manual";
   proxyRules?: string;
   proxyBypassRules?: string;
   spellcheck: boolean;
   spellcheckLanguages: string[];
-  certificateOverrides: Record<string, { allow: boolean; errorTypes: string[] }>;
+  certificateOverrides: Record<
+    string,
+    { allow: boolean; errorTypes: string[] }
+  >;
   /** Agent action confirmation policy. See shared/constants.ts. */
-  aiConfirmActions?: 'never' | 'risky' | 'all';
+  aiConfirmActions?: "never" | "risky" | "all";
   /** Send X-Horizon-Agent header on outgoing requests. Agent Policy v1 § 7. */
   aiAdvertiseAgent?: boolean;
 }
@@ -152,7 +167,7 @@ export interface FindResult {
 }
 
 export interface Suggestion {
-  type: 'url' | 'history' | 'bookmark' | 'search';
+  type: "url" | "history" | "bookmark" | "search";
   title: string;
   url?: string;
   query?: string;
@@ -162,14 +177,14 @@ export interface Suggestion {
 export interface ContextMenuItem {
   id: string;
   label: string;
-  type?: 'normal' | 'separator';
+  type?: "normal" | "separator";
   enabled?: boolean;
   accelerator?: string;
 }
 
 export interface FormField {
   id: string;
-  type: 'text' | 'email' | 'password' | 'tel' | 'number' | 'select';
+  type: "text" | "email" | "password" | "tel" | "number" | "select";
   name: string;
   placeholder?: string;
   autocomplete?: string;
@@ -179,7 +194,7 @@ export interface AutofillMatch {
   fieldId: string;
   value: string;
   label: string;
-  type: 'address' | 'password';
+  type: "address" | "password";
 }
 
 export interface CertificateInfo {
@@ -192,17 +207,26 @@ export interface CertificateInfo {
 }
 
 export type PermissionType =
-  | 'geolocation'
-  | 'camera'
-  | 'microphone'
-  | 'notifications'
-  | 'midi'
-  | 'midiSysex'
-  | 'pointerLock'
-  | 'fullscreen'
-  | 'openExternal'
-  | 'display-capture';
+  | "geolocation"
+  | "camera"
+  | "microphone"
+  | "notifications"
+  | "midi"
+  | "midiSysex"
+  | "pointerLock"
+  | "fullscreen"
+  | "openExternal"
+  | "display-capture";
 
-export type ContentSettingType = 'popup' | 'javascript' | 'images' | 'cookies' | 'plugins';
+export type ContentSettingType =
+  | "popup"
+  | "javascript"
+  | "images"
+  | "cookies"
+  | "plugins";
 
-export type CertificateErrorType = 'expired' | 'self-signed' | 'wrong-hostname' | 'authority-invalid';
+export type CertificateErrorType =
+  | "expired"
+  | "self-signed"
+  | "wrong-hostname"
+  | "authority-invalid";

@@ -22,5 +22,8 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "shared/**/*.ts"],
-  "references": [{ "path": "./tsconfig.main.json" }, { "path": "./tsconfig.preload.json" }]
+  "references": [
+    { "path": "./tsconfig.main.json" },
+    { "path": "./tsconfig.preload.json" }
+  ]
 }

@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EventEmitter } from 'events';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { EventEmitter } from "events";
 
 interface FakeProc extends EventEmitter {
   stdout: EventEmitter & { setEncoding: (e: string) => void };
@@ -11,75 +11,86 @@ interface FakeProc extends EventEmitter {
 
 let lastProc: FakeProc | null = null;
 
-class FakeStream extends EventEmitter { setEncoding(_e: string): this { return this; } }
+class FakeStream extends EventEmitter {
+  setEncoding(_e: string): this {
+    return this;
+  }
+}
 
-vi.mock('child_process', () => ({
+vi.mock("child_process", () => ({
   spawn: vi.fn((_bin: string, _args: string[]) => {
     const p = new EventEmitter() as FakeProc;
     p.stdout = new FakeStream();
     p.stderr = new FakeStream();
     p.killed = false;
-    p.kill = function () { this.killed = true; this.emit('exit', 0); };
+    p.kill = function () {
+      this.killed = true;
+      this.emit("exit", 0);
+    };
     lastProc = p;
     return p as never;
   }),
 }));
 
-const { translateText } = await import('@electron/services/LlmTranslator');
+const { translateText } = await import("@electron/services/LlmTranslator");
 
-describe('translateText', () => {
-  beforeEach(() => { lastProc = null; });
+describe("translateText", () => {
+  beforeEach(() => {
+    lastProc = null;
+  });
 
-  it('returns null immediately for empty / whitespace input without spawning Pi', async () => {
-    expect(await translateText('', 'Spanish')).toBeNull();
-    expect(await translateText('   ', 'Spanish')).toBeNull();
+  it("returns null immediately for empty / whitespace input without spawning Pi", async () => {
+    expect(await translateText("", "Spanish")).toBeNull();
+    expect(await translateText("   ", "Spanish")).toBeNull();
     expect(lastProc).toBeNull();
   });
 
-  it('returns the trimmed stdout when Pi exits successfully', async () => {
-    const promise = translateText('hello', 'Spanish');
+  it("returns the trimmed stdout when Pi exits successfully", async () => {
+    const promise = translateText("hello", "Spanish");
     // Drive the fake Pi.
     await Promise.resolve();
-    lastProc!.stdout.emit('data', '  Hola  \n');
-    lastProc!.emit('exit', 0);
-    expect(await promise).toBe('Hola');
+    lastProc!.stdout.emit("data", "  Hola  \n");
+    lastProc!.emit("exit", 0);
+    expect(await promise).toBe("Hola");
   });
 
-  it('returns null when Pi prints empty output', async () => {
-    const promise = translateText('hi', 'Spanish');
+  it("returns null when Pi prints empty output", async () => {
+    const promise = translateText("hi", "Spanish");
     await Promise.resolve();
-    lastProc!.stdout.emit('data', '\n\n');
-    lastProc!.emit('exit', 0);
+    lastProc!.stdout.emit("data", "\n\n");
+    lastProc!.emit("exit", 0);
     expect(await promise).toBeNull();
   });
 
   it('returns null when Pi fails to spawn (proc emits "error")', async () => {
-    const promise = translateText('hi', 'Spanish');
+    const promise = translateText("hi", "Spanish");
     await Promise.resolve();
-    lastProc!.emit('error', new Error('ENOENT'));
+    lastProc!.emit("error", new Error("ENOENT"));
     expect(await promise).toBeNull();
   });
 
-  it('returns null and kills Pi on timeout', async () => {
+  it("returns null and kills Pi on timeout", async () => {
     vi.useFakeTimers();
-    const promise = translateText('long text', 'Spanish', { timeoutMs: 1000 });
+    const promise = translateText("long text", "Spanish", { timeoutMs: 1000 });
     await vi.advanceTimersByTimeAsync(1100);
     expect(lastProc!.killed).toBe(true);
     expect(await promise).toBeNull();
     vi.useRealTimers();
   });
 
-  it('returns null immediately if the abort signal is already aborted', async () => {
+  it("returns null immediately if the abort signal is already aborted", async () => {
     const c = new AbortController();
     c.abort();
-    expect(await translateText('hi', 'Spanish', { signal: c.signal })).toBeNull();
+    expect(
+      await translateText("hi", "Spanish", { signal: c.signal }),
+    ).toBeNull();
     // No subprocess started.
     expect(lastProc).toBeNull();
   });
 
-  it('aborting mid-flight kills Pi + resolves null', async () => {
+  it("aborting mid-flight kills Pi + resolves null", async () => {
     const c = new AbortController();
-    const promise = translateText('hi', 'Spanish', { signal: c.signal });
+    const promise = translateText("hi", "Spanish", { signal: c.signal });
     await Promise.resolve();
     expect(lastProc!.killed).toBe(false);
     c.abort();
@@ -87,12 +98,12 @@ describe('translateText', () => {
     expect(await promise).toBeNull();
   });
 
-  it('cleanup removes the timeout when Pi exits cleanly (no stray kill later)', async () => {
+  it("cleanup removes the timeout when Pi exits cleanly (no stray kill later)", async () => {
     vi.useFakeTimers();
-    const promise = translateText('hi', 'Spanish', { timeoutMs: 5000 });
+    const promise = translateText("hi", "Spanish", { timeoutMs: 5000 });
     await Promise.resolve();
-    lastProc!.stdout.emit('data', 'Hi');
-    lastProc!.emit('exit', 0);
+    lastProc!.stdout.emit("data", "Hi");
+    lastProc!.emit("exit", 0);
     await promise;
     const procRef = lastProc!;
     // Advance past the timeout — if cleanup didn't clear the timer,

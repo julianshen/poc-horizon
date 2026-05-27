@@ -1,5 +1,5 @@
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import { promises as fs } from "fs";
+import * as path from "path";
 
 interface DomainSkillFile {
   name: string;
@@ -23,14 +23,17 @@ export class DomainSkills {
 
   static normalizeHost(input: string): string {
     let h = input.toLowerCase().trim();
-    if (h.startsWith('www.')) h = h.slice(4);
-    if (h.length === 0 || /[\\/]/.test(h)) throw new Error(`invalid host: ${input}`);
+    if (h.startsWith("www.")) h = h.slice(4);
+    if (h.length === 0 || /[\\/]/.test(h))
+      throw new Error(`invalid host: ${input}`);
     return h;
   }
 
   private static safeName(name: string): string {
-    if (!name.endsWith('.md')) throw new Error('domain skill file must end in .md');
-    if (/[\\/]/.test(name) || name.startsWith('.')) throw new Error(`invalid skill name: ${name}`);
+    if (!name.endsWith(".md"))
+      throw new Error("domain skill file must end in .md");
+    if (/[\\/]/.test(name) || name.startsWith("."))
+      throw new Error(`invalid skill name: ${name}`);
     return name;
   }
 
@@ -42,7 +45,7 @@ export class DomainSkills {
     try {
       const dir = this.hostDir(host);
       const entries = await fs.readdir(dir);
-      return entries.filter((e) => e.endsWith('.md')).sort();
+      return entries.filter((e) => e.endsWith(".md")).sort();
     } catch {
       return [];
     }
@@ -52,21 +55,40 @@ export class DomainSkills {
     const safe = DomainSkills.safeName(name);
     const full = path.join(this.hostDir(host), safe);
     try {
-      const [body, stat] = await Promise.all([fs.readFile(full, 'utf8'), fs.stat(full)]);
-      return { name: safe, host: DomainSkills.normalizeHost(host), body, bytes: stat.size, updatedAt: stat.mtimeMs };
+      const [body, stat] = await Promise.all([
+        fs.readFile(full, "utf8"),
+        fs.stat(full),
+      ]);
+      return {
+        name: safe,
+        host: DomainSkills.normalizeHost(host),
+        body,
+        bytes: stat.size,
+        updatedAt: stat.mtimeMs,
+      };
     } catch {
       return null;
     }
   }
 
-  async save(host: string, name: string, body: string): Promise<DomainSkillFile> {
+  async save(
+    host: string,
+    name: string,
+    body: string,
+  ): Promise<DomainSkillFile> {
     const safe = DomainSkills.safeName(name);
     const dir = this.hostDir(host);
     await fs.mkdir(dir, { recursive: true });
     const full = path.join(dir, safe);
-    await fs.writeFile(full, body, 'utf8');
+    await fs.writeFile(full, body, "utf8");
     const stat = await fs.stat(full);
-    return { name: safe, host: DomainSkills.normalizeHost(host), body, bytes: stat.size, updatedAt: stat.mtimeMs };
+    return {
+      name: safe,
+      host: DomainSkills.normalizeHost(host),
+      body,
+      bytes: stat.size,
+      updatedAt: stat.mtimeMs,
+    };
   }
 
   async remove(host: string, name: string): Promise<boolean> {
@@ -89,22 +111,46 @@ export class DomainSkills {
    * `limit` caps the number of files returned, not the number of lines per
    * file — there's no value in dumping hundreds of files into context.
    */
-  async search(query: string, limit = 20): Promise<Array<{ host: string; name: string; lines: Array<{ n: number; text: string }>; score: number; updatedAt: number }>> {
+  async search(
+    query: string,
+    limit = 20,
+  ): Promise<
+    Array<{
+      host: string;
+      name: string;
+      lines: Array<{ n: number; text: string }>;
+      score: number;
+      updatedAt: number;
+    }>
+  > {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const hosts = await this.listHosts();
-    const hits: Array<{ host: string; name: string; lines: Array<{ n: number; text: string }>; score: number; updatedAt: number }> = [];
+    const hits: Array<{
+      host: string;
+      name: string;
+      lines: Array<{ n: number; text: string }>;
+      score: number;
+      updatedAt: number;
+    }> = [];
     for (const host of hosts) {
       const files = await this.list(host);
       for (const name of files) {
         const skill = await this.read(host, name);
         if (!skill) continue;
         const lines: Array<{ n: number; text: string }> = [];
-        skill.body.split('\n').forEach((text, i) => {
-          if (text.toLowerCase().includes(q)) lines.push({ n: i + 1, text: text.slice(0, 200) });
+        skill.body.split("\n").forEach((text, i) => {
+          if (text.toLowerCase().includes(q))
+            lines.push({ n: i + 1, text: text.slice(0, 200) });
         });
         if (lines.length > 0) {
-          hits.push({ host, name, lines: lines.slice(0, 5), score: lines.length, updatedAt: skill.updatedAt });
+          hits.push({
+            host,
+            name,
+            lines: lines.slice(0, 5),
+            score: lines.length,
+            updatedAt: skill.updatedAt,
+          });
         }
       }
     }
@@ -116,7 +162,10 @@ export class DomainSkills {
   async listHosts(): Promise<string[]> {
     try {
       const entries = await fs.readdir(this.root, { withFileTypes: true });
-      return entries.filter((d) => d.isDirectory()).map((d) => d.name).sort();
+      return entries
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .sort();
     } catch {
       return [];
     }

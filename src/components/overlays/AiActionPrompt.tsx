@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from "react";
 
 interface Prompt {
   id: string;
@@ -22,8 +22,8 @@ export const AiActionPrompt: React.FC = () => {
   const [queue, setQueue] = useState<Prompt[]>([]);
 
   useEffect(() => {
-    return window.horizonAPI.on('ai:actionPrompt', (p: Prompt) =>
-      setQueue((q) => [...q, p])
+    return window.horizonAPI.on("ai:actionPrompt", (p: Prompt) =>
+      setQueue((q) => [...q, p]),
     );
   }, []);
 
@@ -32,10 +32,10 @@ export const AiActionPrompt: React.FC = () => {
   const respond = useCallback(
     (allow: boolean) => {
       if (!current) return;
-      window.horizonAPI.invoke('ai:actionDecide', { id: current.id, allow });
+      window.horizonAPI.invoke("ai:actionDecide", { id: current.id, allow });
       setQueue((q) => q.slice(1));
     },
-    [current]
+    [current],
   );
 
   const onAllow = useCallback(() => respond(true), [respond]);
@@ -51,34 +51,44 @@ export const AiActionPrompt: React.FC = () => {
       aria-label="Agent action approval"
       className="absolute top-[90px] left-1/2 z-50 fade-in"
       style={{
-        transform: 'translateX(-50%)',
-        background: 'var(--surface-1)',
-        boxShadow: 'var(--shadow-lg)',
-        border: '0.5px solid var(--accent-primary)',
-        borderRadius: 'var(--radius-lg)',
+        transform: "translateX(-50%)",
+        background: "var(--surface-1)",
+        boxShadow: "var(--shadow-lg)",
+        border: "0.5px solid var(--accent-primary)",
+        borderRadius: "var(--radius-lg)",
         padding: 12,
-        width: 'min(480px, 90vw)',
-        display: 'flex',
-        alignItems: 'center',
+        width: "min(480px, 90vw)",
+        display: "flex",
+        alignItems: "center",
         gap: 12,
       }}
     >
       <div
         style={{
-          width: 24, height: 24, borderRadius: 12,
-          background: 'var(--accent-primary)', color: 'var(--accent-text)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, fontWeight: 600, flexShrink: 0,
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          background: "var(--accent-primary)",
+          color: "var(--accent-text)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 14,
+          fontWeight: 600,
+          flexShrink: 0,
         }}
         aria-hidden
       >
         AI
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="text-xs font-semibold" style={{ color: 'var(--chrome-fg-muted)' }}>
+        <div
+          className="text-xs font-semibold"
+          style={{ color: "var(--chrome-fg-muted)" }}
+        >
           Agent wants to · {current.tool}
           {remaining > 0 && (
-            <span className="ml-2" style={{ color: 'var(--accent-primary)' }}>
+            <span className="ml-2" style={{ color: "var(--accent-primary)" }}>
               +{remaining} more
             </span>
           )}
@@ -86,10 +96,10 @@ export const AiActionPrompt: React.FC = () => {
         <div
           className="text-sm"
           style={{
-            color: 'var(--chrome-fg)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            color: "var(--chrome-fg)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
           title={current.summary}
         >
@@ -102,9 +112,9 @@ export const AiActionPrompt: React.FC = () => {
           onClick={onBlock}
           className="px-3 py-1.5 text-xs rounded-md"
           style={{
-            background: 'transparent',
-            color: 'var(--chrome-fg-muted)',
-            border: '0.5px solid var(--chrome-border-strong)',
+            background: "transparent",
+            color: "var(--chrome-fg-muted)",
+            border: "0.5px solid var(--chrome-border-strong)",
           }}
         >
           Block
@@ -114,8 +124,8 @@ export const AiActionPrompt: React.FC = () => {
           onClick={onAllow}
           className="px-3 py-1.5 text-xs rounded-md font-medium"
           style={{
-            background: 'var(--accent-primary)',
-            color: 'var(--accent-text)',
+            background: "var(--accent-primary)",
+            color: "var(--accent-text)",
           }}
           autoFocus
         >

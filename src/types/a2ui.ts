@@ -43,7 +43,9 @@ export interface DataModelUpdate {
   contents: unknown;
 }
 
-export interface DeleteSurface { surfaceId: string }
+export interface DeleteSurface {
+  surfaceId: string;
+}
 
 export type A2UIMessage =
   | { beginRendering: BeginRendering }
@@ -52,18 +54,51 @@ export type A2UIMessage =
   | { deleteSurface: DeleteSurface };
 
 /** Reference to a literal or a path into the data model. */
-export interface ValueRef { literalString?: string; path?: string }
+export interface ValueRef {
+  literalString?: string;
+  path?: string;
+}
 
-export interface TextProps    { text: ValueRef; usageHint?: 'h1'|'h2'|'h3'|'h4'|'h5'|'caption'|'body' }
-export interface HeadingProps { text: ValueRef; level?: 1|2|3|4|5 }
-export interface ImageProps   { src: ValueRef; alt?: ValueRef }
-export interface RowProps     { children: string[]; gap?: number; align?: 'start'|'center'|'end' }
-export interface ColumnProps  { children: string[]; gap?: number; align?: 'start'|'center'|'end' }
-export interface CardProps    { child: string }
-export interface ButtonProps  { label: ValueRef; action?: string }
-export interface TextInputProps { value?: ValueRef; placeholder?: ValueRef; path?: string }
-export interface DividerProps   { /* none */ }
-export interface ListProps      { children: string[] }
+export interface TextProps {
+  text: ValueRef;
+  usageHint?: "h1" | "h2" | "h3" | "h4" | "h5" | "caption" | "body";
+}
+export interface HeadingProps {
+  text: ValueRef;
+  level?: 1 | 2 | 3 | 4 | 5;
+}
+export interface ImageProps {
+  src: ValueRef;
+  alt?: ValueRef;
+}
+export interface RowProps {
+  children: string[];
+  gap?: number;
+  align?: "start" | "center" | "end";
+}
+export interface ColumnProps {
+  children: string[];
+  gap?: number;
+  align?: "start" | "center" | "end";
+}
+export interface CardProps {
+  child: string;
+}
+export interface ButtonProps {
+  label: ValueRef;
+  action?: string;
+}
+export interface TextInputProps {
+  value?: ValueRef;
+  placeholder?: ValueRef;
+  path?: string;
+}
+export interface DividerProps {
+  /* none */
+}
+export interface ListProps {
+  children: string[];
+}
 
 export type ComponentBody =
   | { Text: TextProps }
@@ -92,8 +127,11 @@ export interface SurfaceState {
  * Merge an incoming A2UI message into an existing surface state. Pure;
  * returns a NEW state object so React `useState` setters work.
  */
-export function applyA2UIMessage(prev: SurfaceState | null, msg: A2UIMessage): SurfaceState | null {
-  if ('beginRendering' in msg) {
+export function applyA2UIMessage(
+  prev: SurfaceState | null,
+  msg: A2UIMessage,
+): SurfaceState | null {
+  if ("beginRendering" in msg) {
     const b = msg.beginRendering;
     return {
       id: b.surfaceId,
@@ -103,22 +141,34 @@ export function applyA2UIMessage(prev: SurfaceState | null, msg: A2UIMessage): S
       dataModel: prev?.id === b.surfaceId ? prev.dataModel : {},
     };
   }
-  if ('surfaceUpdate' in msg) {
+  if ("surfaceUpdate" in msg) {
     const u = msg.surfaceUpdate;
     // If we never saw beginRendering, surfaceUpdate can still seed: root
     // is unknown, so pick the first component as a fallback.
-    const base = (prev && prev.id === u.surfaceId)
-      ? prev
-      : { id: u.surfaceId, root: u.components[0]?.id ?? '', components: new Map<string, ComponentEntry>(), dataModel: {} };
+    const base =
+      prev && prev.id === u.surfaceId
+        ? prev
+        : {
+            id: u.surfaceId,
+            root: u.components[0]?.id ?? "",
+            components: new Map<string, ComponentEntry>(),
+            dataModel: {},
+          };
     const next = new Map(base.components);
     for (const c of u.components) next.set(c.id, c);
     return { ...base, components: next };
   }
-  if ('dataModelUpdate' in msg) {
+  if ("dataModelUpdate" in msg) {
     if (!prev || prev.id !== msg.dataModelUpdate.surfaceId) return prev;
-    return { ...prev, dataModel: { ...prev.dataModel, [msg.dataModelUpdate.path]: msg.dataModelUpdate.contents } };
+    return {
+      ...prev,
+      dataModel: {
+        ...prev.dataModel,
+        [msg.dataModelUpdate.path]: msg.dataModelUpdate.contents,
+      },
+    };
   }
-  if ('deleteSurface' in msg) {
+  if ("deleteSurface" in msg) {
     if (!prev || prev.id !== msg.deleteSurface.surfaceId) return prev;
     return null;
   }
@@ -126,12 +176,15 @@ export function applyA2UIMessage(prev: SurfaceState | null, msg: A2UIMessage): S
 }
 
 /** Resolve a ValueRef against the surface's data model. */
-export function resolveValue(ref: ValueRef | undefined, dataModel: Record<string, unknown>): string {
-  if (!ref) return '';
+export function resolveValue(
+  ref: ValueRef | undefined,
+  dataModel: Record<string, unknown>,
+): string {
+  if (!ref) return "";
   if (ref.literalString !== undefined) return ref.literalString;
   if (ref.path !== undefined) {
     const v = dataModel[ref.path];
-    return v === undefined || v === null ? '' : String(v);
+    return v === undefined || v === null ? "" : String(v);
   }
-  return '';
+  return "";
 }

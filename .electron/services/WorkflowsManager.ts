@@ -1,12 +1,12 @@
-import { promises as fs, existsSync, readFileSync } from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { promises as fs, existsSync, readFileSync } from "fs";
+import { v4 as uuidv4 } from "uuid";
 
 export interface SavedWorkflow {
   id: string;
   name: string;
   prompt: string;
   /** 'activeTab' | 'allTabs' | 'none' — how to attach tabs when running. */
-  attach: 'activeTab' | 'allTabs' | 'none';
+  attach: "activeTab" | "allTabs" | "none";
   createdAt: number;
 }
 
@@ -22,23 +22,25 @@ export class WorkflowsManager {
   list(): SavedWorkflow[] {
     if (!existsSync(this.filePath)) return [];
     try {
-      const data = JSON.parse(readFileSync(this.filePath, 'utf8'));
-      return Array.isArray(data) ? data as SavedWorkflow[] : [];
+      const data = JSON.parse(readFileSync(this.filePath, "utf8"));
+      return Array.isArray(data) ? (data as SavedWorkflow[]) : [];
     } catch {
       return [];
     }
   }
 
-  async create(input: Omit<SavedWorkflow, 'id' | 'createdAt'>): Promise<SavedWorkflow> {
+  async create(
+    input: Omit<SavedWorkflow, "id" | "createdAt">,
+  ): Promise<SavedWorkflow> {
     const wf: SavedWorkflow = { ...input, id: uuidv4(), createdAt: Date.now() };
     const next = [...this.list(), wf];
-    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), 'utf8');
+    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), "utf8");
     return wf;
   }
 
   async delete(id: string): Promise<void> {
     const next = this.list().filter((w) => w.id !== id);
-    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), 'utf8');
+    await fs.writeFile(this.filePath, JSON.stringify(next, null, 2), "utf8");
   }
 
   get(id: string): SavedWorkflow | undefined {

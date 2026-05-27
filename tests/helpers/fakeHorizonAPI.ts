@@ -1,5 +1,5 @@
-import { vi, beforeEach, afterEach } from 'vitest';
-import { useBrowserStore } from '@/stores/browserStore';
+import { vi, beforeEach, afterEach } from "vitest";
+import { useBrowserStore } from "@/stores/browserStore";
 
 export interface FakeHorizonAPI {
   invoke: ReturnType<typeof vi.fn>;
@@ -33,7 +33,8 @@ function buildFakeApi(): FakeHorizonAPI {
   return {
     invoke,
     on,
-    emit: (channel, payload) => listeners.get(channel)?.forEach((cb) => cb(payload)),
+    emit: (channel, payload) =>
+      listeners.get(channel)?.forEach((cb) => cb(payload)),
     invokes,
     listenerCount: (channel) => listeners.get(channel)?.size ?? 0,
   };
@@ -53,11 +54,14 @@ export function setupRendererTest(): { api: () => FakeHorizonAPI } {
 
   beforeEach(() => {
     current = buildFakeApi();
-    vi.stubGlobal('horizonAPI', current);
+    vi.stubGlobal("horizonAPI", current);
     // window.horizonAPI is what production code reads — mirror to it
     // for completeness (vi.stubGlobal sets globalThis).
     (window as unknown as { horizonAPI: FakeHorizonAPI }).horizonAPI = current;
-    useBrowserStore.setState({ ...initialState, tabs: [], activeTabId: null }, true);
+    useBrowserStore.setState(
+      { ...initialState, tabs: [], activeTabId: null },
+      true,
+    );
   });
 
   afterEach(() => {

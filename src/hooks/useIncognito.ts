@@ -4,9 +4,9 @@
  * Returns a stable boolean — incognito-ness can't change mid-session.
  */
 export function useIncognito(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   try {
-    return new URLSearchParams(window.location.search).get('incognito') === '1';
+    return new URLSearchParams(window.location.search).get("incognito") === "1";
   } catch {
     return false;
   }

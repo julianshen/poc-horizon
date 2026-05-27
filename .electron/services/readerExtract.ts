@@ -1,5 +1,5 @@
-import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
+import { Readability } from "@mozilla/readability";
+import { JSDOM } from "jsdom";
 
 export interface ReaderArticle {
   title: string;
@@ -26,19 +26,25 @@ export interface ReaderArticle {
  * walls, app shells, JSON-only API responses). Caller decides whether
  * to surface the failure or fall back to raw text.
  */
-export function readerExtract(html: string, pageUrl: string): ReaderArticle | null {
+export function readerExtract(
+  html: string,
+  pageUrl: string,
+): ReaderArticle | null {
   let dom: JSDOM;
-  try { dom = new JSDOM(html, { url: pageUrl }); }
-  catch { return null; }
+  try {
+    dom = new JSDOM(html, { url: pageUrl });
+  } catch {
+    return null;
+  }
   const article = new Readability(dom.window.document).parse();
   if (!article) return null;
-  const text = article.textContent ?? '';
+  const text = article.textContent ?? "";
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   return {
-    title: article.title ?? '',
+    title: article.title ?? "",
     byline: article.byline,
     excerpt: article.excerpt,
-    contentHtml: article.content ?? '',
+    contentHtml: article.content ?? "",
     textContent: text,
     length: article.length ?? text.length,
     readingMinutes: Math.max(1, Math.round(wordCount / 200)),

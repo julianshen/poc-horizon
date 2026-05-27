@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useBrowserStore } from '../stores/browserStore';
+import { useEffect } from "react";
+import { useBrowserStore } from "../stores/browserStore";
 
 export function useKeyboardShortcuts(): void {
   const { activeTabId, toggleOverlay } = useBrowserStore();
@@ -8,65 +8,78 @@ export function useKeyboardShortcuts(): void {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
 
-      if (mod && e.key === 't') {
+      if (mod && e.key === "t") {
         e.preventDefault();
-        window.horizonAPI.invoke('tab:create', {});
+        window.horizonAPI.invoke("tab:create", {});
       }
-      if (mod && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+      if (mod && e.shiftKey && (e.key === "N" || e.key === "n")) {
         e.preventDefault();
-        window.horizonAPI.invoke('window:newIncognito', {});
+        window.horizonAPI.invoke("window:newIncognito", {});
       }
-      if (mod && e.key === 'w') {
+      if (mod && e.key === "w") {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('tab:close', { tabId: activeTabId });
+        if (activeTabId)
+          window.horizonAPI.invoke("tab:close", { tabId: activeTabId });
       }
-      if (mod && e.key === 'l') {
+      if (mod && e.key === "l") {
         e.preventDefault();
-        document.querySelector('input')?.focus();
+        document.querySelector("input")?.focus();
       }
-      if (mod && e.key === 'r') {
+      if (mod && e.key === "r") {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('navigation:reload', { tabId: activeTabId });
+        if (activeTabId)
+          window.horizonAPI.invoke("navigation:reload", { tabId: activeTabId });
       }
-      if (mod && e.key === 'f') {
+      if (mod && e.key === "f") {
         e.preventDefault();
-        toggleOverlay('showFindBar');
+        toggleOverlay("showFindBar");
       }
-      if (mod && e.key === ',') {
+      if (mod && e.key === ",") {
         e.preventDefault();
-        toggleOverlay('showSettings');
+        toggleOverlay("showSettings");
       }
-      if (mod && e.key === 'k') {
+      if (mod && e.key === "k") {
         e.preventDefault();
-        toggleOverlay('showCmd');
+        toggleOverlay("showCmd");
       }
-      if (mod && e.key === 'j') {
+      if (mod && e.key === "j") {
         e.preventDefault();
-        toggleOverlay('showDownloads');
+        toggleOverlay("showDownloads");
       }
-      if (mod && e.key === 'p') {
+      if (mod && e.key === "p") {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('print:start', { tabId: activeTabId });
+        if (activeTabId)
+          window.horizonAPI.invoke("print:start", { tabId: activeTabId });
       }
-      if (mod && e.shiftKey && (e.key === 'I' || e.key === 'i')) {
+      if (mod && e.shiftKey && (e.key === "I" || e.key === "i")) {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('devtools:toggle', { tabId: activeTabId });
+        if (activeTabId)
+          window.horizonAPI.invoke("devtools:toggle", { tabId: activeTabId });
       }
-      if (mod && (e.key === '=' || e.key === '+')) {
+      if (mod && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('zoom:set', { tabId: activeTabId, level: 1.2 });
+        if (activeTabId)
+          window.horizonAPI.invoke("zoom:set", {
+            tabId: activeTabId,
+            level: 1.2,
+          });
       }
-      if (mod && e.key === '-') {
+      if (mod && e.key === "-") {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('zoom:set', { tabId: activeTabId, level: 0.9 });
+        if (activeTabId)
+          window.horizonAPI.invoke("zoom:set", {
+            tabId: activeTabId,
+            level: 0.9,
+          });
       }
-      if (mod && e.key === '0') {
+      if (mod && e.key === "0") {
         e.preventDefault();
-        if (activeTabId) window.horizonAPI.invoke('zoom:reset', { tabId: activeTabId });
+        if (activeTabId)
+          window.horizonAPI.invoke("zoom:reset", { tabId: activeTabId });
       }
     };
 
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [activeTabId, toggleOverlay]);
 }

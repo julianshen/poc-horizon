@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import type { Tab, TabGroup } from '../types/browser';
+import { create } from "zustand";
+import type { Tab, TabGroup } from "../types/browser";
 
 interface BrowserState {
   tabs: Tab[];
@@ -12,15 +12,26 @@ interface BrowserState {
   showFindBar: boolean;
   showTranslationBar: boolean;
   translationProgress: { translated: number; total: number } | null;
-  setTranslationProgress: (progress: { translated: number; total: number } | null) => void;
+  setTranslationProgress: (
+    progress: { translated: number; total: number } | null,
+  ) => void;
   /**
    * Per-tab translation status. Keyed by tabId so completion of a
    * background translation isn't lost when the user switches tabs and
    * back. TranslationBar reads its visible state from the entry for
    * activeTabId; absent = idle.
    */
-  translationStatesByTab: Record<string, { status: 'translating' | 'done' | 'error'; errorMsg?: string }>;
-  setTranslationStateForTab: (tabId: string, state: { status: 'translating' | 'done' | 'error'; errorMsg?: string } | null) => void;
+  translationStatesByTab: Record<
+    string,
+    { status: "translating" | "done" | "error"; errorMsg?: string }
+  >;
+  setTranslationStateForTab: (
+    tabId: string,
+    state: {
+      status: "translating" | "done" | "error";
+      errorMsg?: string;
+    } | null,
+  ) => void;
   showAI: boolean;
   showCmd: boolean;
   /** Queue of llms.txt navigation guides pushed by main when a new
@@ -30,17 +41,32 @@ interface BrowserState {
     origin: string;
     title?: string;
     summary?: string;
-    sections: Array<{ name: string; links: Array<{ title: string; url: string; description?: string }> }>;
+    sections: Array<{
+      name: string;
+      links: Array<{ title: string; url: string; description?: string }>;
+    }>;
     hasFull: boolean;
     skillFile?: string;
   }>;
-  pushLlmsGuide: (g: BrowserState['pendingLlmsGuides'][number]) => void;
-  consumeLlmsGuides: () => BrowserState['pendingLlmsGuides'];
+  pushLlmsGuide: (g: BrowserState["pendingLlmsGuides"][number]) => void;
+  consumeLlmsGuides: () => BrowserState["pendingLlmsGuides"];
   /** A pending "ask AI about this selection" request — main pushes,
    *  AIPanel drains by prefilling its draft. Null when nothing pending. */
-  pendingSelection: { selection: string; pageUrl: string; pageTitle: string } | null;
-  pushSelection: (s: { selection: string; pageUrl: string; pageTitle: string }) => void;
-  consumeSelection: () => { selection: string; pageUrl: string; pageTitle: string } | null;
+  pendingSelection: {
+    selection: string;
+    pageUrl: string;
+    pageTitle: string;
+  } | null;
+  pushSelection: (s: {
+    selection: string;
+    pageUrl: string;
+    pageTitle: string;
+  }) => void;
+  consumeSelection: () => {
+    selection: string;
+    pageUrl: string;
+    pageTitle: string;
+  } | null;
   // Component-local menus lifted to the store so BrowserContentArea can
   // hide the BrowserView when they're open — Electron's BrowserView paints
   // above all DOM, so an open menu that crosses into the view region would
@@ -57,7 +83,16 @@ interface BrowserState {
   reorderTab: (tabId: string, targetIndex: number) => void;
   upsertGroup: (group: TabGroup) => void;
   removeGroup: (groupId: string) => void;
-  toggleOverlay: (overlay: 'showSettings' | 'showBookmarks' | 'showHistory' | 'showDownloads' | 'showFindBar' | 'showCmd' | 'showTranslationBar') => void;
+  toggleOverlay: (
+    overlay:
+      | "showSettings"
+      | "showBookmarks"
+      | "showHistory"
+      | "showDownloads"
+      | "showFindBar"
+      | "showCmd"
+      | "showTranslationBar",
+  ) => void;
 }
 
 export const useBrowserStore = create<BrowserState>((set) => ({
@@ -73,11 +108,13 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   translationProgress: null,
   setTranslationProgress: (translationProgress) => set({ translationProgress }),
   translationStatesByTab: {},
-  setTranslationStateForTab: (tabId, state) => set((s) => {
-    const next = { ...s.translationStatesByTab };
-    if (state === null) delete next[tabId]; else next[tabId] = state;
-    return { translationStatesByTab: next };
-  }),
+  setTranslationStateForTab: (tabId, state) =>
+    set((s) => {
+      const next = { ...s.translationStatesByTab };
+      if (state === null) delete next[tabId];
+      else next[tabId] = state;
+      return { translationStatesByTab: next };
+    }),
   showAI: false,
   showCmd: false,
   showAppMenu: false,
@@ -86,17 +123,24 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   setTabContextMenuOpen: (open) => set({ showTabContextMenu: open }),
   toggleAI: () => set((state) => ({ showAI: !state.showAI })),
   pendingLlmsGuides: [],
-  pushLlmsGuide: (g) => set((state) => ({ pendingLlmsGuides: [...state.pendingLlmsGuides, g] })),
+  pushLlmsGuide: (g) =>
+    set((state) => ({ pendingLlmsGuides: [...state.pendingLlmsGuides, g] })),
   consumeLlmsGuides: () => {
-    let drained: BrowserState['pendingLlmsGuides'] = [];
-    set((state) => { drained = state.pendingLlmsGuides; return { pendingLlmsGuides: [] }; });
+    let drained: BrowserState["pendingLlmsGuides"] = [];
+    set((state) => {
+      drained = state.pendingLlmsGuides;
+      return { pendingLlmsGuides: [] };
+    });
     return drained;
   },
   pendingSelection: null,
   pushSelection: (s) => set({ pendingSelection: s }),
   consumeSelection: () => {
-    let drained: BrowserState['pendingSelection'] = null;
-    set((state) => { drained = state.pendingSelection; return { pendingSelection: null }; });
+    let drained: BrowserState["pendingSelection"] = null;
+    set((state) => {
+      drained = state.pendingSelection;
+      return { pendingSelection: null };
+    });
     return drained;
   },
 
@@ -129,6 +173,7 @@ export const useBrowserStore = create<BrowserState>((set) => ({
       next[idx] = group;
       return { groups: next };
     }),
-  removeGroup: (groupId) => set((state) => ({ groups: state.groups.filter((g) => g.id !== groupId) })),
+  removeGroup: (groupId) =>
+    set((state) => ({ groups: state.groups.filter((g) => g.id !== groupId) })),
   toggleOverlay: (overlay) => set((state) => ({ [overlay]: !state[overlay] })),
 }));

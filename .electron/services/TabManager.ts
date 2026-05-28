@@ -205,7 +205,6 @@ export class TabManager {
     this.setupWebContentsEvents(id, view);
     this.safeSend("tab:created", tab);
     this.activateTab(id);
-    this.lifecycleObserver?.onActivated?.(id);
 
     return tab;
   }
@@ -759,6 +758,10 @@ export class TabManager {
     this.setupWebContentsEvents(tabId, view);
     this.window.addBrowserView(view);
     view.webContents.loadURL(entry.tab.url);
+
+    if (entry.tab.isMuted) {
+      view.webContents.setAudioMuted(true);
+    }
 
     entry.tab.isHibernated = false;
 

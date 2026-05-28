@@ -743,7 +743,7 @@ export class TabManager {
     entry.tab.isHibernated = true;
 
     this.safeSend("tab:hibernated", { tabId });
-    this.safeSend("tab:updated", { tab: entry.tab });
+    this.safeSend("tab:updated", { ...entry.tab });
     return true;
   }
 
@@ -763,7 +763,7 @@ export class TabManager {
     entry.tab.isHibernated = false;
 
     this.safeSend("tab:woken", { tabId });
-    this.safeSend("tab:updated", { tab: entry.tab });
+    this.safeSend("tab:updated", { ...entry.tab });
   }
 
   private updateTab(tabId: string, updates: Partial<Tab>): void {

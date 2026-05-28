@@ -43,6 +43,7 @@ import { writePiSkill } from "./services/piSkillWriter";
 import { buildAugmentedPrompt } from "./services/promptHelper";
 import { WorkflowsManager } from "./services/WorkflowsManager";
 import { HelperRegistry } from "./services/HelperRegistry";
+import { HibernationController } from "./services/HibernationController";
 import { DomainSkills } from "./services/DomainSkills";
 import { SkillsLibrary } from "./services/SkillsLibrary";
 import {
@@ -716,6 +717,37 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   );
   contexts.set(wcId, { tabManager: localTabManager, window: win });
 
+  const hibernationController = new HibernationController({
+    tabManager: {
+      getAllTabs: () =>
+        localTabManager.getAllTabs().map((t) => ({
+          id: t.id,
+          url: t.url,
+          pinned: t.isPinned,
+          hibernated: t.isHibernated,
+          createdAt: t.createdAt,
+        })),
+      getActiveTabId: () => localTabManager.getActiveTabId(),
+      isLoading: (id) => localTabManager.isTabLoading(id),
+      isAudible: (id) => localTabManager.isTabAudible(id),
+      isIncognito: () => localTabManager.isIncognito(),
+      hibernateTab: (id) => localTabManager.hibernateTab(id),
+    },
+    getSettings: () => {
+      const s = settingsManager.getAll();
+      return {
+        autoHibernate: s.autoHibernate,
+        hibernationTimeoutMinutes: s.hibernationTimeoutMinutes,
+        maxActiveTabs: s.maxActiveTabs,
+      };
+    },
+  });
+  localTabManager.setLifecycleObserver({
+    onActivated: (id) => hibernationController.noteActivated(id),
+    onClosed: (id) => hibernationController.forgetTab(id),
+  });
+  hibernationController.start();
+
   // llms.txt navigation guide: when this window navigates to a new
   // origin, async-probe /llms.txt and /llms-full.txt. If found, send
   // a one-shot ai:llmsTxtFound IPC to the chrome renderer so it can
@@ -746,6 +778,7 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
   win.once("closed", () => {
     contexts.delete(wcId);
     persistableTabManagers.delete(localTabManager);
+    hibernationController.stop();
     // Tear down this window's Pi subprocess so we don't leak it.
     piSessions.get(wcId)?.dispose();
     piSessions.delete(wcId);

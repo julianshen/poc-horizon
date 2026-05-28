@@ -71,7 +71,7 @@ const SELECTION_TRANSLATE_OVERLAY_SHOW = `(function() {
 })()`;
 
 export class TabManager {
-  private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
+  private tabs = new Map<string, { tab: Tab; view: BrowserView | null }>();
   private groups = new Map<string, TabGroup>();
   private activeTabId: string | null = null;
   private window: BrowserWindow;
@@ -87,6 +87,10 @@ export class TabManager {
     width: number;
     height: number;
   } | null = null;
+  private lifecycleObserver?: {
+    onActivated?: (tabId: string) => void;
+    onClosed?: (tabId: string) => void;
+  };
 
   constructor(window: BrowserWindow, mode: TabManagerMode) {
     this.window = window;
@@ -154,16 +158,20 @@ export class TabManager {
     this.emitChange();
   }
 
+  private defaultWebPreferences() {
+    return {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true,
+      partition: this.partition(),
+    };
+  }
+
   createTab(url = "horizon://newtab"): Tab {
     const id = uuidv4();
     const view = new BrowserView({
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        spellcheck: true,
-        partition: this.partition(),
-      },
+      webPreferences: this.defaultWebPreferences(),
     });
 
     const tab: Tab = {
@@ -357,16 +365,23 @@ export class TabManager {
       const prev = this.tabs.get(this.activeTabId);
       if (prev) {
         prev.tab.isActive = false;
-        prev.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        if (prev.view) {
+          prev.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        }
       }
     }
 
     const current = this.tabs.get(tabId);
     if (!current) return;
 
+    if (current.tab.isHibernated) {
+      this.wakeTab(tabId);
+    }
+
     current.tab.isActive = true;
     current.tab.lastAccessedAt = Date.now();
     this.activeTabId = tabId;
+    this.lifecycleObserver?.onActivated?.(tabId);
 
     this.applyBoundsToActive();
 
@@ -397,7 +412,7 @@ export class TabManager {
   private applyBoundsToActive(): void {
     if (!this.activeTabId) return;
     const current = this.tabs.get(this.activeTabId);
-    if (!current) return;
+    if (!current?.view) return;
     const rect = this.contentBounds ?? this.fallbackBounds();
     current.view.setBounds(rect);
   }
@@ -431,19 +446,22 @@ export class TabManager {
     const entry = this.tabs.get(tabId);
     if (!entry) return;
 
-    if (!this.window.isDestroyed()) {
-      this.window.removeBrowserView(entry.view);
-    }
-    const wc = entry.view.webContents as Electron.WebContents & {
-      destroy?: () => void;
-    };
-    if (wc && !wc.isDestroyed()) {
-      // Electron's BrowserView webContents has a destroy() method that
-      // releases the renderer process. Optional-chain on the off-chance
-      // it's been renamed in a future API revision.
-      wc.destroy?.();
+    if (entry.view) {
+      if (!this.window.isDestroyed()) {
+        this.window.removeBrowserView(entry.view);
+      }
+      const wc = entry.view.webContents as Electron.WebContents & {
+        destroy?: () => void;
+      };
+      if (wc && !wc.isDestroyed()) {
+        // Electron's BrowserView webContents has a destroy() method that
+        // releases the renderer process. Optional-chain on the off-chance
+        // it's been renamed in a future API revision.
+        wc.destroy?.();
+      }
     }
     this.tabs.delete(tabId);
+    this.lifecycleObserver?.onClosed?.(tabId);
     this.safeSend("tab:closed", { tabId });
 
     if (this.activeTabId === tabId) {
@@ -459,7 +477,7 @@ export class TabManager {
 
   navigate(tabId: string, url: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       // Update tab.url eagerly so the immediately-following did-start-loading
       // event reports the URL we are *navigating to*, not the previous one.
       this.updateTab(tabId, { url });
@@ -469,21 +487,21 @@ export class TabManager {
 
   goBack(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry?.view.webContents.navigationHistory.canGoBack()) {
+    if (entry?.view?.webContents.navigationHistory.canGoBack()) {
       entry.view.webContents.navigationHistory.goBack();
     }
   }
 
   goForward(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry?.view.webContents.navigationHistory.canGoForward()) {
+    if (entry?.view?.webContents.navigationHistory.canGoForward()) {
       entry.view.webContents.navigationHistory.goForward();
     }
   }
 
   reload(tabId: string, hard = false): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       if (hard) {
         entry.view.webContents.reloadIgnoringCache();
       } else {
@@ -494,7 +512,7 @@ export class TabManager {
 
   stop(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       entry.view.webContents.stop();
     }
   }
@@ -509,6 +527,23 @@ export class TabManager {
 
   getActiveTabId(): string | null {
     return this.activeTabId;
+  }
+
+  isTabLoading(tabId: string): boolean {
+    const entry = this.tabs.get(tabId);
+    return !!entry?.view && entry.view.webContents.isLoading();
+  }
+
+  isTabAudible(tabId: string): boolean {
+    const entry = this.tabs.get(tabId);
+    return !!entry?.view && entry.view.webContents.isCurrentlyAudible();
+  }
+
+  setLifecycleObserver(observer: {
+    onActivated?: (tabId: string) => void;
+    onClosed?: (tabId: string) => void;
+  }): void {
+    this.lifecycleObserver = observer;
   }
 
   // ─── Tab Groups ──────────────────────────────────────────────────────
@@ -569,7 +604,7 @@ export class TabManager {
 
   setZoom(tabId: string, level: number): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       const zoomLevel = Math.log2(level) / Math.log2(1.2);
       entry.view.webContents.setZoomLevel(zoomLevel);
       entry.tab.zoomLevel = level;
@@ -578,7 +613,7 @@ export class TabManager {
 
   toggleDevTools(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (!entry) return;
+    if (!entry?.view) return;
     const wc = entry.view.webContents;
     if (wc.isDevToolsOpened()) {
       wc.closeDevTools();
@@ -598,21 +633,21 @@ export class TabManager {
     mode: "right" | "bottom" | "undocked" | "detach" = "detach",
   ): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       entry.view.webContents.openDevTools({ mode });
     }
   }
 
   print(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       entry.view.webContents.print();
     }
   }
 
   printToPDF(tabId: string, outputPath: string): Promise<string> {
     const entry = this.tabs.get(tabId);
-    if (!entry) throw new Error("Tab not found");
+    if (!entry?.view) throw new Error("Tab not found");
     return entry.view.webContents.printToPDF({}).then(async (data) => {
       await writeFile(outputPath, data);
       return outputPath;
@@ -620,7 +655,7 @@ export class TabManager {
   }
 
   getBrowserView(tabId: string): BrowserView | undefined {
-    return this.tabs.get(tabId)?.view;
+    return this.tabs.get(tabId)?.view ?? undefined;
   }
 
   setPinned(tabId: string, pinned: boolean): void {
@@ -630,7 +665,9 @@ export class TabManager {
   setMuted(tabId: string, muted: boolean): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;
-    entry.view.webContents.setAudioMuted(muted);
+    if (entry.view) {
+      entry.view.webContents.setAudioMuted(muted);
+    }
     this.updateTab(tabId, { isMuted: muted });
   }
 
@@ -672,13 +709,70 @@ export class TabManager {
     ids.splice(from, 1);
     ids.splice(clamped, 0, tabId);
 
-    const next = new Map<string, { tab: Tab; view: BrowserView }>();
+    const next = new Map<string, { tab: Tab; view: BrowserView | null }>();
     for (const id of ids) {
       const entry = this.tabs.get(id);
       if (entry) next.set(id, entry);
     }
     this.tabs = next;
     this.safeSend("tab:reordered", { tabId, index: clamped });
+  }
+
+  hibernateTab(tabId: string): boolean {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return false;
+    if (entry.tab.id === this.activeTabId) return false;
+    if (entry.tab.isHibernated) return false;
+    if (!entry.view) return false;
+
+    // Race re-check: a load may have started since the policy decision.
+    if (entry.view.webContents.isLoading()) return false;
+
+    if (!this.window.isDestroyed()) {
+      this.window.removeBrowserView(entry.view);
+    }
+    const wc = entry.view.webContents as Electron.WebContents & {
+      destroy?: () => void;
+    };
+    if (wc && !wc.isDestroyed()) {
+      wc.destroy?.();
+    }
+
+    entry.view = null;
+    entry.tab.isHibernated = true;
+
+    this.safeSend("tab:hibernated", { tabId });
+    this.safeSend("tab:updated", { ...entry.tab });
+    return true;
+  }
+
+  wakeTab(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return;
+    if (!entry.tab.isHibernated) return;
+
+    const view = new BrowserView({
+      webPreferences: this.defaultWebPreferences(),
+    });
+    entry.view = view;
+    this.setupWebContentsEvents(tabId, view);
+    this.window.addBrowserView(view);
+    view.webContents.loadURL(entry.tab.url);
+
+    if (entry.tab.isMuted) {
+      view.webContents.setAudioMuted(true);
+    }
+
+    entry.tab.isHibernated = false;
+
+    if (this.activeTabId === tabId) {
+      this.applyBoundsToActive();
+    } else {
+      view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    }
+
+    this.safeSend("tab:woken", { tabId });
+    this.safeSend("tab:updated", { ...entry.tab });
   }
 
   private updateTab(tabId: string, updates: Partial<Tab>): void {

@@ -2,6 +2,7 @@ import {
   app,
   DownloadItem as ElectronDownloadItem,
   Event,
+  shell,
   WebContents,
 } from "electron";
 import path from "path";
@@ -92,6 +93,21 @@ export class DownloadManager {
 
   clearCompleted(): void {
     this.store.clearCompleted();
+  }
+
+  async open(downloadId: string): Promise<boolean> {
+    const record = this.store.get(downloadId);
+    if (!record || record.state !== "completed" || !record.savePath)
+      return false;
+    const err = await shell.openPath(record.savePath);
+    return err === "";
+  }
+
+  showInFolder(downloadId: string): boolean {
+    const record = this.store.get(downloadId);
+    if (!record || !record.savePath) return false;
+    shell.showItemInFolder(record.savePath);
+    return true;
   }
 
   onUpdate(callback: DownloadListener): () => void {

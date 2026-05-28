@@ -102,6 +102,12 @@ export function registerIpcHandlers(
   handle("tab:reorder", (event, { tabId, index }) =>
     ctx(event).tabManager.reorder(tabId, index),
   );
+  handle("tab:hibernate", (event, { tabId }) =>
+    ctx(event).tabManager.hibernateTab(tabId),
+  );
+  handle("tab:wake", (event, { tabId }) =>
+    ctx(event).tabManager.wakeTab(tabId),
+  );
 
   handle("tabGroup:create", (event, { name, color, tabIds }) =>
     ctx(event).tabManager.createGroup(name, color, tabIds ?? []),
@@ -232,6 +238,12 @@ export function registerIpcHandlers(
     downloadManager.cancel(downloadId),
   );
   handle("download:clearCompleted", () => downloadManager.clearCompleted());
+  handle("download:open", (_event, { downloadId }) =>
+    downloadManager.open(downloadId),
+  );
+  handle("download:showInFolder", (_event, { downloadId }) =>
+    downloadManager.showInFolder(downloadId),
+  );
 
   handle("find:start", (event, { tabId, text, caseSensitive }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);

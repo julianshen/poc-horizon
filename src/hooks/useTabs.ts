@@ -41,6 +41,20 @@ export function useTabs(): void {
       },
     );
 
+    const unsubHibernated = window.horizonAPI.on(
+      "tab:hibernated",
+      ({ tabId }: { tabId: string }) => {
+        updateTab(tabId, { isHibernated: true });
+      },
+    );
+
+    const unsubWoken = window.horizonAPI.on(
+      "tab:woken",
+      ({ tabId }: { tabId: string }) => {
+        updateTab(tabId, { isHibernated: false });
+      },
+    );
+
     const unsubNavState = window.horizonAPI.on(
       "navigation:state",
       (state: {
@@ -108,6 +122,8 @@ export function useTabs(): void {
       unsubClosed();
       unsubActivated();
       unsubUpdated();
+      unsubHibernated();
+      unsubWoken();
       unsubNavState();
       unsubLoadStarted();
       unsubLoadFinished();

@@ -232,6 +232,12 @@ export function registerIpcHandlers(
     downloadManager.cancel(downloadId),
   );
   handle("download:clearCompleted", () => downloadManager.clearCompleted());
+  handle("download:open", (_event, { downloadId }) =>
+    downloadManager.open(downloadId),
+  );
+  handle("download:showInFolder", (_event, { downloadId }) =>
+    downloadManager.showInFolder(downloadId),
+  );
 
   handle("find:start", (event, { tabId, text, caseSensitive }) => {
     const view = ctx(event).tabManager.getBrowserView(tabId);

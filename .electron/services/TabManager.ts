@@ -87,6 +87,10 @@ export class TabManager {
     width: number;
     height: number;
   } | null = null;
+  private lifecycleObserver?: {
+    onActivated?: (tabId: string) => void;
+    onClosed?: (tabId: string) => void;
+  };
 
   constructor(window: BrowserWindow, mode: TabManagerMode) {
     this.window = window;
@@ -201,6 +205,7 @@ export class TabManager {
     this.setupWebContentsEvents(id, view);
     this.safeSend("tab:created", tab);
     this.activateTab(id);
+    this.lifecycleObserver?.onActivated?.(id);
 
     return tab;
   }
@@ -377,6 +382,7 @@ export class TabManager {
     current.tab.isActive = true;
     current.tab.lastAccessedAt = Date.now();
     this.activeTabId = tabId;
+    this.lifecycleObserver?.onActivated?.(tabId);
 
     this.applyBoundsToActive();
 
@@ -456,6 +462,7 @@ export class TabManager {
       }
     }
     this.tabs.delete(tabId);
+    this.lifecycleObserver?.onClosed?.(tabId);
     this.safeSend("tab:closed", { tabId });
 
     if (this.activeTabId === tabId) {
@@ -521,6 +528,23 @@ export class TabManager {
 
   getActiveTabId(): string | null {
     return this.activeTabId;
+  }
+
+  isTabLoading(tabId: string): boolean {
+    const entry = this.tabs.get(tabId);
+    return !!entry?.view && entry.view.webContents.isLoading();
+  }
+
+  isTabAudible(tabId: string): boolean {
+    const entry = this.tabs.get(tabId);
+    return !!entry?.view && entry.view.webContents.isCurrentlyAudible();
+  }
+
+  setLifecycleObserver(observer: {
+    onActivated?: (tabId: string) => void;
+    onClosed?: (tabId: string) => void;
+  }): void {
+    this.lifecycleObserver = observer;
   }
 
   // ─── Tab Groups ──────────────────────────────────────────────────────

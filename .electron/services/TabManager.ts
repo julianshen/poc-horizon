@@ -762,6 +762,12 @@ export class TabManager {
 
     entry.tab.isHibernated = false;
 
+    if (this.activeTabId === tabId) {
+      this.applyBoundsToActive();
+    } else {
+      view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    }
+
     this.safeSend("tab:woken", { tabId });
     this.safeSend("tab:updated", { ...entry.tab });
   }

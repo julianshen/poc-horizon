@@ -71,7 +71,7 @@ const SELECTION_TRANSLATE_OVERLAY_SHOW = `(function() {
 })()`;
 
 export class TabManager {
-  private tabs = new Map<string, { tab: Tab; view: BrowserView }>();
+  private tabs = new Map<string, { tab: Tab; view: BrowserView | null }>();
   private groups = new Map<string, TabGroup>();
   private activeTabId: string | null = null;
   private window: BrowserWindow;
@@ -357,7 +357,9 @@ export class TabManager {
       const prev = this.tabs.get(this.activeTabId);
       if (prev) {
         prev.tab.isActive = false;
-        prev.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        if (prev.view) {
+          prev.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        }
       }
     }
 
@@ -368,6 +370,9 @@ export class TabManager {
     current.tab.lastAccessedAt = Date.now();
     this.activeTabId = tabId;
 
+    // If the tab is hibernated (no view), skip the BrowserView swap.
+    // Task 5 will add auto-wake; for now this is a safe no-op on the
+    // view side while bookkeeping (active flag, IPC) still happens.
     this.applyBoundsToActive();
 
     this.safeSend("tab:activated", { tabId });
@@ -397,7 +402,7 @@ export class TabManager {
   private applyBoundsToActive(): void {
     if (!this.activeTabId) return;
     const current = this.tabs.get(this.activeTabId);
-    if (!current) return;
+    if (!current?.view) return;
     const rect = this.contentBounds ?? this.fallbackBounds();
     current.view.setBounds(rect);
   }
@@ -431,17 +436,19 @@ export class TabManager {
     const entry = this.tabs.get(tabId);
     if (!entry) return;
 
-    if (!this.window.isDestroyed()) {
-      this.window.removeBrowserView(entry.view);
-    }
-    const wc = entry.view.webContents as Electron.WebContents & {
-      destroy?: () => void;
-    };
-    if (wc && !wc.isDestroyed()) {
-      // Electron's BrowserView webContents has a destroy() method that
-      // releases the renderer process. Optional-chain on the off-chance
-      // it's been renamed in a future API revision.
-      wc.destroy?.();
+    if (entry.view) {
+      if (!this.window.isDestroyed()) {
+        this.window.removeBrowserView(entry.view);
+      }
+      const wc = entry.view.webContents as Electron.WebContents & {
+        destroy?: () => void;
+      };
+      if (wc && !wc.isDestroyed()) {
+        // Electron's BrowserView webContents has a destroy() method that
+        // releases the renderer process. Optional-chain on the off-chance
+        // it's been renamed in a future API revision.
+        wc.destroy?.();
+      }
     }
     this.tabs.delete(tabId);
     this.safeSend("tab:closed", { tabId });
@@ -459,7 +466,7 @@ export class TabManager {
 
   navigate(tabId: string, url: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       // Update tab.url eagerly so the immediately-following did-start-loading
       // event reports the URL we are *navigating to*, not the previous one.
       this.updateTab(tabId, { url });
@@ -469,21 +476,21 @@ export class TabManager {
 
   goBack(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry?.view.webContents.navigationHistory.canGoBack()) {
+    if (entry?.view?.webContents.navigationHistory.canGoBack()) {
       entry.view.webContents.navigationHistory.goBack();
     }
   }
 
   goForward(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry?.view.webContents.navigationHistory.canGoForward()) {
+    if (entry?.view?.webContents.navigationHistory.canGoForward()) {
       entry.view.webContents.navigationHistory.goForward();
     }
   }
 
   reload(tabId: string, hard = false): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       if (hard) {
         entry.view.webContents.reloadIgnoringCache();
       } else {
@@ -494,7 +501,7 @@ export class TabManager {
 
   stop(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       entry.view.webContents.stop();
     }
   }
@@ -569,7 +576,7 @@ export class TabManager {
 
   setZoom(tabId: string, level: number): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       const zoomLevel = Math.log2(level) / Math.log2(1.2);
       entry.view.webContents.setZoomLevel(zoomLevel);
       entry.tab.zoomLevel = level;
@@ -578,7 +585,7 @@ export class TabManager {
 
   toggleDevTools(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (!entry) return;
+    if (!entry?.view) return;
     const wc = entry.view.webContents;
     if (wc.isDevToolsOpened()) {
       wc.closeDevTools();
@@ -598,21 +605,21 @@ export class TabManager {
     mode: "right" | "bottom" | "undocked" | "detach" = "detach",
   ): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       entry.view.webContents.openDevTools({ mode });
     }
   }
 
   print(tabId: string): void {
     const entry = this.tabs.get(tabId);
-    if (entry) {
+    if (entry?.view) {
       entry.view.webContents.print();
     }
   }
 
   printToPDF(tabId: string, outputPath: string): Promise<string> {
     const entry = this.tabs.get(tabId);
-    if (!entry) throw new Error("Tab not found");
+    if (!entry?.view) throw new Error("Tab not found");
     return entry.view.webContents.printToPDF({}).then(async (data) => {
       await writeFile(outputPath, data);
       return outputPath;
@@ -620,7 +627,7 @@ export class TabManager {
   }
 
   getBrowserView(tabId: string): BrowserView | undefined {
-    return this.tabs.get(tabId)?.view;
+    return this.tabs.get(tabId)?.view ?? undefined;
   }
 
   setPinned(tabId: string, pinned: boolean): void {
@@ -630,7 +637,9 @@ export class TabManager {
   setMuted(tabId: string, muted: boolean): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;
-    entry.view.webContents.setAudioMuted(muted);
+    if (entry.view) {
+      entry.view.webContents.setAudioMuted(muted);
+    }
     this.updateTab(tabId, { isMuted: muted });
   }
 
@@ -672,7 +681,7 @@ export class TabManager {
     ids.splice(from, 1);
     ids.splice(clamped, 0, tabId);
 
-    const next = new Map<string, { tab: Tab; view: BrowserView }>();
+    const next = new Map<string, { tab: Tab; view: BrowserView | null }>();
     for (const id of ids) {
       const entry = this.tabs.get(id);
       if (entry) next.set(id, entry);

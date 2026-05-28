@@ -11,6 +11,7 @@ export interface Tab {
   isPinned: boolean;
   isMuted: boolean;
   isActive: boolean;
+  /** True when the tab's webContents has been destroyed and only metadata remains. */
   isHibernated: boolean;
   zoomLevel: number;
   createdAt: number;

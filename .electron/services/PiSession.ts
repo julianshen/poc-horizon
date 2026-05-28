@@ -46,9 +46,6 @@ export class PiSession extends EventEmitter {
   private sessionFile: string | null = null;
   /** Counter for request IDs we send to Pi (so we can correlate responses). */
   private reqId = 0;
-  /** Buffer of streaming text deltas; flushed at ≤60Hz to the renderer. */
-  private deltaBuf = "";
-  private flushTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly opts: PiOptions,
@@ -146,17 +143,11 @@ export class PiSession extends EventEmitter {
   cancel(): void {
     if (!this.proc || !this.running) return;
     this.send({ type: "abort" });
-    this.flushDeltas();
     this.emitEvent({ type: "turn_end", reason: "cancelled" });
     this.running = false;
   }
 
   dispose(): void {
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = null;
-    }
-    this.deltaBuf = "";
     if (!this.proc) return;
     try {
       this.proc.kill();
@@ -204,13 +195,10 @@ export class PiSession extends EventEmitter {
             }
           | undefined;
         if (ev?.type === "text_delta" && typeof ev.delta === "string") {
-          // Pi burst-delivers responses (e.g. 200 deltas in 30ms when the
-          // upstream LLM batches). Coalesce into ≤60Hz flushes so the
-          // renderer doesn't drop frames re-parsing markdown on every chunk.
-          this.deltaBuf += ev.delta;
-          if (!this.flushTimer) {
-            this.flushTimer = setTimeout(() => this.flushDeltas(), 16);
-          }
+          // Emit each delta immediately so the AI panel shows progressive
+          // output. React 18 batches rapid state updates; MessageBubble is
+          // memoized so only the streaming bubble re-renders.
+          this.emitEvent({ type: "text_delta", text: ev.delta });
           return;
         }
         // Upstream error from the LLM provider (rate limit, size limit,
@@ -219,7 +207,6 @@ export class PiSession extends EventEmitter {
         // properly completed. We must clear `running` ourselves or the
         // UI shows "Thinking…" forever.
         if (ev?.type === "error") {
-          this.flushDeltas();
           const reason = ev.reason ?? "error";
           const detail = ev.errorMessage ?? "(no detail)";
           this.emitEvent({
@@ -240,7 +227,6 @@ export class PiSession extends EventEmitter {
         const aborted = msg.aborted as boolean | undefined;
         const finalError = msg.finalError as string | undefined;
         if (aborted && finalError) {
-          this.flushDeltas();
           this.emitEvent({
             type: "error",
             message: `Agent retry failed: ${finalError}`,
@@ -332,7 +318,6 @@ export class PiSession extends EventEmitter {
 
         if (errMsg) {
           if (this.running) {
-            this.flushDeltas();
             this.emitEvent({ type: "error", message: errMsg });
             this.emitEvent({ type: "turn_end", reason: "error" });
             this.running = false;
@@ -345,9 +330,6 @@ export class PiSession extends EventEmitter {
         // renderer-visible turn_end on agent_end so the AI panel shows
         // "still working" through intermediate tool-call rounds.
         if (t === "agent_end") {
-          // Flush any buffered text BEFORE turn_end so the renderer paints
-          // the final chunk before clearing the loading flag.
-          this.flushDeltas();
           this.emitEvent({ type: "turn_end", reason: "stop" });
           this.running = false;
           // Capture the session file path once per process, after the
@@ -404,18 +386,6 @@ export class PiSession extends EventEmitter {
 
   private requestSessionFile(): void {
     this.send({ id: `req-${++this.reqId}`, type: "get_state" });
-  }
-
-  /** Emit the buffered text deltas as a single AgentEvent. */
-  private flushDeltas(): void {
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = null;
-    }
-    if (this.deltaBuf.length === 0) return;
-    const text = this.deltaBuf;
-    this.deltaBuf = "";
-    this.emitEvent({ type: "text_delta", text });
   }
 
   private send(msg: object): void {

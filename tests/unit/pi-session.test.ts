@@ -157,7 +157,7 @@ describe("PiSession", () => {
     expect(session.isRunning).toBe(true);
   });
 
-  it("coalesces adjacent text_delta events into a single flush (60Hz)", async () => {
+  it("emits each text_delta immediately without coalescing", () => {
     void session.startTurn("hi");
     emit({
       type: "message_update",
@@ -167,21 +167,20 @@ describe("PiSession", () => {
       type: "message_update",
       assistantMessageEvent: { type: "text_delta", delta: " world" },
     });
-    // Coalescing schedules a 16ms timer; wait it out.
-    await new Promise((r) => setTimeout(r, 30));
+    // Each delta is emitted synchronously — no timer waiting required.
     expect(events.filter((e) => e.type === "text_delta")).toEqual([
-      { type: "text_delta", text: "Hello world" },
+      { type: "text_delta", text: "Hello" },
+      { type: "text_delta", text: " world" },
     ]);
   });
 
-  it("flushes pending text_delta immediately on agent_end", () => {
+  it("emits text_delta before agent_end when they arrive in sequence", () => {
     void session.startTurn("hi");
     emit({
       type: "message_update",
       assistantMessageEvent: { type: "text_delta", delta: "done." },
     });
     emit({ type: "agent_end" });
-    // No setTimeout wait — flushDeltas runs synchronously before turn_end.
     const types = events.map((e) => e.type);
     expect(types.indexOf("text_delta")).toBeLessThan(types.indexOf("turn_end"));
     expect(events.find((e) => e.type === "text_delta")).toEqual({

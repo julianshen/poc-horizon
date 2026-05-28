@@ -112,6 +112,7 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
         onDrop={onDrop}
         onClick={activate}
         onContextMenu={openMenu}
+        title={tab.isHibernated ? `${tab.title || "New Tab"} (sleeping)` : undefined}
         className={`group h-[26px] px-2.5 flex items-center gap-2 cursor-pointer text-xs select-none relative ${width}`}
         style={{
           background: isActive
@@ -125,10 +126,11 @@ export const Tab: React.FC<TabProps> = ({ tab, isActive, index }) => {
               ? "var(--tab-shadow-active)"
               : "none",
           transition:
-            "background var(--transition-fast), color var(--transition-fast)",
+            "background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast)",
           WebkitAppRegion: "no-drag",
           fontWeight: 500,
           letterSpacing: "-0.005em",
+          opacity: tab.isHibernated ? 0.6 : 1,
         }}
         onMouseEnter={(e) => {
           if (!isActive) {

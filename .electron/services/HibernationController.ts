@@ -90,17 +90,24 @@ export class HibernationController {
       return true;
     };
 
-    // Phase 1 — time-based.
+    // Phase 1 — time-based. Track successful hibernations so Phase 2
+    // doesn't count them as still-live against the `tabs` snapshot
+    // (taken before Phase 1 mutated TabManager state).
+    const hibernatedInPhase1 = new Set<string>();
     for (const t of tabs) {
       if (!eligible(t)) continue;
       const last = this.lastActivatedAt.get(t.id) ?? t.createdAt;
       if (now - last >= timeoutMs) {
-        this.tabManager.hibernateTab(t.id);
+        if (this.tabManager.hibernateTab(t.id)) {
+          hibernatedInPhase1.add(t.id);
+        }
       }
     }
 
     // Phase 2 — count-based safety net.
-    const liveEligible = tabs.filter(eligible);
+    const liveEligible = tabs.filter(
+      (t) => eligible(t) && !hibernatedInPhase1.has(t.id),
+    );
     if (liveEligible.length <= cap) return;
     const surplus = liveEligible.length - cap;
     const victims = liveEligible

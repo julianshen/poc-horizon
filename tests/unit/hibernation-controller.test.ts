@@ -156,6 +156,32 @@ describe("HibernationController.sweep — count-based eviction", () => {
     expect(tm.hibernateTab).toHaveBeenCalledTimes(1);
   });
 
+  it("does not double-count Phase-1 hibernations when computing Phase-2 surplus", () => {
+    // 5 tabs, cap=3, ALL expired (idle past timeout). Phase 1 hibernates
+    // every non-active eligible tab (4 of them). Phase 2 should see zero
+    // surviving live-eligible tabs and not call hibernateTab again.
+    const tabs: Tab[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `t${i}`,
+      url: `https://t${i}`,
+      pinned: false,
+      hibernated: false,
+      createdAt: i,
+    }));
+    const tm = makeFakeTabManager(tabs, "t0");
+    let now = 0;
+    const c = new HibernationController({
+      tabManager: tm as never,
+      getSettings: () => ({ ...defaultSettings, maxActiveTabs: 3 }),
+      now: () => now,
+    });
+    for (const t of tabs) c.noteActivated(t.id);
+    now = 60 * 60_000; // 60 minutes — well past the 30-minute timeout
+    c.sweep();
+    // 4 tabs hibernated in Phase 1 (everyone except active t0). Phase 2
+    // should not redundantly hibernate. Total call count is 4.
+    expect(tm.hibernateTab).toHaveBeenCalledTimes(4);
+  });
+
   it("breaks LRU ties by createdAt when timestamps are equal", () => {
     const tabs: Tab[] = [
       { id: "active", url: "https://active", pinned: false, hibernated: false, createdAt: 0 },

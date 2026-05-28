@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useBrowserStore } from "../../stores/browserStore";
 
-const POPULAR_LANGUAGES = [
+export const POPULAR_LANGUAGES = [
   "English",
   "Spanish",
   "Chinese",

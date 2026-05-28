@@ -78,6 +78,30 @@ describe("SettingsPanel", () => {
     ]);
   });
 
+  it("renders the Translation section with the target language select", async () => {
+    api().invoke.mockResolvedValue({
+      translateTargetLang: "Spanish",
+    });
+    act(() => useBrowserStore.setState({ showSettings: true }));
+    render(<SettingsPanel />);
+    await waitFor(() => expect(screen.getByText("Target language")).toBeTruthy());
+    expect(screen.getByRole("heading", { name: "Translation" })).toBeTruthy();
+  });
+
+  it("changing the translation language dispatches settings:set", async () => {
+    api().invoke.mockResolvedValue({ translateTargetLang: "English" });
+    act(() => useBrowserStore.setState({ showSettings: true }));
+    render(<SettingsPanel />);
+    await waitFor(() => expect(screen.getByText("Target language")).toBeTruthy());
+    const label = screen.getByText("Target language").closest("label");
+    const langSelect = label?.querySelector("select") as HTMLSelectElement;
+    fireEvent.change(langSelect, { target: { value: "Japanese" } });
+    expect(api().invoke.mock.calls).toContainEqual([
+      "settings:set",
+      { key: "translateTargetLang", value: "Japanese" },
+    ]);
+  });
+
   it("renders the Proxy section with the type select", async () => {
     api().invoke.mockResolvedValue({
       proxyType: "system",

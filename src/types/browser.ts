@@ -134,6 +134,8 @@ export interface Settings {
   aiConfirmActions?: "never" | "risky" | "all";
   /** Send X-Horizon-Agent header on outgoing requests. Agent Policy v1 § 7. */
   aiAdvertiseAgent?: boolean;
+  /** Default target language for page/selection translation. */
+  translateTargetLang?: string;
 }
 
 export interface PasswordEntry {

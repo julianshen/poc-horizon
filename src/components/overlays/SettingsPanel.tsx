@@ -9,6 +9,7 @@ import {
   TextInput,
   Toggle,
 } from "./SettingsPanel.parts";
+import { POPULAR_LANGUAGES } from "./TranslationBar";
 
 export const SettingsPanel: React.FC = () => {
   const { showSettings, toggleOverlay } = useBrowserStore();
@@ -134,6 +135,15 @@ export const SettingsPanel: React.FC = () => {
             checked={settings?.aiAdvertiseAgent ?? true}
             onChange={(v) => update("aiAdvertiseAgent", v)}
           />
+        </Section>
+        <Section title="Translation">
+          <Field label="Target language">
+            <Select
+              value={settings?.translateTargetLang ?? "English"}
+              onChange={(v) => update("translateTargetLang", v)}
+              options={POPULAR_LANGUAGES.map((lang) => [lang, lang])}
+            />
+          </Field>
         </Section>
         <Section title="Proxy">
           <Field label="Proxy type">

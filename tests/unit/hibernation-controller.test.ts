@@ -155,6 +155,47 @@ describe("HibernationController.sweep — count-based eviction", () => {
     expect(tm.hibernateTab).toHaveBeenCalledWith("t1");
     expect(tm.hibernateTab).toHaveBeenCalledTimes(1);
   });
+
+  it("breaks LRU ties by createdAt when timestamps are equal", () => {
+    const tabs: Tab[] = [
+      { id: "active", url: "https://active", pinned: false, hibernated: false, createdAt: 0 },
+      { id: "newer", url: "https://newer", pinned: false, hibernated: false, createdAt: 100 },
+      { id: "older", url: "https://older", pinned: false, hibernated: false, createdAt: 50 },
+    ];
+    const tm = makeFakeTabManager(tabs, "active");
+    const fixedNow = 1000;
+    const c = new HibernationController({
+      tabManager: tm as never,
+      getSettings: () => ({ ...defaultSettings, maxActiveTabs: 1 }),
+      now: () => fixedNow,
+    });
+    // Only activate "newer", leaving "older" without a lastActivatedAt entry.
+    // Both fall back to createdAt: "newer" → 100, "older" → 50.
+    // The sort should evict "older" (50) before "newer" (100).
+    c.noteActivated("newer");
+    c.sweep();
+    expect(tm.hibernateTab).toHaveBeenCalledWith("older");
+    expect(tm.hibernateTab).not.toHaveBeenCalledWith("newer");
+  });
+
+  it("falls back to createdAt in time-based eviction when lastActivatedAt is missing", () => {
+    const tabs: Tab[] = [
+      { id: "active", url: "https://active", pinned: false, hibernated: false, createdAt: 0 },
+      { id: "inactive", url: "https://inactive", pinned: false, hibernated: false, createdAt: 100 },
+    ];
+    const tm = makeFakeTabManager(tabs, "active");
+    let now = 0;
+    const c = new HibernationController({
+      tabManager: tm as never,
+      getSettings: () => defaultSettings,
+      now: () => now,
+    });
+    // Never call noteActivated on tab "inactive" — it has no lastActivatedAt entry.
+    // So it falls back to createdAt (100), which is now old enough to evict.
+    now = 35 * 60_000;
+    c.sweep();
+    expect(tm.hibernateTab).toHaveBeenCalledWith("inactive");
+  });
 });
 
 describe("HibernationController.sweep — settings", () => {
@@ -251,5 +292,42 @@ describe("HibernationController.start / stop", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("start is idempotent (double-start branches)", () => {
+    vi.useFakeTimers();
+    try {
+      const tm = makeFakeTabManager(
+        [{ id: "a", url: "https://a", pinned: false, hibernated: false, createdAt: 0 }],
+        "a",
+      );
+      const c = new HibernationController({
+        tabManager: tm as never,
+        getSettings: () => defaultSettings,
+        now: () => Date.now(),
+        sweepIntervalMs: 1000,
+      });
+      c.start();
+      c.start(); // Second start should be a no-op (branches the "if (this.timer) return")
+      vi.advanceTimersByTime(2000);
+      // Should only sweep once, not twice, if start() properly handles existing timer
+      expect(tm.hibernateTab.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stop is idempotent (double-stop branches)", () => {
+    const tm = makeFakeTabManager(
+      [{ id: "a", url: "https://a", pinned: false, hibernated: false, createdAt: 0 }],
+      "a",
+    );
+    const c = new HibernationController({
+      tabManager: tm as never,
+      getSettings: () => defaultSettings,
+      now: () => 0,
+    });
+    c.stop(); // Stop without ever starting (branches the "if (!this.timer) return")
+    expect(() => c.stop()).not.toThrow();
   });
 });

@@ -102,6 +102,12 @@ export function registerIpcHandlers(
   handle("tab:reorder", (event, { tabId, index }) =>
     ctx(event).tabManager.reorder(tabId, index),
   );
+  handle("tab:hibernate", (event, { tabId }) =>
+    ctx(event).tabManager.hibernateTab(tabId),
+  );
+  handle("tab:wake", (event, { tabId }) =>
+    ctx(event).tabManager.wakeTab(tabId),
+  );
 
   handle("tabGroup:create", (event, { name, color, tabIds }) =>
     ctx(event).tabManager.createGroup(name, color, tabIds ?? []),

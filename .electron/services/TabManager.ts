@@ -154,16 +154,20 @@ export class TabManager {
     this.emitChange();
   }
 
+  private defaultWebPreferences() {
+    return {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true,
+      partition: this.partition(),
+    };
+  }
+
   createTab(url = "horizon://newtab"): Tab {
     const id = uuidv4();
     const view = new BrowserView({
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        spellcheck: true,
-        partition: this.partition(),
-      },
+      webPreferences: this.defaultWebPreferences(),
     });
 
     const tab: Tab = {

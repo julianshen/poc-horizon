@@ -694,6 +694,53 @@ export class TabManager {
     this.safeSend("tab:reordered", { tabId, index: clamped });
   }
 
+  hibernateTab(tabId: string): boolean {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return false;
+    if (entry.tab.id === this.activeTabId) return false;
+    if (entry.tab.isHibernated) return false;
+    if (!entry.view) return false;
+
+    // Race re-check: a load may have started since the policy decision.
+    if (entry.view.webContents.isLoading()) return false;
+
+    if (!this.window.isDestroyed()) {
+      this.window.removeBrowserView(entry.view);
+    }
+    const wc = entry.view.webContents as Electron.WebContents & {
+      destroy?: () => void;
+    };
+    if (wc && !wc.isDestroyed()) {
+      wc.destroy?.();
+    }
+
+    entry.view = null;
+    entry.tab.isHibernated = true;
+
+    this.safeSend("tab:hibernated", { tabId });
+    this.safeSend("tab:updated", { tab: entry.tab });
+    return true;
+  }
+
+  wakeTab(tabId: string): void {
+    const entry = this.tabs.get(tabId);
+    if (!entry) return;
+    if (!entry.tab.isHibernated) return;
+
+    const view = new BrowserView({
+      webPreferences: this.defaultWebPreferences(),
+    });
+    entry.view = view;
+    this.setupWebContentsEvents(tabId, view);
+    this.window.addBrowserView(view);
+    view.webContents.loadURL(entry.tab.url);
+
+    entry.tab.isHibernated = false;
+
+    this.safeSend("tab:woken", { tabId });
+    this.safeSend("tab:updated", { tab: entry.tab });
+  }
+
   private updateTab(tabId: string, updates: Partial<Tab>): void {
     const entry = this.tabs.get(tabId);
     if (!entry) return;

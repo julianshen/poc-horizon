@@ -123,3 +123,22 @@ describe("TabManager.wakeTab", () => {
     expect(channels).toContain("tab:updated");
   });
 });
+
+describe("TabManager.activateTab auto-wakes hibernated tabs", () => {
+  it("activating a hibernated tab wakes it first", () => {
+    const win = fakeWindow();
+    const tm = new TabManager(win, {
+      kind: "default",
+      historyManager: fakeHistory(),
+    });
+    const a = tm.createTab("https://a");
+    const b = tm.createTab("https://b");
+    tm.activateTab(a.id);
+    tm.hibernateTab(b.id);
+    expect(tm.getTab(b.id)?.isHibernated).toBe(true);
+
+    tm.activateTab(b.id);
+    expect(tm.getTab(b.id)?.isHibernated).toBe(false);
+    expect(tm.getActiveTabId()).toBe(b.id);
+  });
+});

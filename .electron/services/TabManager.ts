@@ -370,13 +370,14 @@ export class TabManager {
     const current = this.tabs.get(tabId);
     if (!current) return;
 
+    if (current.tab.isHibernated) {
+      this.wakeTab(tabId);
+    }
+
     current.tab.isActive = true;
     current.tab.lastAccessedAt = Date.now();
     this.activeTabId = tabId;
 
-    // If the tab is hibernated (no view), skip the BrowserView swap.
-    // Task 5 will add auto-wake; for now this is a safe no-op on the
-    // view side while bookkeeping (active flag, IPC) still happens.
     this.applyBoundsToActive();
 
     this.safeSend("tab:activated", { tabId });

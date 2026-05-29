@@ -1,113 +1,207 @@
 import { net } from "electron";
+import {
+  LlmsTxtCacheStore,
+  CacheEntry,
+} from "./LlmsTxtCacheStore";
 
 /**
  * llms.txt / llms-full.txt resolver.
  *
- * The llms.txt spec (proposed by Jeremy Howard, adopted by browse.sh and
- * others) is a sitemap of agent-friendly site skills published at the
- * origin root. Treat the file as untrusted UTF-8 documentation —
- * fetched once per origin, cached, never executed.
- *
- * - Tries /llms-full.txt first (richer), falls back to /llms.txt.
- * - Network fetch via Electron's `net` module so it respects the same
- *   session / proxy / TLS config the user sees in their tabs.
- * - In-memory cache only; cleared on app restart. No disk persistence
- *   yet — would need an integrity/freshness model first.
+ * Delegates persistence and TTL math to LlmsTxtCacheStore. Owns the
+ * network: parallel GETs for /llms.txt and /llms-full.txt, conditional
+ * revalidation via If-None-Match / If-Modified-Since, 256 KB per-body
+ * cap, and stale-while-revalidate orchestration.
  */
+
+const MAX_BODY_BYTES = 256 * 1024;
+const REQUEST_TIMEOUT_MS = 3000;
+
+interface ConditionalHeaders {
+  ifNoneMatch?: string;
+  ifModifiedSince?: string;
+}
+
+interface TryGetResult {
+  status: 200 | 304 | 404 | "error";
+  body: string | null;
+  etag?: string;
+  lastModified?: string;
+}
+
 export class LlmsTxtResolver {
-  private cache = new Map<string, string | null>(); // origin → contents | null (404)
-  private both = new Map<
-    string,
-    { llmsTxt: string | null; llmsFullTxt: string | null }
-  >();
-  private inflight = new Map<string, Promise<string | null>>();
+  private readonly store: LlmsTxtCacheStore;
+  private readonly now: () => number;
   private inflightBoth = new Map<
     string,
     Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }>
   >();
+  private inflightRevalidate = new Set<string>();
 
-  /** Get the best available llms*.txt for an origin (full preferred). Null if neither. */
-  async fetch(origin: string): Promise<string | null> {
-    if (this.cache.has(origin)) return this.cache.get(origin) ?? null;
-    const existing = this.inflight.get(origin);
-    if (existing) return existing;
-    const p = this.doFetch(origin);
-    this.inflight.set(origin, p);
-    try {
-      const result = await p;
-      this.cache.set(origin, result);
-      return result;
-    } finally {
-      this.inflight.delete(origin);
-    }
+  constructor(store: LlmsTxtCacheStore, now: () => number = Date.now) {
+    this.store = store;
+    this.now = now;
   }
 
-  /** Get both files for an origin. Either or both may be null. Cached per-origin. */
+  async fetch(origin: string): Promise<string | null> {
+    const both = await this.fetchBoth(origin);
+    return both.llmsFullTxt ?? both.llmsTxt;
+  }
+
   async fetchBoth(
     origin: string,
   ): Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }> {
-    if (this.both.has(origin)) return this.both.get(origin)!;
+    const cached = this.store.get(origin);
+    if (cached) {
+      if (cached.freshness === "stale") {
+        this.scheduleRevalidate(origin, cached.entry);
+      }
+      return {
+        llmsTxt: cached.entry.llmsTxt,
+        llmsFullTxt: cached.entry.llmsFullTxt,
+      };
+    }
     const existing = this.inflightBoth.get(origin);
     if (existing) return existing;
-    const p = (async () => ({
-      llmsTxt: await this.tryGet(`${origin}/llms.txt`),
-      llmsFullTxt: await this.tryGet(`${origin}/llms-full.txt`),
-    }))();
+    const p = this.doFreshFetch(origin);
     this.inflightBoth.set(origin, p);
     try {
-      const result = await p;
-      this.both.set(origin, result);
-      return result;
+      return await p;
     } finally {
       this.inflightBoth.delete(origin);
     }
   }
 
-  private async doFetch(origin: string): Promise<string | null> {
-    for (const path of ["/llms-full.txt", "/llms.txt"]) {
-      const text = await this.tryGet(`${origin}${path}`);
-      if (text !== null) return text;
-    }
-    return null;
+  invalidate(origin: string): void {
+    this.store.invalidate(origin);
   }
 
-  private tryGet(url: string): Promise<string | null> {
-    return new Promise((resolve) => {
-      const req = net.request({ method: "GET", url, redirect: "follow" });
-      let body = "";
-      // 3-second hard cap — agent shouldn't block on a slow llms.txt fetch.
-      const timer = setTimeout(() => {
-        req.abort();
-        resolve(null);
-      }, 3000);
-      req.on("response", (res) => {
-        if (res.statusCode < 200 || res.statusCode >= 300) {
-          clearTimeout(timer);
-          resolve(null);
-          return;
-        }
-        res.on("data", (chunk) => {
-          body += chunk.toString("utf8");
-        });
-        res.on("end", () => {
-          clearTimeout(timer);
-          resolve(body || null);
-        });
-        res.on("error", () => {
-          clearTimeout(timer);
-          resolve(null);
-        });
-      });
-      req.on("error", () => {
-        clearTimeout(timer);
-        resolve(null);
-      });
-      req.end();
+  private async doFreshFetch(
+    origin: string,
+  ): Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }> {
+    const [indexResult, fullResult] = await Promise.all([
+      this.tryGet(`${origin}/llms.txt`),
+      this.tryGet(`${origin}/llms-full.txt`),
+    ]);
+
+    const isPersistable =
+      indexResult.status === 200 ||
+      fullResult.status === 200 ||
+      (indexResult.status === 404 && fullResult.status === 404);
+
+    if (isPersistable) {
+      const entry = this.buildEntry(indexResult, fullResult, this.now());
+      this.store.put(origin, entry);
+    }
+
+    return {
+      llmsTxt: indexResult.status === 200 ? indexResult.body : null,
+      llmsFullTxt: fullResult.status === 200 ? fullResult.body : null,
+    };
+  }
+
+  private scheduleRevalidate(origin: string, _existing: CacheEntry): void {
+    // Inert in Task 3; filled in by Task 5.
+    if (this.inflightRevalidate.has(origin)) return;
+    this.inflightRevalidate.add(origin);
+    void Promise.resolve().finally(() => {
+      this.inflightRevalidate.delete(origin);
     });
   }
 
-  /** Force-refresh an origin (e.g. user clicked "Re-scan site skills"). */
-  invalidate(origin: string): void {
-    this.cache.delete(origin);
+  private buildEntry(
+    indexResult: TryGetResult,
+    fullResult: TryGetResult,
+    fetchedAt: number,
+  ): CacheEntry {
+    const entry: CacheEntry = {
+      llmsTxt: indexResult.status === 200 ? indexResult.body : null,
+      llmsFullTxt: fullResult.status === 200 ? fullResult.body : null,
+      fetchedAt,
+    };
+    if (indexResult.status === 200) {
+      if (indexResult.etag) entry.etagIndex = indexResult.etag;
+      if (indexResult.lastModified) entry.lastModifiedIndex = indexResult.lastModified;
+    }
+    if (fullResult.status === 200) {
+      if (fullResult.etag) entry.etagFull = fullResult.etag;
+      if (fullResult.lastModified) entry.lastModifiedFull = fullResult.lastModified;
+    }
+    return entry;
   }
+
+  private tryGet(
+    url: string,
+    conditional?: ConditionalHeaders,
+  ): Promise<TryGetResult> {
+    return new Promise((resolve) => {
+      const req = net.request({ method: "GET", url, redirect: "follow" });
+      if (conditional?.ifNoneMatch) req.setHeader("If-None-Match", conditional.ifNoneMatch);
+      if (conditional?.ifModifiedSince) req.setHeader("If-Modified-Since", conditional.ifModifiedSince);
+
+      let body = "";
+      let aborted = false;
+      const timer = setTimeout(() => {
+        aborted = true;
+        req.abort();
+        resolve({ status: "error", body: null });
+      }, REQUEST_TIMEOUT_MS);
+
+      req.on("response", (res) => {
+        const status = res.statusCode;
+        const headers = res.headers as Record<string, string | string[]>;
+        const etag = first(headers["etag"]);
+        const lastModified = first(headers["last-modified"]);
+
+        if (status === 304) {
+          clearTimeout(timer);
+          resolve({ status: 304, body: null, etag, lastModified });
+          return;
+        }
+        if (status >= 200 && status < 300) {
+          res.on("data", (chunk: Buffer) => {
+            if (aborted) return;
+            body += chunk.toString("utf8");
+            if (body.length > MAX_BODY_BYTES) {
+              aborted = true;
+              clearTimeout(timer);
+              req.abort();
+              resolve({ status: "error", body: null });
+            }
+          });
+          res.on("end", () => {
+            if (aborted) return;
+            clearTimeout(timer);
+            resolve({ status: 200, body, etag, lastModified });
+          });
+          res.on("error", () => {
+            if (aborted) return;
+            aborted = true;
+            clearTimeout(timer);
+            resolve({ status: "error", body: null });
+          });
+          return;
+        }
+        clearTimeout(timer);
+        if (status >= 400 && status < 500) {
+          resolve({ status: 404, body: null });
+        } else {
+          resolve({ status: "error", body: null });
+        }
+      });
+
+      req.on("error", () => {
+        if (aborted) return;
+        aborted = true;
+        clearTimeout(timer);
+        resolve({ status: "error", body: null });
+      });
+
+      req.end();
+    });
+  }
+}
+
+function first(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
 }

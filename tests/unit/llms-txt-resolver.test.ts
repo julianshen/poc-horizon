@@ -356,4 +356,33 @@ describe("LlmsTxtResolver: stale-while-revalidate", () => {
 
     expect(requestQueue).toHaveLength(0);
   });
+
+  it("revalidation 200 without etag/lastModified clears stored ones", async () => {
+    let now = 1000;
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => now);
+    store.put("https://example.com", {
+      llmsTxt: "# old",
+      llmsFullTxt: null,
+      etagIndex: '"old"',
+      lastModifiedIndex: "Wed, 21 May 2026 07:28:00 GMT",
+      fetchedAt: 1000,
+    });
+    now = 1000 + 25 * 60 * 60 * 1000;
+    const r = new LlmsTxtResolver(store, () => now);
+
+    // Server returns new body but omits ETag and Last-Modified headers.
+    enqueueResponse("https://example.com/llms.txt", {
+      statusCode: 200,
+      body: "# new",
+    });
+    enqueueResponse("https://example.com/llms-full.txt", { statusCode: 404 });
+
+    await r.fetchBoth("https://example.com");
+    await settle();
+
+    const e = store.get("https://example.com")!.entry;
+    expect(e.llmsTxt).toBe("# new");
+    expect(e.etagIndex).toBeUndefined();
+    expect(e.lastModifiedIndex).toBeUndefined();
+  });
 });

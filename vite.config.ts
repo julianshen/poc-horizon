@@ -64,6 +64,7 @@ export default defineConfig({
         ".electron/services/autoUpdateScheduler.ts",
         ".electron/services/HibernationController.ts",
         ".electron/services/LlmsTxtCacheStore.ts",
+        ".electron/services/LlmsTxtResolver.ts",
         ".electron/ipc/main-handlers.ts",
         ".electron/preload.ts",
       ],

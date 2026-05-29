@@ -38,6 +38,7 @@ import { installAppMenu } from "./services/appMenu";
 import { BrowserHarness } from "./services/BrowserHarness";
 import { PiSession } from "./services/PiSession";
 import { LlmsTxtResolver } from "./services/LlmsTxtResolver";
+import { LlmsTxtCacheStore } from "./services/LlmsTxtCacheStore";
 import { parseLlmsTxt } from "./services/llmsTxtParser";
 import { writePiSkill } from "./services/piSkillWriter";
 import { buildAugmentedPrompt } from "./services/promptHelper";
@@ -113,7 +114,8 @@ let activePiSession: PiSession | null = null;
 let lastAgentActivityAt = 0;
 let bridgeServer: HorizonBridgeServer | null = null;
 let bridgePort = 0;
-const llmsTxtResolver = new LlmsTxtResolver();
+let llmsTxtCacheStore: LlmsTxtCacheStore;
+let llmsTxtResolver: LlmsTxtResolver;
 
 type AiSessionKind = "default" | "incognito";
 function aiSessionKindFor(tm: TabManager): AiSessionKind {
@@ -350,6 +352,8 @@ function initSingletons(): void {
     }
   });
   tabSessionStore = new TabSessionStore(path.join(data, "session.json"));
+  llmsTxtCacheStore = new LlmsTxtCacheStore(path.join(data, "llms-cache.json"));
+  llmsTxtResolver = new LlmsTxtResolver(llmsTxtCacheStore);
 
   protocol.registerFileProtocol("horizon", (request, callback) => {
     const url = new URL(request.url);
@@ -378,15 +382,19 @@ function initSingletons(): void {
   // One global before-quit flush — uses the live `persistableTabManagers`
   // set so it stays correct as windows open and close.
   app.on("before-quit", () => {
-    if (!tabSessionStore) return;
-    for (const tm of persistableTabManagers) {
-      const tabs = tm.getAllTabs().map((t: Tab) => ({
-        url: t.url,
-        title: t.title,
-        isPinned: t.isPinned,
-        isActive: t.isActive,
-      }));
-      tabSessionStore.flush(tabs);
+    if (tabSessionStore) {
+      for (const tm of persistableTabManagers) {
+        const tabs = tm.getAllTabs().map((t: Tab) => ({
+          url: t.url,
+          title: t.title,
+          isPinned: t.isPinned,
+          isActive: t.isActive,
+        }));
+        tabSessionStore.flush(tabs);
+      }
+    }
+    if (llmsTxtCacheStore) {
+      void llmsTxtCacheStore.flush();
     }
   });
 }

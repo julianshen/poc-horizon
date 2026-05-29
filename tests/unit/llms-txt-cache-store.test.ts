@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { writeFileSync } from "fs";
+import { writeFileSync, existsSync, readFileSync, statSync } from "fs";
 import { LlmsTxtCacheStore } from "@electron/services/LlmsTxtCacheStore";
 import { useTmpDir } from "../helpers/tmpdir";
 
@@ -126,5 +126,57 @@ describe("LlmsTxtCacheStore: invalidate / has / bumpFetchedAt", () => {
   it("bumpFetchedAt is a no-op for unknown origin", () => {
     const store = new LlmsTxtCacheStore(cachePath(), () => 1000);
     expect(() => store.bumpFetchedAt("https://nope.com")).not.toThrow();
+  });
+});
+
+describe("LlmsTxtCacheStore: debounced flush", () => {
+  it("flush() persists current entries to disk", async () => {
+    const p = cachePath();
+    const store = new LlmsTxtCacheStore(p, () => 1000);
+    store.put("https://example.com", { ...baseEntry, fetchedAt: 1000 });
+    await store.flush();
+    expect(existsSync(p)).toBe(true);
+    const onDisk = JSON.parse(readFileSync(p, "utf8"));
+    expect(onDisk.schemaVersion).toBe(1);
+    expect(onDisk.entries["https://example.com"].llmsTxt).toBe(
+      "# example\n> summary",
+    );
+  });
+
+  it("flush() is a no-op when nothing has changed since last save", async () => {
+    const p = cachePath();
+    const store = new LlmsTxtCacheStore(p, () => 1000);
+    store.put("https://example.com", { ...baseEntry, fetchedAt: 1000 });
+    await store.flush();
+    const mtimeFirst = statSync(p).mtimeMs;
+    await new Promise((r) => setTimeout(r, 5));
+    await store.flush();
+    const mtimeSecond = statSync(p).mtimeMs;
+    expect(mtimeSecond).toBe(mtimeFirst);
+  });
+
+  it("a new construction reads back what a previous instance flushed", async () => {
+    const p = cachePath();
+    const store1 = new LlmsTxtCacheStore(p, () => 1000);
+    store1.put("https://example.com", { ...baseEntry, fetchedAt: 1000 });
+    await store1.flush();
+
+    const store2 = new LlmsTxtCacheStore(p, () => 1000);
+    const r = store2.get("https://example.com");
+    expect(r?.entry.llmsTxt).toBe("# example\n> summary");
+  });
+
+  it("debounced flush coalesces rapid puts into one write", async () => {
+    const p = cachePath();
+    const store = new LlmsTxtCacheStore(p, () => 1000);
+    store.put("https://a.com", { ...baseEntry, fetchedAt: 1000 });
+    store.put("https://b.com", { ...baseEntry, fetchedAt: 1000 });
+    store.put("https://c.com", { ...baseEntry, fetchedAt: 1000 });
+    expect(existsSync(p)).toBe(false);
+    // Wait for the debounced flush to complete (500ms + some margin)
+    await new Promise((r) => setTimeout(r, 600));
+    expect(existsSync(p)).toBe(true);
+    const onDisk = JSON.parse(readFileSync(p, "utf8"));
+    expect(Object.keys(onDisk.entries)).toHaveLength(3);
   });
 });

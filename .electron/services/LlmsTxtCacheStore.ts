@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { promises as fs } from "fs";
 
 export interface CacheEntry {
   llmsTxt: string | null;
@@ -29,6 +30,8 @@ export class LlmsTxtCacheStore {
   private readonly filePath: string;
   private readonly now: () => number;
   private entries: Record<string, CacheEntry> = {};
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastSavedJson = "";
 
   constructor(filePath: string, now: () => number = Date.now) {
     this.filePath = filePath;
@@ -69,6 +72,7 @@ export class LlmsTxtCacheStore {
       return;
     }
     this.entries = (parsed as LlmsCacheFile).entries;
+    this.lastSavedJson = raw;
   }
 
   get(origin: string): GetResult | null {
@@ -82,19 +86,50 @@ export class LlmsTxtCacheStore {
 
   put(origin: string, entry: CacheEntry): void {
     this.entries[origin] = entry;
+    this.scheduleFlush();
   }
 
   bumpFetchedAt(origin: string): void {
     const entry = this.entries[origin];
     if (!entry) return;
     entry.fetchedAt = this.now();
+    this.scheduleFlush();
   }
 
   invalidate(origin: string): void {
+    if (!(origin in this.entries)) return;
     delete this.entries[origin];
+    this.scheduleFlush();
   }
 
   has(origin: string): boolean {
     return origin in this.entries;
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = setTimeout(() => {
+      void this.flush();
+    }, 500);
+  }
+
+  async flush(): Promise<void> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    const json = JSON.stringify({ schemaVersion: 1, entries: this.entries });
+    if (json === this.lastSavedJson) return;
+    const tmpPath = this.filePath + ".tmp";
+    try {
+      await fs.writeFile(tmpPath, json, "utf8");
+      await fs.rename(tmpPath, this.filePath);
+      this.lastSavedJson = json;
+    } catch (err) {
+      console.warn(
+        "[llms-cache] failed to persist cache:",
+        (err as Error).message,
+      );
+    }
   }
 }

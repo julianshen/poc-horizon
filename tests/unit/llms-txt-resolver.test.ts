@@ -234,3 +234,126 @@ describe("LlmsTxtResolver: cache hit fast path", () => {
     expect(result.llmsTxt).toBe("# new");
   });
 });
+
+async function settle(): Promise<void> {
+  // Let pending microtasks + the EE-mock's setTimeout(0) chain drain.
+  // Alternate setTimeout(0) and setImmediate to make sure both the timer
+  // phase and check phase run, regardless of Node's event-loop ordering.
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setImmediate(r));
+  }
+}
+
+describe("LlmsTxtResolver: stale-while-revalidate", () => {
+  it("stale hit returns cached immediately and fires revalidation in background", async () => {
+    let now = 1000;
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => now);
+    store.put("https://example.com", {
+      llmsTxt: "# old index",
+      llmsFullTxt: "# old full",
+      etagIndex: '"i1"',
+      etagFull: '"f1"',
+      fetchedAt: 1000,
+    });
+    // Advance past 24h TTL so the cached entry is stale.
+    now = 1000 + 25 * 60 * 60 * 1000;
+    const r = new LlmsTxtResolver(store, () => now);
+
+    enqueueResponse("https://example.com/llms.txt", {
+      statusCode: 200,
+      body: "# new index",
+      headers: { etag: '"i2"' },
+    });
+    enqueueResponse("https://example.com/llms-full.txt", {
+      statusCode: 304,
+    });
+
+    // Caller gets cached bodies immediately.
+    const result = await r.fetchBoth("https://example.com");
+    expect(result.llmsTxt).toBe("# old index");
+    expect(result.llmsFullTxt).toBe("# old full");
+
+    await settle();
+
+    const updated = store.get("https://example.com")!.entry;
+    expect(updated.llmsTxt).toBe("# new index");      // 200 replaced body
+    expect(updated.etagIndex).toBe('"i2"');
+    expect(updated.llmsFullTxt).toBe("# old full");   // 304 kept body
+    expect(updated.etagFull).toBe('"f1"');
+    expect(updated.fetchedAt).toBe(now);
+  });
+
+  it("revalidation network error keeps existing bodies and bumps fetchedAt", async () => {
+    let now = 1000;
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => now);
+    store.put("https://example.com", {
+      llmsTxt: "# old",
+      llmsFullTxt: null,
+      etagIndex: '"i1"',
+      fetchedAt: 1000,
+    });
+    now = 1000 + 25 * 60 * 60 * 1000;
+    const r = new LlmsTxtResolver(store, () => now);
+
+    enqueueResponse("https://example.com/llms.txt", "error");
+    enqueueResponse("https://example.com/llms-full.txt", "error");
+
+    await r.fetchBoth("https://example.com");
+    await settle();
+
+    const e = store.get("https://example.com")!.entry;
+    expect(e.llmsTxt).toBe("# old"); // unchanged
+    expect(e.fetchedAt).toBe(now);   // bumped
+  });
+
+  it("revalidation 404 nulls the body and clears etag", async () => {
+    let now = 1000;
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => now);
+    store.put("https://example.com", {
+      llmsTxt: "# old",
+      llmsFullTxt: "# old full",
+      etagIndex: '"i1"',
+      etagFull: '"f1"',
+      fetchedAt: 1000,
+    });
+    now = 1000 + 25 * 60 * 60 * 1000;
+    const r = new LlmsTxtResolver(store, () => now);
+
+    enqueueResponse("https://example.com/llms.txt", { statusCode: 404 });
+    enqueueResponse("https://example.com/llms-full.txt", { statusCode: 304 });
+
+    await r.fetchBoth("https://example.com");
+    await settle();
+
+    const e = store.get("https://example.com")!.entry;
+    expect(e.llmsTxt).toBeNull();
+    expect(e.etagIndex).toBeUndefined();
+    expect(e.llmsFullTxt).toBe("# old full"); // 304 kept
+  });
+
+  it("concurrent stale hits trigger only one revalidation", async () => {
+    let now = 1000;
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => now);
+    store.put("https://example.com", {
+      llmsTxt: "# cached",
+      llmsFullTxt: null,
+      fetchedAt: 1000,
+    });
+    now = 1000 + 25 * 60 * 60 * 1000;
+    const r = new LlmsTxtResolver(store, () => now);
+
+    enqueueResponse("https://example.com/llms.txt", { statusCode: 304 });
+    enqueueResponse("https://example.com/llms-full.txt", { statusCode: 404 });
+    // If a second revalidation fired, it would find an empty queue.
+
+    await Promise.all([
+      r.fetchBoth("https://example.com"),
+      r.fetchBoth("https://example.com"),
+      r.fetchBoth("https://example.com"),
+    ]);
+    await settle();
+
+    expect(requestQueue).toHaveLength(0);
+  });
+});

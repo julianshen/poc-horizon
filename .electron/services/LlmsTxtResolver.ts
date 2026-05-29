@@ -99,13 +99,33 @@ export class LlmsTxtResolver {
     };
   }
 
-  private scheduleRevalidate(origin: string, _existing: CacheEntry): void {
-    // Inert in Task 3; filled in by Task 5.
+  private scheduleRevalidate(origin: string, existing: CacheEntry): void {
     if (this.inflightRevalidate.has(origin)) return;
     this.inflightRevalidate.add(origin);
-    void Promise.resolve().finally(() => {
+    void this.doRevalidate(origin, existing).finally(() => {
       this.inflightRevalidate.delete(origin);
     });
+  }
+
+  private async doRevalidate(
+    origin: string,
+    existing: CacheEntry,
+  ): Promise<void> {
+    const [indexResult, fullResult] = await Promise.all([
+      this.tryGet(`${origin}/llms.txt`, {
+        ifNoneMatch: existing.etagIndex,
+        ifModifiedSince: existing.lastModifiedIndex,
+      }),
+      this.tryGet(`${origin}/llms-full.txt`, {
+        ifNoneMatch: existing.etagFull,
+        ifModifiedSince: existing.lastModifiedFull,
+      }),
+    ]);
+
+    const merged: CacheEntry = { ...existing, fetchedAt: this.now() };
+    applyPerFile(merged, "Index", indexResult);
+    applyPerFile(merged, "Full", fullResult);
+    this.store.put(origin, merged);
   }
 
   private buildEntry(
@@ -204,4 +224,40 @@ export class LlmsTxtResolver {
 function first(v: string | string[] | undefined): string | undefined {
   if (Array.isArray(v)) return v[0];
   return v;
+}
+
+function applyPerFile(
+  merged: CacheEntry,
+  kind: "Index" | "Full",
+  result: TryGetResult,
+): void {
+  const bodyKey = kind === "Index" ? "llmsTxt" : "llmsFullTxt";
+  const etagKey = kind === "Index" ? "etagIndex" : "etagFull";
+  const lmKey = kind === "Index" ? "lastModifiedIndex" : "lastModifiedFull";
+  switch (result.status) {
+    case 200:
+      merged[bodyKey] = result.body;
+      if (result.etag) {
+        merged[etagKey] = result.etag;
+      } else {
+        delete merged[etagKey];
+      }
+      if (result.lastModified) {
+        merged[lmKey] = result.lastModified;
+      } else {
+        delete merged[lmKey];
+      }
+      break;
+    case 304:
+      // Keep existing body/etag/lm.
+      break;
+    case 404:
+      merged[bodyKey] = null;
+      delete merged[etagKey];
+      delete merged[lmKey];
+      break;
+    case "error":
+      // Keep existing fields. fetchedAt is bumped at the outer scope.
+      break;
+  }
 }

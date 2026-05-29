@@ -38,16 +38,43 @@ export class LlmsTxtResolver {
   >();
   private inflightRevalidate = new Set<string>();
 
+  /**
+   * @param store - The backing cache store for persistence and TTL math.
+   * @param now - Dependency-injected clock (defaults to `Date.now`).
+   */
   constructor(store: LlmsTxtCacheStore, now: () => number = Date.now) {
     this.store = store;
     this.now = now;
   }
 
+  /**
+   * Fetch the best available llms.txt content for an origin.
+   *
+   * Prefers `/llms-full.txt` when available; falls back to `/llms.txt`.
+   * May return cached data immediately and refresh in the background
+   * (stale-while-revalidate).
+   *
+   * @param origin - The origin URL string (e.g. `"https://example.com"`).
+   * @returns The content string, or `null` when neither file is available.
+   */
   async fetch(origin: string): Promise<string | null> {
     const both = await this.fetchBoth(origin);
     return both.llmsFullTxt ?? both.llmsTxt;
   }
 
+  /**
+   * Fetch both `/llms.txt` and `/llms-full.txt` for an origin.
+   *
+   * On a cache miss, performs two parallel GET requests and persists the
+   * result. On a cache hit with stale data, returns the stale content
+   * immediately while scheduling a background revalidation using
+   * conditional headers (`If-None-Match`, `If-Modified-Since`).
+   * Concurrent calls for the same origin are deduplicated.
+   *
+   * @param origin - The origin URL string (e.g. `"https://example.com"`).
+   * @returns An object with `llmsTxt` and `llmsFullTxt` — each is the
+   *          content string or `null`.
+   */
   async fetchBoth(
     origin: string,
   ): Promise<{ llmsTxt: string | null; llmsFullTxt: string | null }> {
@@ -72,6 +99,11 @@ export class LlmsTxtResolver {
     }
   }
 
+  /**
+   * Remove a cached entry for the given origin.
+   *
+   * @param origin - The origin URL string used as the cache key.
+   */
   invalidate(origin: string): void {
     this.store.invalidate(origin);
   }
@@ -103,9 +135,16 @@ export class LlmsTxtResolver {
   private scheduleRevalidate(origin: string, existing: CacheEntry): void {
     if (this.inflightRevalidate.has(origin)) return;
     this.inflightRevalidate.add(origin);
-    void this.doRevalidate(origin, existing).finally(() => {
-      this.inflightRevalidate.delete(origin);
-    });
+    void this.doRevalidate(origin, existing)
+      .catch((err) => {
+        console.warn(
+          `[llms-resolver] revalidation failed for ${origin}:`,
+          err,
+        );
+      })
+      .finally(() => {
+        this.inflightRevalidate.delete(origin);
+      });
   }
 
   private async doRevalidate(
@@ -122,6 +161,10 @@ export class LlmsTxtResolver {
         ifModifiedSince: existing.lastModifiedFull,
       }),
     ]);
+
+    // Don't bump fetchedAt or write the cache when both fetches failed.
+    const bothFailed = indexResult.status === "error" && fullResult.status === "error";
+    if (bothFailed) return;
 
     const merged: CacheEntry = { ...existing, fetchedAt: this.now() };
     applyPerFile(merged, "Index", indexResult);
@@ -208,7 +251,7 @@ export class LlmsTxtResolver {
           return;
         }
         clearTimeout(timer);
-        if (status >= 400 && status < 500) {
+        if (status === 404 || status === 410) {
           resolve({ status: 404, body: null });
         } else {
           resolve({ status: "error", body: null });
@@ -263,7 +306,8 @@ function applyPerFile(
       delete merged[lmKey];
       break;
     case "error":
-      // Keep existing fields. fetchedAt is bumped at the outer scope.
+      // Keep existing fields. fetchedAt is bumped at the outer scope
+      // only when at least one fetch succeeded.
       break;
   }
 }

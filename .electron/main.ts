@@ -381,7 +381,7 @@ function initSingletons(): void {
 
   // One global before-quit flush — uses the live `persistableTabManagers`
   // set so it stays correct as windows open and close.
-  app.on("before-quit", () => {
+  app.on("before-quit", (event) => {
     if (tabSessionStore) {
       for (const tm of persistableTabManagers) {
         const tabs = tm.getAllTabs().map((t: Tab) => ({
@@ -394,7 +394,15 @@ function initSingletons(): void {
       }
     }
     if (llmsTxtCacheStore) {
-      void llmsTxtCacheStore.flush();
+      event.preventDefault();
+      llmsTxtCacheStore
+        .flush()
+        .catch((err) => {
+          console.error("[main] llms.txt cache flush failed:", err);
+        })
+        .finally(() => {
+          app.quit();
+        });
     }
   });
 }

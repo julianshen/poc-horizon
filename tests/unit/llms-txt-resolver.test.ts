@@ -11,7 +11,21 @@ interface MockResponse {
 const requestQueue: Array<{
   url: string;
   response: MockResponse | "timeout" | "error" | "oversized";
+  sentHeaders?: Record<string, string>;
 }> = [];
+
+/** Persistent log of headers sent, keyed by URL (survives queue drain). */
+const sentHeadersLog: Record<string, Record<string, string>> = {};
+
+/** Read the last recorded headers for a URL, even after queue drain. */
+export function getSentHeaders(url: string): Record<string, string> | undefined {
+  return sentHeadersLog[url];
+}
+
+/** Reset the sent-headers log (call before each test). */
+export function clearSentHeaders(): void {
+  for (const k of Object.keys(sentHeadersLog)) delete sentHeadersLog[k];
+}
 
 function enqueueResponse(
   url: string,
@@ -43,6 +57,9 @@ vi.mock("electron", () => {
             setTimeout(() => req.emit("error", new Error("no queued response")), 0);
             return;
           }
+          // Record the headers sent so tests can assert conditional GET headers.
+          requestQueue[idx].sentHeaders = { ...sentHeaders };
+          sentHeadersLog[url] = sentHeaders;
           const { response } = requestQueue.splice(idx, 1)[0];
           if (response === "timeout") return;
           if (response === "error") {
@@ -83,6 +100,7 @@ const tmp = useTmpDir("horizon-llms-resolver");
 
 beforeEach(() => {
   requestQueue.length = 0;
+  clearSentHeaders();
 });
 
 describe("LlmsTxtResolver.fetchBoth: fresh path", () => {
@@ -274,6 +292,15 @@ describe("LlmsTxtResolver: stale-while-revalidate", () => {
     expect(result.llmsTxt).toBe("# old index");
     expect(result.llmsFullTxt).toBe("# old full");
 
+    // Assert conditional GET headers were sent during revalidation.
+    expect(getSentHeaders("https://example.com/llms.txt")).toBeDefined();
+    const idxHeaders = getSentHeaders("https://example.com/llms.txt")!;
+    expect(idxHeaders["If-None-Match"]).toBe('"i1"');
+    expect(idxHeaders["If-Modified-Since"]).toBeUndefined();
+    const fullHeaders = getSentHeaders("https://example.com/llms-full.txt");
+    expect(fullHeaders).toBeDefined();
+    expect(fullHeaders!["If-None-Match"]).toBe('"f1"');
+
     await settle();
 
     const updated = store.get("https://example.com")!.entry;
@@ -284,7 +311,7 @@ describe("LlmsTxtResolver: stale-while-revalidate", () => {
     expect(updated.fetchedAt).toBe(now);
   });
 
-  it("revalidation network error keeps existing bodies and bumps fetchedAt", async () => {
+  it("revalidation network error keeps existing bodies without bumping fetchedAt", async () => {
     let now = 1000;
     const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => now);
     store.put("https://example.com", {
@@ -304,7 +331,7 @@ describe("LlmsTxtResolver: stale-while-revalidate", () => {
 
     const e = store.get("https://example.com")!.entry;
     expect(e.llmsTxt).toBe("# old"); // unchanged
-    expect(e.fetchedAt).toBe(now);   // bumped
+    expect(e.fetchedAt).toBe(1000);   // NOT bumped — both fetches failed
   });
 
   it("revalidation 404 nulls the body and clears etag", async () => {

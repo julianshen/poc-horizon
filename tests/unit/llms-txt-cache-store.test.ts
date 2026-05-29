@@ -1,7 +1,16 @@
 import { describe, it, expect, vi } from "vitest";
 import { writeFileSync, existsSync, readFileSync, statSync } from "fs";
-import { LlmsTxtCacheStore } from "@electron/services/LlmsTxtCacheStore";
+import {
+  LlmsTxtCacheStore,
+  FLUSH_DEBOUNCE_MS,
+  POSITIVE_TTL_MS,
+  NEGATIVE_TTL_MS,
+} from "@electron/services/LlmsTxtCacheStore";
 import { useTmpDir } from "../helpers/tmpdir";
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const DEBOUNCE_WAIT_MS = FLUSH_DEBOUNCE_MS + 100;
 
 const tmp = useTmpDir("horizon-llms-cache");
 const cachePath = () => tmp.path("llms-cache.json");
@@ -34,7 +43,7 @@ describe("LlmsTxtCacheStore: load + get", () => {
     let now = 1000;
     const store = new LlmsTxtCacheStore(cachePath(), () => now);
     store.put("https://example.com", { ...baseEntry, fetchedAt: 1000 });
-    now = 1000 + 25 * 60 * 60 * 1000;
+    now = 1000 + POSITIVE_TTL_MS + HOUR_MS; // 25 hours: stale
     expect(store.get("https://example.com")?.freshness).toBe("stale");
   });
 
@@ -56,7 +65,7 @@ describe("LlmsTxtCacheStore: load + get", () => {
       llmsFullTxt: null,
       fetchedAt: 0,
     });
-    now = 8 * 24 * 60 * 60 * 1000;
+    now = NEGATIVE_TTL_MS + DAY_MS; // 8 days: stale
     expect(store.get("https://example.com")?.freshness).toBe("stale");
   });
 
@@ -115,7 +124,7 @@ describe("LlmsTxtCacheStore: invalidate / has / bumpFetchedAt", () => {
     let now = 1000;
     const store = new LlmsTxtCacheStore(cachePath(), () => now);
     store.put("https://example.com", { ...baseEntry, fetchedAt: 1000 });
-    now = 1000 + 25 * 60 * 60 * 1000;
+    now = 1000 + POSITIVE_TTL_MS + HOUR_MS;
     expect(store.get("https://example.com")?.freshness).toBe("stale");
     store.bumpFetchedAt("https://example.com");
     const r = store.get("https://example.com");
@@ -173,8 +182,8 @@ describe("LlmsTxtCacheStore: debounced flush", () => {
     store.put("https://b.com", { ...baseEntry, fetchedAt: 1000 });
     store.put("https://c.com", { ...baseEntry, fetchedAt: 1000 });
     expect(existsSync(p)).toBe(false);
-    // Wait for the debounced flush to complete (500ms + some margin)
-    await new Promise((r) => setTimeout(r, 600));
+    // Wait for the debounced flush to complete
+    await new Promise((r) => setTimeout(r, DEBOUNCE_WAIT_MS));
     expect(existsSync(p)).toBe(true);
     const onDisk = JSON.parse(readFileSync(p, "utf8"));
     expect(Object.keys(onDisk.entries)).toHaveLength(3);

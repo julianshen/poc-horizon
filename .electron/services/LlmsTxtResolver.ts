@@ -1,4 +1,5 @@
 import { net } from "electron";
+import { StringDecoder } from "string_decoder";
 import {
   LlmsTxtCacheStore,
   CacheEntry,
@@ -158,7 +159,9 @@ export class LlmsTxtResolver {
       if (conditional?.ifNoneMatch) req.setHeader("If-None-Match", conditional.ifNoneMatch);
       if (conditional?.ifModifiedSince) req.setHeader("If-Modified-Since", conditional.ifModifiedSince);
 
+      const decoder = new StringDecoder("utf8");
       let body = "";
+      let bytesReceived = 0;
       let aborted = false;
       const timer = setTimeout(() => {
         aborted = true;
@@ -180,16 +183,19 @@ export class LlmsTxtResolver {
         if (status >= 200 && status < 300) {
           res.on("data", (chunk: Buffer) => {
             if (aborted) return;
-            body += chunk.toString("utf8");
-            if (body.length > MAX_BODY_BYTES) {
+            bytesReceived += chunk.length;
+            if (bytesReceived > MAX_BODY_BYTES) {
               aborted = true;
               clearTimeout(timer);
               req.abort();
               resolve({ status: "error", body: null });
+              return;
             }
+            body += decoder.write(chunk);
           });
           res.on("end", () => {
             if (aborted) return;
+            body += decoder.end();
             clearTimeout(timer);
             resolve({ status: 200, body, etag, lastModified });
           });

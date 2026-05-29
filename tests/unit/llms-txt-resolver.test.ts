@@ -203,3 +203,34 @@ describe("LlmsTxtResolver.fetch: prefer full, fallback to index", () => {
     expect(await r.fetch("https://example.com")).toBeNull();
   });
 });
+
+describe("LlmsTxtResolver: cache hit fast path", () => {
+  it("fresh cache hit returns immediately without any network calls", async () => {
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => 1000);
+    store.put("https://example.com", {
+      llmsTxt: "# cached index",
+      llmsFullTxt: "# cached full",
+      fetchedAt: 1000,
+    });
+    const r = new LlmsTxtResolver(store, () => 1000);
+    const result = await r.fetchBoth("https://example.com");
+    expect(result.llmsTxt).toBe("# cached index");
+    expect(result.llmsFullTxt).toBe("# cached full");
+    expect(requestQueue).toHaveLength(0);
+  });
+
+  it("invalidate causes the next fetch to hit the network", async () => {
+    const store = new LlmsTxtCacheStore(tmp.path("c.json"), () => 1000);
+    store.put("https://example.com", {
+      llmsTxt: "# cached",
+      llmsFullTxt: null,
+      fetchedAt: 1000,
+    });
+    const r = new LlmsTxtResolver(store, () => 1000);
+    r.invalidate("https://example.com");
+    enqueueResponse("https://example.com/llms.txt", { statusCode: 200, body: "# new" });
+    enqueueResponse("https://example.com/llms-full.txt", { statusCode: 404 });
+    const result = await r.fetchBoth("https://example.com");
+    expect(result.llmsTxt).toBe("# new");
+  });
+});

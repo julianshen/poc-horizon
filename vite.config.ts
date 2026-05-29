@@ -63,6 +63,7 @@ export default defineConfig({
         ".electron/services/windowOpenPolicy.ts",
         ".electron/services/autoUpdateScheduler.ts",
         ".electron/services/HibernationController.ts",
+        ".electron/services/LlmsTxtCacheStore.ts",
         ".electron/ipc/main-handlers.ts",
         ".electron/preload.ts",
       ],

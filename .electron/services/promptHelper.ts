@@ -1,3 +1,5 @@
+import type { ParsedLlmsTxt } from "./llmsTxtParser";
+
 /**
  * Truncate text to prevent model token limits being exceeded.
  */
@@ -6,6 +8,29 @@ export function truncateText(text: string, maxChars: number): string {
   return (
     text.slice(0, maxChars) + "\n\n... [truncated to save token limit] ...\n"
   );
+}
+
+/**
+ * Render a COMPACT, useful summary from a parsed llms.txt — the title,
+ * one-line summary, and the section nav links. Deliberately excludes raw
+ * document bodies (llms-full.txt content) so we never dump large docs into
+ * the agent's token budget; the agent can fetch a linked doc on demand.
+ * Returns "" when there's nothing useful to inject.
+ */
+export function summarizeLlmsGuide(parsed: ParsedLlmsTxt): string {
+  const lines: string[] = [];
+  if (parsed.title) lines.push(`# ${parsed.title}`);
+  if (parsed.summary) lines.push(parsed.summary);
+  for (const section of parsed.sections) {
+    if (section.links.length === 0) continue;
+    if (section.name) lines.push(`\n## ${section.name}`);
+    for (const link of section.links) {
+      lines.push(
+        `- ${link.title}: ${link.url}${link.description ? ` — ${link.description}` : ""}`,
+      );
+    }
+  }
+  return lines.join("\n");
 }
 
 /**

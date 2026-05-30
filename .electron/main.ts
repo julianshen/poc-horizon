@@ -545,6 +545,15 @@ function registerHandlers(): void {
         pages,
       });
 
+      // Diagnostic: surface how much context we send into Pi each turn so an
+      // oversized prompt (→ 400 "prompt too long") is visible. ~4 chars/token.
+      const pageChars = pages.reduce((n, p) => n + p.text.length, 0);
+      console.warn(
+        `[ai:start] prompt ${augmentedPrompt.length} chars (~${Math.round(
+          augmentedPrompt.length / 4,
+        )} tok) — skills ${skills ? skills.length : 0}, ${pages.length} mentioned page(s) ${pageChars} chars`,
+      );
+
       activePiSession = piSession;
       lastAgentActivityAt = Date.now();
       void piSession.startTurn(augmentedPrompt);

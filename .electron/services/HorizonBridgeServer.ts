@@ -473,7 +473,7 @@ export class HorizonBridgeServer {
         const name = String(args.name ?? "").trim();
         if (!name) throw new Error("proposeSave: name required");
         const content = String(args.content ?? "");
-        if (!content) throw new Error("proposeSave: content required");
+        if (!content.trim()) throw new Error("proposeSave: content required");
         const host = typeof args.host === "string" ? args.host : undefined;
         const attach =
           kind === "action" &&

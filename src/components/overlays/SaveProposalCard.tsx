@@ -63,7 +63,10 @@ export const SaveProposalCard: React.FC = () => {
   if (!current) return null;
 
   const remaining = queue.length - 1;
-  const canSave = name.trim().length > 0 && (kind === "action" || host.trim().length > 0);
+  const canSave =
+    name.trim().length > 0 &&
+    content.trim().length > 0 &&
+    (kind === "action" || host.trim().length > 0);
 
   return (
     <div

@@ -668,6 +668,22 @@ function registerHandlers(): void {
       return domainSkills.save(host, name, content ?? "");
     },
   );
+  ipcMain.handle(
+    IPC_CHANNELS.DOMAIN_SKILL_LIST,
+    async (_event, { host }: { host?: string }) => {
+      if (host) return { host, names: await domainSkills.list(host) };
+      const hosts = await domainSkills.listHosts();
+      const byHost = await Promise.all(
+        hosts.map(async (h) => ({ host: h, names: await domainSkills.list(h) })),
+      );
+      return byHost;
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.DOMAIN_SKILL_REMOVE,
+    (_event, { host, name }: { host: string; name: string }) =>
+      domainSkills.remove(host, name),
+  );
 
   // Translation handlers (translate:page / translate:cancel / translate:restore
   // / translate:selection) are registered in .electron/ipc/main-handlers.ts —

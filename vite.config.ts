@@ -48,6 +48,7 @@ export default defineConfig({
         "src/components/overlays/PermissionPrompt.tsx",
         "src/components/overlays/SettingsPanel.tsx",
         "src/components/overlays/SidePanel.tsx",
+        "src/components/overlays/SaveProposalCard.tsx",
         "shared/**/*.ts",
         ".electron/services/SettingsManager.ts",
         ".electron/services/pageTranslator.ts",

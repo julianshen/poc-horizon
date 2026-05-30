@@ -69,6 +69,7 @@ export default defineConfig({
         ".electron/services/LlmsTxtResolver.ts",
         ".electron/services/StructuredActionInvoker.ts",
         ".electron/services/PageLearner.ts",
+        ".electron/services/agentTraffic.ts",
         ".electron/ipc/main-handlers.ts",
         ".electron/preload.ts",
       ],

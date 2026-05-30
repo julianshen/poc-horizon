@@ -44,6 +44,11 @@ export class PiSession extends EventEmitter {
   private proc: ChildProcess | null = null;
   private buf = "";
   private running = false;
+  /** Last prompt sent this turn — re-queued with a streamingBehavior if Pi
+   *  rejects a plain prompt with "Agent is already processing". */
+  private lastPrompt: string | null = null;
+  /** Guards the steer-retry above so a persistent rejection can't loop. */
+  private steerRetried = false;
   /** Pi's session file path, captured from the first get_state response. */
   private sessionFile: string | null = null;
   /** Counter for request IDs we send to Pi (so we can correlate responses). */
@@ -133,6 +138,8 @@ export class PiSession extends EventEmitter {
   async startTurn(prompt: string): Promise<void> {
     if (!this.proc) this.start();
     if (!this.proc) return;
+    this.lastPrompt = prompt;
+    this.steerRetried = false;
     if (this.running) {
       // Pi will reject overlapping prompts without streamingBehavior; we
       // queue with 'steer' so a second prompt during streaming is delivered
@@ -362,9 +369,29 @@ export class PiSession extends EventEmitter {
 
       case "response": {
         if (msg.success === false) {
+          const errStr = String(msg.error ?? "unknown");
+          // Desync recovery: Pi was still processing (e.g. auto-retrying a
+          // failed turn) while our `running` flag had cleared, so startTurn
+          // sent a plain prompt that Pi rejected ("Agent is already
+          // processing"). Re-queue the SAME prompt once with a
+          // streamingBehavior instead of surfacing a confusing error.
+          if (
+            /already processing|streamingBehavior/i.test(errStr) &&
+            this.lastPrompt !== null &&
+            !this.steerRetried
+          ) {
+            this.steerRetried = true;
+            this.running = true;
+            this.send({
+              type: "prompt",
+              message: this.lastPrompt,
+              streamingBehavior: "steer",
+            });
+            return;
+          }
           this.emitEvent({
             type: "error",
-            message: `Pi command failed: ${String(msg.error ?? "unknown")}`,
+            message: `Pi command failed: ${errStr}`,
           });
           if (
             this.running &&

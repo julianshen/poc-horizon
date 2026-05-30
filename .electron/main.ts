@@ -128,7 +128,6 @@ type AiSessionKind = "default" | "incognito";
 function aiSessionKindFor(tm: TabManager): AiSessionKind {
   return tm.isIncognito() ? "incognito" : "default";
 }
-/** XML-escape for use inside an attribute value (mention <page> tags). */
 /**
  * Agent Policy v1 § 7 — identify agent-driven traffic via header.
  * Spec § 7: "User agents that act on behalf of an AI agent SHOULD

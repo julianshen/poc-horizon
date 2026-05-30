@@ -76,6 +76,7 @@ const INITIAL: Message[] = [
 /** Label shared by the learn-page header button, the toolbar button's
  *  drained request, and the resolvePreset entry below. */
 const LEARN_LABEL = "Learn this page's actions";
+const SAVE_LABEL = "Save what we learned";
 
 /**
  * Known one-click presets. Maps the chip label (and the "Summarize"
@@ -114,6 +115,15 @@ function resolvePreset(
         "Learn what actions I can take on this page. Call browser_learn_page_actions, " +
         "then give me a short summary of the available actions (search, create, navigation, " +
         "filters, etc.), any forms, and any API endpoints you observed.",
+      attach: "activeTab",
+    };
+  }
+  if (label === SAVE_LABEL) {
+    return {
+      prompt:
+        "From what we just learned or did on this page, propose ONE useful thing to save by calling " +
+        "browser_propose_save. Use kind='skill' (markdown notes + host) for reusable site knowledge, " +
+        "or kind='action' (a name + a short prompt + attach) for a repeatable request. Give it a clear, short name.",
       attach: "activeTab",
     };
   }
@@ -375,6 +385,7 @@ export const AIPanel: React.FC = () => {
   );
 
   const learnThisPage = useCallback(() => runPreset(LEARN_LABEL), [runPreset]);
+  const saveWhatWeLearned = useCallback(() => runPreset(SAVE_LABEL), [runPreset]);
 
   // Drain a "learn this page" request from a toolbar/command trigger.
   // consumeLearnRequest() runs first so the flag always clears; runPreset
@@ -489,6 +500,20 @@ export const AIPanel: React.FC = () => {
             <circle cx="11" cy="11" r="6" />
             <line x1="15.5" y1="15.5" x2="21" y2="21" />
             <path d="M18.5 2.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+        <button
+          onClick={saveWhatWeLearned}
+          disabled={running}
+          aria-label="Save what we learned"
+          title="Save a site skill or reusable action from this page"
+          className="icon-btn"
+          style={{ width: 26, height: 26 }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <path d="M5 3h11l3 3v15a0 0 0 0 1 0 0H5z" fill="none" />
+            <path d="M8 3v6h7V3" />
+            <rect x="8" y="13" width="8" height="5" fill="none" />
           </svg>
         </button>
         <div className="relative" style={{ width: 26, height: 26 }}>

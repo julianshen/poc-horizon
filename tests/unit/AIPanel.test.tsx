@@ -672,6 +672,15 @@ describe("AIPanel", () => {
     expect(api().invokes.filter((i) => i.channel === "ai:start").length).toBe(1);
   });
 
+  it("'Save…' header button dispatches a propose-save prompt to the agent", async () => {
+    render(<AIPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Save what we learned" }));
+    await waitFor(() => {
+      const start = api().invokes.find((i) => i.channel === "ai:start");
+      expect((start!.payload as { prompt: string }).prompt).toContain("browser_propose_save");
+    });
+  });
+
   // Suppress unused import warning.
   void api;
 });

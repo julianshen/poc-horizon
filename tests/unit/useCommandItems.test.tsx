@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { setupRendererTest } from "../helpers/fakeHorizonAPI";
 import { useCommandItems } from "@/hooks/useCommandItems";
@@ -74,5 +74,18 @@ describe("useCommandItems", () => {
       channel: "navigation:reload",
       payload: { tabId: "x" },
     });
+  });
+
+  it("exposes a 'Learn this page's actions' command whose action requests learn + closes", () => {
+    const close = vi.fn();
+    const { result } = renderHook(() => useCommandItems("", close));
+    const item = result.current.find(
+      (i) => i.label === "Learn this page's actions",
+    );
+    expect(item).toBeTruthy();
+    act(() => item!.action());
+    expect(useBrowserStore.getState().pendingLearnRequest).toBe(true);
+    expect(useBrowserStore.getState().showAI).toBe(true);
+    expect(close).toHaveBeenCalledTimes(1);
   });
 });

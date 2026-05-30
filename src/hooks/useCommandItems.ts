@@ -17,7 +17,8 @@ export function useCommandItems(
   query: string,
   close: () => void,
 ): CommandItem[] {
-  const { tabs, activeTabId, toggleOverlay, toggleAI } = useBrowserStore();
+  const { tabs, activeTabId, toggleOverlay, toggleAI, requestLearnPage } =
+    useBrowserStore();
 
   return useMemo<CommandItem[]>(() => {
     const base: CommandItem[] = [
@@ -27,6 +28,15 @@ export function useCommandItems(
         hint: "AI",
         action: () => {
           if (!useBrowserStore.getState().showAI) toggleAI();
+          close();
+        },
+      },
+      {
+        kind: "page",
+        label: "Learn this page's actions",
+        hint: "AI",
+        action: () => {
+          requestLearnPage();
           close();
         },
       },
@@ -73,7 +83,7 @@ export function useCommandItems(
     return base.filter(
       (it) => it.kind === "ai" || it.label.toLowerCase().includes(needle),
     );
-  }, [query, tabs, activeTabId, toggleAI, toggleOverlay, close]);
+  }, [query, tabs, activeTabId, toggleAI, toggleOverlay, requestLearnPage, close]);
 }
 
 type OverlayKey = Parameters<

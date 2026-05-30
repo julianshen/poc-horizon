@@ -67,6 +67,16 @@ interface BrowserState {
     pageUrl: string;
     pageTitle: string;
   } | null;
+  /** Set true by requestLearnPage() (which also opens the AI panel via
+   *  showAI:true) when a "learn this page" trigger fires. AIPanel drains
+   *  it by running the learn preset, then clears it via
+   *  consumeLearnRequest(). consumeLearnRequest only clears the flag — it
+   *  intentionally leaves showAI untouched so the panel stays open while
+   *  the agent's reply renders (mirrors consumeSelection). Flag-only: no
+   *  return value. */
+  pendingLearnRequest: boolean;
+  requestLearnPage: () => void;
+  consumeLearnRequest: () => void;
   // Component-local menus lifted to the store so BrowserContentArea can
   // hide the BrowserView when they're open — Electron's BrowserView paints
   // above all DOM, so an open menu that crosses into the view region would
@@ -143,6 +153,9 @@ export const useBrowserStore = create<BrowserState>((set) => ({
     });
     return drained;
   },
+  pendingLearnRequest: false,
+  requestLearnPage: () => set({ showAI: true, pendingLearnRequest: true }),
+  consumeLearnRequest: () => set({ pendingLearnRequest: false }),
 
   setTabs: (tabs) => set({ tabs }),
   setActiveTab: (activeTabId) => set({ activeTabId }),

@@ -7,15 +7,20 @@ import { useBrowserStore } from "../../stores/browserStore";
 export const Toolbar: React.FC = () => {
   const { goBack, goForward, reload, canGoBack, canGoForward, isLoading } =
     useNavigation();
-  const { showAI, toggleAI, toggleOverlay, showAppMenu, setAppMenuOpen } =
-    useBrowserStore();
+  const {
+    showAI,
+    toggleAI,
+    toggleOverlay,
+    showAppMenu,
+    setAppMenuOpen,
+    requestLearnPage,
+  } = useBrowserStore();
   const toggleMenu = useCallback(
     () => setAppMenuOpen(!showAppMenu),
     [setAppMenuOpen, showAppMenu],
   );
   const closeMenu = useCallback(() => setAppMenuOpen(false), [setAppMenuOpen]);
   const openCmd = useCallback(() => toggleOverlay("showCmd"), [toggleOverlay]);
-
   return (
     <div
       className="flex items-center gap-1.5 px-3.5 pb-2.5 shrink-0 relative"
@@ -83,6 +88,18 @@ export const Toolbar: React.FC = () => {
             <rect x="14" y="3" width="7" height="7" rx="1.5" />
             <rect x="3" y="14" width="7" height="7" rx="1.5" />
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg>
+        </button>
+        <button
+          onClick={requestLearnPage}
+          className="icon-btn"
+          aria-label="Learn this page's actions"
+          title="Learn what actions this page offers"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <circle cx="11" cy="11" r="6" />
+            <line x1="15.5" y1="15.5" x2="21" y2="21" />
+            <path d="M18.5 2.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z" fill="currentColor" stroke="none" />
           </svg>
         </button>
         <button

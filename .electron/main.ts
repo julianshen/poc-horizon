@@ -41,8 +41,10 @@ import { writePiConfig } from "./services/PiConfigWriter";
 import { LlmsTxtResolver } from "./services/LlmsTxtResolver";
 import { LlmsTxtCacheStore } from "./services/LlmsTxtCacheStore";
 import { parseLlmsTxt } from "./services/llmsTxtParser";
-import { writePiSkill } from "./services/piSkillWriter";
-import { buildAugmentedPrompt } from "./services/promptHelper";
+import {
+  buildAugmentedPrompt,
+  summarizeLlmsGuide,
+} from "./services/promptHelper";
 import { WorkflowsManager } from "./services/WorkflowsManager";
 import { HelperRegistry } from "./services/HelperRegistry";
 import { HibernationController } from "./services/HibernationController";
@@ -372,15 +374,13 @@ async function handleNavigateForLlmsTxt(
   }
   // Parse the index (prefer llms.txt; fall back to first lines of llms-full.txt).
   const parsed = parseLlmsTxt(llmsTxt ?? llmsFullTxt ?? "");
-  let skillFile: string | undefined;
-  if (llmsTxt || llmsFullTxt) {
-    const path = await writePiSkill(
-      origin,
-      llmsTxt ?? "",
-      llmsFullTxt ?? undefined,
-    );
-    if (path) skillFile = path;
-  }
+  // NOTE: we deliberately no longer write per-site Pi skill files from
+  // llms.txt. Pi auto-loads every ~/.pi/agent/skills file into context on
+  // startup, so one file per visited site accumulated into a large, hidden
+  // token cost on every request. The parsed guide below (panel) + a compact
+  // summary injected at turn time (see ai:start) cover the useful parts
+  // without dumping raw llms content into the token budget.
+  const skillFile: string | undefined = undefined;
   if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
     win.webContents.send(IPC_CHANNELS.AI_LLMS_TXT_FOUND, {
       origin,
@@ -586,7 +586,11 @@ function registerHandlers(): void {
       if (useLlmsTxt) {
         try {
           origin = new URL(view.webContents.getURL()).origin;
-          skills = await llmsTxtResolver.fetch(origin);
+          // Inject ONLY a compact, useful summary (title + section nav links)
+          // — never the raw llms.txt / llms-full.txt body, which can be huge.
+          const both = await llmsTxtResolver.fetchBoth(origin);
+          const raw = both.llmsTxt ?? both.llmsFullTxt;
+          skills = raw ? summarizeLlmsGuide(parseLlmsTxt(raw)) : null;
         } catch {
           /* invalid URL (horizon:// etc.) — skip */
         }

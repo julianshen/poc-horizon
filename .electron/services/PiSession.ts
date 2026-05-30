@@ -402,6 +402,9 @@ export class PiSession extends EventEmitter {
   }
 
   private emitEvent(e: AgentEvent): void {
+    // Surface the verbatim agent/provider error (e.g. an LLM 400 body) to the
+    // terminal — the AI panel may abbreviate it to just the status code.
+    if (e.type === "error") console.error("[ai:error]", e.message);
     this.emit("event", e);
   }
 }

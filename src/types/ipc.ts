@@ -229,6 +229,22 @@ export interface IpcChannels {
   };
   /** Renderer → Main: the user decided on a pending action prompt. */
   "ai:actionDecide": { id: string; allow: boolean };
+  /** Main → Renderer: the agent drafted something to save; the renderer
+   *  shows an editable confirm card. */
+  "ai:saveProposal": {
+    id: string;
+    kind: "skill" | "action";
+    name: string;
+    content: string;
+    host?: string;
+    attach?: "activeTab" | "allTabs" | "none";
+  };
+  /** Renderer → Main: persist a per-site skill. */
+  "domainSkill:save": { host: string; name: string; content: string };
+  /** Renderer → Main: list skill names for a host (or all hosts when host omitted). */
+  "domainSkill:list": { host?: string };
+  /** Renderer → Main: delete a per-site skill. */
+  "domainSkill:remove": { host: string; name: string };
   /** Translate the active tab's visible text into targetLang via headless Pi. */
   "translate:page": { targetLang: string };
   /** Roll back a previously-translated page to its original text. */

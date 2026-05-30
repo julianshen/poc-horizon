@@ -37,6 +37,11 @@ interface ToolResponse {
 export class HorizonBridgeServer {
   private server: Server | null = null;
   private connections = new Set<Socket>();
+  private proposalSeq = 0;
+  private nextProposalSeq(): number {
+    this.proposalSeq += 1;
+    return this.proposalSeq;
+  }
 
   constructor(
     private readonly harness: BrowserHarness,
@@ -51,6 +56,16 @@ export class HorizonBridgeServer {
     private readonly policyResolver?: AgentPolicyResolver,
     private readonly structuredInvoker?: StructuredActionInvoker,
     private readonly pageLearner?: PageLearner,
+    /** Surfaces an agent-drafted save proposal to the renderer. Wired by
+     *  main to broadcast ai:saveProposal. */
+    private readonly onSaveProposal?: (proposal: {
+      id: string;
+      kind: "skill" | "action";
+      name: string;
+      content: string;
+      host?: string;
+      attach?: "activeTab" | "allTabs" | "none";
+    }) => void,
   ) {}
 
   /**
@@ -448,6 +463,30 @@ export class HorizonBridgeServer {
           }
         }
         return learnResult;
+      }
+      // ─── Save proposal (agent drafts, user confirms in UI) ───────────
+      case "proposeSave": {
+        if (!this.onSaveProposal) throw new Error("save proposal sink not enabled");
+        const kind = args.kind;
+        if (kind !== "skill" && kind !== "action")
+          throw new Error("proposeSave: kind must be 'skill' or 'action'");
+        const name = String(args.name ?? "").trim();
+        if (!name) throw new Error("proposeSave: name required");
+        const content = String(args.content ?? "");
+        if (!content) throw new Error("proposeSave: content required");
+        const host = typeof args.host === "string" ? args.host : undefined;
+        const attach =
+          kind === "action" &&
+          (args.attach === "activeTab" || args.attach === "allTabs" || args.attach === "none")
+            ? args.attach
+            : undefined;
+        let resolvedHost = host;
+        if (kind === "skill" && !resolvedHost) {
+          resolvedHost = this.hostFromUrl(await this.harness.getUrl()) ?? undefined;
+        }
+        const id = `save-${this.nextProposalSeq()}`;
+        this.onSaveProposal({ id, kind, name, content, host: resolvedHost, attach });
+        return { proposed: true, id };
       }
       // ─── Conversation maintenance ───────────────────────────────
       case "compact": {

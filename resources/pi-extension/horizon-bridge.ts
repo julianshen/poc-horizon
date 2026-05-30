@@ -590,6 +590,29 @@ export default function (pi: ExtensionAPI): void {
       bridge("learnPageActions", params as Record<string, unknown>),
   });
 
+  // ─── Save proposal ────────────────────────────────────────────────
+  pi.registerTool({
+    name: "browser_propose_save",
+    label: "Propose a save",
+    description:
+      "Surface a draft to the user for confirmation when they ask to save what they learned or did. " +
+      "You do NOT save directly — the user reviews and confirms in the UI. " +
+      "kind='skill' for per-site knowledge (markdown 'content' + optional 'host', defaults to the active site); " +
+      "kind='action' for a re-runnable request ('name' + a 'content' prompt + 'attach'=activeTab|allTabs|none). " +
+      "Pick the single most useful thing to save and give it a short, clear name.",
+    parameters: Type.Object({
+      kind: Type.Union([Type.Literal("skill"), Type.Literal("action")]),
+      name: Type.String(),
+      content: Type.String(),
+      host: Type.Optional(Type.String()),
+      attach: Type.Optional(
+        Type.Union([Type.Literal("activeTab"), Type.Literal("allTabs"), Type.Literal("none")]),
+      ),
+    }),
+    execute: async (_id, params) =>
+      bridge("proposeSave", params as Record<string, unknown>),
+  });
+
   // ─── Conversation maintenance ────────────────────────────────────────
   pi.registerTool({
     name: "browser_compact",

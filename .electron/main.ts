@@ -205,6 +205,12 @@ async function ensurePiSession(
       agentPolicyResolver,
       new StructuredActionInvoker(),
       new PageLearner(),
+      (proposal) => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed())
+            w.webContents.send(IPC_CHANNELS.AI_SAVE_PROPOSAL, proposal);
+        }
+      },
     );
     bridgePort = await bridgeServer.listen();
   }

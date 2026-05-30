@@ -338,8 +338,13 @@ export class TabManager {
 
     wc.on(
       "did-fail-load",
-      (_event, errorCode, errorDescription, validatedURL) => {
+      (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
         if (errorCode === -3) return; // ERR_ABORTED
+        // Only the main frame failing should replace the page with the error
+        // view. Subframe failures (ads, trackers, Google's cookie-rotation
+        // iframe hitting ERR_BLOCKED_BY_RESPONSE, etc.) are normal and must
+        // not blank the real page — matches how Chrome behaves.
+        if (!isMainFrame) return;
         wc.loadURL(
           `horizon://error?code=${errorCode}&url=${encodeURIComponent(validatedURL)}`,
         );

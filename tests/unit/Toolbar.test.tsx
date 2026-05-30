@@ -10,7 +10,7 @@ describe("Toolbar — Learn this page button", () => {
 
   it("clicking it opens the AI panel and raises pendingLearnRequest", () => {
     render(<Toolbar />);
-    fireEvent.click(screen.getByRole("button", { name: "Learn this page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Learn this page's actions" }));
     const s = useBrowserStore.getState();
     expect(s.showAI).toBe(true);
     expect(s.pendingLearnRequest).toBe(true);

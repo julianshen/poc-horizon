@@ -32,6 +32,7 @@ export const WorkflowsPopover: React.FC<Props> = ({
 }) => {
   const [list, setList] = useState<Workflow[]>([]);
   const [savingName, setSavingName] = useState<string | null>(null);
+  const [skills, setSkills] = useState<Array<{ host: string; names: string[] }>>([]);
 
   const refresh = useCallback(async () => {
     const l = (await window.horizonAPI.invoke(
@@ -53,6 +54,25 @@ export const WorkflowsPopover: React.FC<Props> = ({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const refreshSkills = useCallback(async () => {
+    const s = (await window.horizonAPI.invoke("domainSkill:list", {})) as
+      | Array<{ host: string; names: string[] }>
+      | undefined;
+    setSkills(Array.isArray(s) ? s : []);
+  }, []);
+
+  useEffect(() => {
+    void refreshSkills();
+  }, [refreshSkills]);
+
+  const removeSkill = useCallback(
+    async (host: string, name: string) => {
+      await window.horizonAPI.invoke("domainSkill:remove", { host, name });
+      void refreshSkills();
+    },
+    [refreshSkills],
+  );
 
   const remove = useCallback(
     async (id: string) => {
@@ -164,6 +184,43 @@ export const WorkflowsPopover: React.FC<Props> = ({
           </div>
         ))}
       </div>
+      {skills.some((g) => g.names.length > 0) && (
+        <div className="mt-2">
+          <div
+            className="text-xs font-semibold px-2 py-1"
+            style={{ color: "var(--chrome-fg-muted)" }}
+          >
+            Site skills
+          </div>
+          {skills.flatMap((g) =>
+            g.names.map((n) => (
+              <div
+                key={`${g.host}/${n}`}
+                className="flex items-center justify-between px-2 py-1 text-sm"
+              >
+                <span style={{ color: "var(--chrome-fg)" }}>{n}</span>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--chrome-fg-subtle)" }}
+                >
+                  {g.host}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Delete site skill ${n}`}
+                  onClick={() => {
+                    void removeSkill(g.host, n);
+                  }}
+                  className="px-2 text-xs"
+                  style={{ color: "var(--chrome-fg-muted)" }}
+                >
+                  ✕
+                </button>
+              </div>
+            )),
+          )}
+        </div>
+      )}
       {lastPrompt && (
         <div
           className="px-3 py-2"

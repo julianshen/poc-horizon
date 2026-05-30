@@ -575,6 +575,13 @@ function registerHandlers(): void {
     IPC_CHANNELS.WORKFLOW_DELETE,
     (_event, { id }: { id: string }) => workflowsManager.delete(id),
   );
+  ipcMain.handle(
+    IPC_CHANNELS.DOMAIN_SKILL_SAVE,
+    (_event, { host, name, content }: { host: string; name: string; content: string }) => {
+      if (!host || !name) throw new Error("domainSkill:save requires host and name");
+      return domainSkills.save(host, name, content ?? "");
+    },
+  );
 
   // Translation handlers (translate:page / translate:cancel / translate:restore
   // / translate:selection) are registered in .electron/ipc/main-handlers.ts —

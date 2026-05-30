@@ -13,8 +13,15 @@ user-facing trigger. This adds one.
 
 **Behavior (agent-assisted):** a single action — open the AI panel and
 **auto-send** a fixed "learn this page" prompt — exposed through **three
-triggers**: a toolbar button, a ⌘K command-palette entry, and a quick
-chip inside the AI panel.
+triggers**: a toolbar button, a ⌘K command-palette entry, and a button in
+the AI panel header.
+
+> **As-built note (synced 2026-05-30):** the in-panel affordance is a
+> header icon button beside the existing "Summarize this page" button
+> (not a chip above the input). This reuses the established preset/
+> header-button pattern and keeps the prompt in one place — the
+> `resolvePreset` registry. Decided at plan time and carried into
+> implementation.
 
 This is deliberately *not* a deterministic, no-LLM inspector. The user
 chose the agent-assisted path: the agent runs the tool and replies with
@@ -33,19 +40,22 @@ components; triggers flip store state, `AIPanel` reacts). It mirrors the
 existing `pendingSelection` drain.
 
 ```
-[Toolbar button]  ┐
-[⌘K command item] ┼─→ store.requestLearnPage()
-[AI-panel chip]   ┘        → { showAI: true, pendingLearnRequest: true }
-                                        │
-                                        ▼
-                 AIPanel useEffect drains pendingLearnRequest
-                 → handleSend(LEARN_PROMPT)   (existing overridePrompt path)
-                 → agent turn → browser_learn_page_actions → reply (tool chip + summary)
+[Toolbar button]    ┐
+[⌘K command item]   ┼─→ store.requestLearnPage()
+                    │        → { showAI: true, pendingLearnRequest: true }
+                    │                   │
+                    │                   ▼
+                    │   AIPanel useEffect drains pendingLearnRequest
+                    │   → runPreset(LEARN_LABEL)  (consume flag, then run)
+[AI-panel header ───┘   → send(preset.prompt, activeTab)  (existing path)
+ button] ───────────────→ runPreset(LEARN_LABEL) directly
+                        → agent turn → browser_learn_page_actions → reply (tool chip + summary)
 ```
 
-The AI-panel chip is inside `AIPanel` and can call the local send
-handler directly; for consistency all three converge on the same
-`LEARN_PROMPT` constant.
+The toolbar button and ⌘K command flip the store flag; `AIPanel` drains
+it via `runPreset(LEARN_LABEL)`. The AI-panel header button is inside
+`AIPanel` and calls `runPreset(LEARN_LABEL)` directly. All three resolve
+the same prompt from one place — the `resolvePreset` registry.
 
 ### 2.1 Shared prompt
 
@@ -55,7 +65,13 @@ then give me a short summary of the available actions (search, create,
 navigation, filters, etc.), any forms, and any API endpoints you observed.
 ```
 
-Exact wording lives in one `LEARN_PROMPT` constant **defined and exported from `AIPanel.tsx`** (it is the only consumer — the toolbar button, command item, and store only flip the flag; none need the prompt text).
+The prompt lives in exactly one place: the `LEARN_LABEL` branch of the
+existing `resolvePreset()` registry in `AIPanel.tsx` (`attach: "activeTab"`,
+so the agent targets the focused tab). `LEARN_LABEL` (`"Learn this page's
+actions"`) is the single shared label/preset key — also used as the panel
+button's `aria-label` and the drain target. No standalone exported
+`LEARN_PROMPT` constant is needed; nothing outside `AIPanel` consumes the
+prompt text (the toolbar/command only flip the store flag).
 
 ## 3. Components / files touched
 
@@ -65,13 +81,15 @@ All small additions to existing files; all are already in
 | File | Change |
 |---|---|
 | `src/stores/browserStore.ts` | Add `pendingLearnRequest: boolean`; `requestLearnPage()` (sets `showAI: true`, flag `true`); `consumeLearnRequest()` (clears flag). Mirrors `pendingSelection`. |
-| `src/components/chrome/Toolbar.tsx` | New `icon-btn` button (magnifier-with-sparkle inline SVG, `aria-label="Learn this page"`, `title`), placed **between the ⌘K button and the AI toggle**. `onClick` wrapped in `useCallback` calls `requestLearnPage()`. |
-| `src/hooks/useCommandItems.ts` | New item `{ kind: "page", label: "Learn this page's actions", hint: "AI", action: () => { requestLearnPage(); close(); } }`. |
-| `src/components/overlays/AIPanel.tsx` | (a) A "🔎 Learn this page" quick chip above the input; (b) a `useEffect` draining `pendingLearnRequest` → `handleSend(LEARN_PROMPT)` → `consumeLearnRequest()`. |
-| (within `AIPanel.tsx`) | Define + export the `LEARN_PROMPT` constant. |
+| `src/components/chrome/Toolbar.tsx` | New `icon-btn` button (magnifier-with-sparkle inline SVG, `aria-label="Learn this page's actions"`, `title`), placed **between the ⌘K button and the AI toggle**. `onClick={requestLearnPage}` (the store action is a stable reference, so no `useCallback` wrapper — not an inline arrow). |
+| `src/hooks/useCommandItems.ts` | New item `{ kind: "page", label: "Learn this page's actions", hint: "AI", action: () => { requestLearnPage(); close(); } }`; `requestLearnPage` added to the `useMemo` deps. |
+| `src/components/overlays/AIPanel.tsx` | (a) `LEARN_LABEL` constant + a `resolvePreset` branch holding the prompt; (b) a header icon button beside "Summarize this page" with `aria-label={LEARN_LABEL}`, calling a memoized `runPreset(LEARN_LABEL)`; (c) a `useEffect` draining `pendingLearnRequest` → `consumeLearnRequest()` then `runPreset(LEARN_LABEL)` (no-ops while a turn runs). |
 
-No `enum`, no inline JSX handlers (wrap in `useCallback`), files stay
-under their size caps (per AGENTS.md §3, §12.4).
+No `enum`. Inline JSX arrow handlers are wrapped in `useCallback` (Toolbar
+uses the bare stable store action; the panel header button uses a memoized
+`runPreset` wrapper, matching the file's pattern). `AIPanel.tsx` is a
+pre-existing large file (>200-line cap); this feature adds ~40 lines and
+does not split it — clearing that pre-existing debt is out of scope.
 
 ## 4. Error / edge handling
 

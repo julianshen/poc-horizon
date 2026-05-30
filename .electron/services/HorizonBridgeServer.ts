@@ -8,6 +8,8 @@ import type { ActionRecorder } from "./ActionRecorder";
 import { AgentPolicyResolver } from "./AgentPolicyResolver";
 import { computeConformanceLevel } from "./agentPolicy";
 import { readerExtract } from "./readerExtract";
+import type { StructuredActionInvoker } from "./StructuredActionInvoker";
+import type { PageLearner } from "./PageLearner";
 
 interface ToolRequest {
   id: string;
@@ -47,6 +49,8 @@ export class HorizonBridgeServer {
      *  the currently-active PiSession. */
     private readonly compactSession?: (customInstructions?: string) => void,
     private readonly policyResolver?: AgentPolicyResolver,
+    private readonly structuredInvoker?: StructuredActionInvoker,
+    private readonly pageLearner?: PageLearner,
   ) {}
 
   /**
@@ -393,6 +397,57 @@ export class HorizonBridgeServer {
         // stale policy the guard happens to hold.
         this.guard?.setSitePolicy(policy);
         return { level: computeConformanceLevel(policy), origin, policy };
+      }
+      // ─── Structured action invocation ────────────────────────
+      case "invokeStructuredAction": {
+        const actionName = String(args.actionName ?? "");
+        const actionArgs =
+          args.args && typeof args.args === "object"
+            ? (args.args as Record<string, unknown>)
+            : {};
+        if (!this.policyResolver)
+          throw new Error("policy resolver not enabled");
+        if (!this.structuredInvoker)
+          throw new Error("structured invoker not enabled");
+        const url = await this.harness.getUrl();
+        const policy = await this.policyResolver.resolve(url);
+        if (!policy)
+          throw new Error(`no agent.json found for ${url}`);
+        return await this.structuredInvoker.invoke(
+          this.harness,
+          policy,
+          actionName,
+          actionArgs,
+        );
+      }
+      // ─── Page learning ───────────────────────────────────────
+      case "learnPageActions": {
+        if (!this.pageLearner)
+          throw new Error("page learner not enabled");
+        const mode =
+          args.mode === "active"
+            ? "active"
+            : args.mode === "passive"
+              ? "passive"
+              : undefined;
+        const learnResult = await this.pageLearner.learn(this.harness, {
+          mode,
+          includeNetwork: args.includeNetwork === true,
+          includeScripting: args.includeScripting !== false,
+          includeUrlAnalysis: args.includeUrlAnalysis !== false,
+        });
+        // The learner is policy-agnostic; the bridge owns policy
+        // resolution, so fill in the conformance level here. Best-effort:
+        // a resolver miss leaves the learner's default (0).
+        if (this.policyResolver) {
+          try {
+            const policy = await this.policyResolver.resolve(learnResult.url);
+            learnResult.agentPolicyLevel = computeConformanceLevel(policy);
+          } catch {
+            /* leave default level 0 */
+          }
+        }
+        return learnResult;
       }
       // ─── Conversation maintenance ───────────────────────────────
       case "compact": {

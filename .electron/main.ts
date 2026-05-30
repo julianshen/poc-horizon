@@ -58,6 +58,8 @@ import { AgentPolicyResolver } from "./services/AgentPolicyResolver";
 // translateText / translatePage / restorePage are imported by
 // .electron/ipc/main-handlers.ts where their IPC handlers live.
 import { HorizonBridgeServer } from "./services/HorizonBridgeServer";
+import { StructuredActionInvoker } from "./services/StructuredActionInvoker";
+import { PageLearner } from "./services/PageLearner";
 import type { AgentEvent } from "../src/types/ai";
 import type { Tab } from "../src/types/browser";
 
@@ -260,6 +262,8 @@ async function ensurePiSession(
       // is unambiguously its own.
       (customInstructions) => activePiSession?.compact(customInstructions),
       agentPolicyResolver,
+      new StructuredActionInvoker(),
+      new PageLearner(),
     );
     bridgePort = await bridgeServer.listen();
   }

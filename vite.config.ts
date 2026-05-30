@@ -66,6 +66,8 @@ export default defineConfig({
         ".electron/services/HibernationController.ts",
         ".electron/services/LlmsTxtCacheStore.ts",
         ".electron/services/LlmsTxtResolver.ts",
+        ".electron/services/StructuredActionInvoker.ts",
+        ".electron/services/PageLearner.ts",
         ".electron/ipc/main-handlers.ts",
         ".electron/preload.ts",
       ],

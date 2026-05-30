@@ -76,6 +76,14 @@ describe("useCommandItems", () => {
     });
   });
 
+  it("filters out the Learn item when the query doesn't match its label", () => {
+    const close = vi.fn();
+    const { result } = renderHook(() => useCommandItems("reload", close));
+    expect(
+      result.current.find((i) => i.label === "Learn this page's actions"),
+    ).toBeUndefined();
+  });
+
   it("exposes a 'Learn this page's actions' command whose action requests learn + closes", () => {
     const close = vi.fn();
     const { result } = renderHook(() => useCommandItems("", close));

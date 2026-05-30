@@ -629,10 +629,10 @@ describe("AIPanel", () => {
     expect(useBrowserStore.getState().pendingLearnRequest).toBe(false);
   });
 
-  it("header 'Learn this page actions' button dispatches the learn prompt", async () => {
+  it("header 'Learn this page's actions' button dispatches the learn prompt", async () => {
     render(<AIPanel />);
     fireEvent.click(
-      screen.getByRole("button", { name: "Learn this page actions" }),
+      screen.getByRole("button", { name: "Learn this page's actions" }),
     );
     await waitFor(() => {
       const start = api().invokes.find((i) => i.channel === "ai:start");
@@ -659,7 +659,7 @@ describe("AIPanel", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "Learn this page actions",
+          name: "Learn this page's actions",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);

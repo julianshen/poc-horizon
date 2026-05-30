@@ -21,8 +21,6 @@ export const Toolbar: React.FC = () => {
   );
   const closeMenu = useCallback(() => setAppMenuOpen(false), [setAppMenuOpen]);
   const openCmd = useCallback(() => toggleOverlay("showCmd"), [toggleOverlay]);
-  const learnPage = useCallback(() => requestLearnPage(), [requestLearnPage]);
-
   return (
     <div
       className="flex items-center gap-1.5 px-3.5 pb-2.5 shrink-0 relative"
@@ -93,9 +91,9 @@ export const Toolbar: React.FC = () => {
           </svg>
         </button>
         <button
-          onClick={learnPage}
+          onClick={requestLearnPage}
           className="icon-btn"
-          aria-label="Learn this page"
+          aria-label="Learn this page's actions"
           title="Learn what actions this page offers"
         >
           <svg viewBox="0 0 24 24" aria-hidden>

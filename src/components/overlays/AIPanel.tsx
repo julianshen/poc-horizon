@@ -75,7 +75,7 @@ const INITIAL: Message[] = [
 
 /** Label shared by the learn-page header button, the toolbar button's
  *  drained request, and the resolvePreset entry below. */
-const LEARN_LABEL = "Learn this page actions";
+const LEARN_LABEL = "Learn this page's actions";
 
 /**
  * Known one-click presets. Maps the chip label (and the "Summarize"
@@ -374,6 +374,8 @@ export const AIPanel: React.FC = () => {
     [running, send],
   );
 
+  const learnThisPage = useCallback(() => runPreset(LEARN_LABEL), [runPreset]);
+
   // Drain a "learn this page" request from a toolbar/command trigger.
   // consumeLearnRequest() runs first so the flag always clears; runPreset
   // no-ops if a turn is already running, so the request is simply dropped.
@@ -476,9 +478,9 @@ export const AIPanel: React.FC = () => {
           </svg>
         </button>
         <button
-          onClick={() => runPreset(LEARN_LABEL)}
+          onClick={learnThisPage}
           disabled={running}
-          aria-label="Learn this page actions"
+          aria-label={LEARN_LABEL}
           title="Learn what actions this page offers"
           className="icon-btn"
           style={{ width: 26, height: 26 }}

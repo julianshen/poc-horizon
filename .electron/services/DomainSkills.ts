@@ -24,7 +24,9 @@ export class DomainSkills {
   static normalizeHost(input: string): string {
     let h = input.toLowerCase().trim();
     if (h.startsWith("www.")) h = h.slice(4);
-    if (h.length === 0 || /[\\/]/.test(h))
+    // Reject path separators, NUL, and bare dot segments. `.` / `..` have
+    // no slashes yet would escape the skills root via path.join — block them.
+    if (h.length === 0 || /[\\/\0]/.test(h) || h === "." || h === "..")
       throw new Error(`invalid host: ${input}`);
     return h;
   }
@@ -32,13 +34,19 @@ export class DomainSkills {
   private static safeName(name: string): string {
     if (!name.endsWith(".md"))
       throw new Error("domain skill file must end in .md");
-    if (/[\\/]/.test(name) || name.startsWith("."))
+    if (/[\\/\0]/.test(name) || name.startsWith("."))
       throw new Error(`invalid skill name: ${name}`);
     return name;
   }
 
   private hostDir(host: string): string {
-    return path.join(this.root, DomainSkills.normalizeHost(host));
+    const dir = path.join(this.root, DomainSkills.normalizeHost(host));
+    // Defense in depth: the resolved dir must stay strictly inside root —
+    // never root itself and never an ancestor (path-traversal guard).
+    const rel = path.relative(this.root, dir);
+    if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel))
+      throw new Error(`invalid host: ${host}`);
+    return dir;
   }
 
   async list(host: string): Promise<string[]> {

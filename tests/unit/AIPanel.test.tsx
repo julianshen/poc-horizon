@@ -672,6 +672,45 @@ describe("AIPanel", () => {
     expect(api().invokes.filter((i) => i.channel === "ai:start").length).toBe(1);
   });
 
+  it("'Save…' header button is disabled until a turn has completed", () => {
+    render(<AIPanel />);
+    expect(
+      (screen.getByRole("button", { name: "Save what we learned" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("'Save…' header button dispatches a propose-save prompt after a turn completes", async () => {
+    render(<AIPanel />);
+    fireEvent.change(screen.getByPlaceholderText(/Ask anything/), { target: { value: "hi" } });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Ask anything/), { key: "Enter" });
+    act(() => { api().emit("ai:event", { type: "turn_end" }); });
+    fireEvent.click(screen.getByRole("button", { name: "Save what we learned" }));
+    await waitFor(() => {
+      const start = api().invokes.filter((i) => i.channel === "ai:start").at(-1);
+      expect((start!.payload as { prompt: string }).prompt).toContain("browser_propose_save");
+    });
+  });
+
+  it("tool-call chip 'Save this action' dispatches a propose-save prompt (after the turn ends)", async () => {
+    render(<AIPanel />);
+    fireEvent.change(screen.getByPlaceholderText(/Ask anything/), { target: { value: "go" } });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Ask anything/), { key: "Enter" });
+    act(() => {
+      api().emit("ai:event", { type: "tool_use", id: "t1", name: "browser_click", input: { selector: "#go" } });
+    });
+    expect(
+      (screen.getByRole("button", { name: "Save this action" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    act(() => {
+      api().emit("ai:event", { type: "turn_end" });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save this action" }));
+    await waitFor(() => {
+      const starts = api().invokes.filter((i) => i.channel === "ai:start");
+      expect((starts.at(-1)!.payload as { prompt: string }).prompt).toContain("browser_propose_save");
+    });
+  });
+
   // Suppress unused import warning.
   void api;
 });

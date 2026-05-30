@@ -76,6 +76,7 @@ const INITIAL: Message[] = [
 /** Label shared by the learn-page header button, the toolbar button's
  *  drained request, and the resolvePreset entry below. */
 const LEARN_LABEL = "Learn this page's actions";
+const SAVE_LABEL = "Save what we learned";
 
 /**
  * Known one-click presets. Maps the chip label (and the "Summarize"
@@ -117,6 +118,15 @@ function resolvePreset(
       attach: "activeTab",
     };
   }
+  if (label === SAVE_LABEL) {
+    return {
+      prompt:
+        "From what we just learned or did on this page, propose ONE useful thing to save by calling " +
+        "browser_propose_save. Use kind='skill' (markdown notes + host) for reusable site knowledge, " +
+        "or kind='action' (a name + a short prompt + attach) for a repeatable request. Give it a clear, short name.",
+      attach: "activeTab",
+    };
+  }
   return null;
 }
 
@@ -147,6 +157,7 @@ export const AIPanel: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState("");
   const [running, setRunning] = useState(false);
+  const [hasReplied, setHasReplied] = useState(false);
   // @-mention chips queued for the next send.
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -270,6 +281,7 @@ export const AIPanel: React.FC = () => {
           case "turn_end":
             next[next.length - 1] = { ...last, loading: false };
             setRunning(false);
+            setHasReplied(true);
             return next;
           case "error":
             next[next.length - 1] = {
@@ -375,6 +387,7 @@ export const AIPanel: React.FC = () => {
   );
 
   const learnThisPage = useCallback(() => runPreset(LEARN_LABEL), [runPreset]);
+  const saveWhatWeLearned = useCallback(() => runPreset(SAVE_LABEL), [runPreset]);
 
   // Drain a "learn this page" request from a toolbar/command trigger.
   // consumeLearnRequest() runs first so the flag always clears; runPreset
@@ -491,6 +504,20 @@ export const AIPanel: React.FC = () => {
             <path d="M18.5 2.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z" fill="currentColor" stroke="none" />
           </svg>
         </button>
+        <button
+          onClick={saveWhatWeLearned}
+          disabled={running || !hasReplied}
+          aria-label="Save what we learned"
+          title="Save a site skill or reusable action from this page"
+          className="icon-btn"
+          style={{ width: 26, height: 26 }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <path d="M5 3h11l3 3v15H5z" fill="none" />
+            <path d="M8 3v6h7V3" />
+            <rect x="8" y="13" width="8" height="5" fill="none" />
+          </svg>
+        </button>
         <div className="relative" style={{ width: 26, height: 26 }}>
           <button
             onClick={() => setWorkflowsOpen((v) => !v)}
@@ -554,6 +581,8 @@ export const AIPanel: React.FC = () => {
             m={m}
             isLastAndStreaming={running && i === messages.length - 1}
             onPreset={runPreset}
+            onSave={saveWhatWeLearned}
+            saveDisabled={running}
           />
         ))}
       </div>
@@ -709,7 +738,9 @@ const MessageBubbleInner: React.FC<{
   m: Message;
   isLastAndStreaming?: boolean;
   onPreset?: (label: string) => void;
-}> = ({ m, isLastAndStreaming, onPreset }) => {
+  onSave?: () => void;
+  saveDisabled?: boolean;
+}> = ({ m, isLastAndStreaming, onPreset, onSave, saveDisabled }) => {
   if (m.who === "system" && m.guide) {
     return <LlmsTxtGuideCard guide={m.guide} />;
   }
@@ -782,7 +813,7 @@ const MessageBubbleInner: React.FC<{
       {m.tools && m.tools.length > 0 && (
         <div className="flex flex-col gap-1 w-[92%] max-w-[92%]">
           {m.tools.map((t) => (
-            <ToolChip key={t.id} tool={t} />
+            <ToolChip key={t.id} tool={t} onSave={onSave} saveDisabled={saveDisabled} />
           ))}
         </div>
       )}
@@ -825,7 +856,9 @@ const MessageBubble = React.memo(
   (prev, next) =>
     prev.m === next.m &&
     prev.isLastAndStreaming === next.isLastAndStreaming &&
-    prev.onPreset === next.onPreset,
+    prev.onPreset === next.onPreset &&
+    prev.onSave === next.onSave &&
+    prev.saveDisabled === next.saveDisabled,
 );
 
 /**
@@ -1122,24 +1155,29 @@ const LlmsTxtGuideCard: React.FC<{ guide: LlmsTxtGuide }> = ({ guide }) => {
   );
 };
 
-const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
+const ToolChip: React.FC<{ tool: ToolCall; onSave?: () => void; saveDisabled?: boolean }> = ({
+  tool,
+  onSave,
+  saveDisabled,
+}) => {
   const [open, setOpen] = useState(false);
   const isImage = isImageResult(tool.output);
   const isPending = tool.output === undefined;
 
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="text-left text-[11px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5 self-start"
-        style={{
-          background: tool.isError
-            ? "rgba(212,77,77,0.10)"
-            : "var(--surface-2)",
-          color: tool.isError ? "var(--insecure)" : "var(--chrome-fg-muted)",
-        }}
-      >
+      <div className="flex items-center gap-1.5 self-start">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-left text-[11px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5"
+          style={{
+            background: tool.isError
+              ? "rgba(212,77,77,0.10)"
+              : "var(--surface-2)",
+            color: tool.isError ? "var(--insecure)" : "var(--chrome-fg-muted)",
+          }}
+        >
         <span style={{ opacity: 0.5, fontSize: 9 }}>{open ? "▾" : "▸"}</span>
         <span>{tool.name}</span>
         {isPending ? (
@@ -1158,7 +1196,21 @@ const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
             />
           </span>
         ) : null}
-      </button>
+        </button>
+        {onSave && (
+          <button
+            type="button"
+            aria-label="Save this action"
+            onClick={onSave}
+            disabled={saveDisabled}
+            className="text-xs shrink-0"
+            style={{ background: "transparent", border: 0, color: "var(--chrome-fg-subtle)", cursor: saveDisabled ? "default" : "pointer" }}
+            title="Save what the agent learned as a skill or reusable action"
+          >
+            ⤓
+          </button>
+        )}
+      </div>
       {open && (
         <div
           className="mt-1 text-[11px] rounded-md font-mono"

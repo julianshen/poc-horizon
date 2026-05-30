@@ -543,6 +543,76 @@ export default function (pi: ExtensionAPI): void {
     execute: async () => bridge("getAgentPolicy", {}),
   });
 
+  // ─── Structured action invocation ─────────────────────────────────
+  pi.registerTool({
+    name: "browser_invoke_structured_action",
+    label: "Invoke structured action",
+    description:
+      "Call a site-declared action from its /agent.json via the page's HTTP session. " +
+      "Prefer this over UI clicking when the site publishes structured actions (level >= 2). " +
+      "Look up available action names from browser_get_agent_policy. " +
+      "Returns the JSON response body. Only cookie and none auth are supported in v1.",
+    parameters: Type.Object({
+      actionName: Type.String(),
+      args: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    }),
+    execute: async (_id, params) =>
+      bridge("invokeStructuredAction", params as Record<string, unknown>),
+  });
+
+  // ─── Page learning ───────────────────────────────────────────────
+  pi.registerTool({
+    name: "browser_learn_page_actions",
+    label: "Learn page actions",
+    description:
+      "Analyze the current page to discover what actions the user can perform. " +
+      "Scans interactive elements, forms, navigation, URL patterns, and optionally " +
+      "network requests and scripting probes. Returns a LearnResult with:" +
+      "- perception: inventory of clickable elements, forms, search inputs, nav sections" +
+      "- urlAnalysis: URL pattern groupings and query parameters" +
+      "- scripting (optional): framework detected, state keys, route patterns, and " +
+      "  data-agent-action elements the site explicitly declared" +
+      "- network (optional): observed API endpoints (method, path, GraphQL flag)" +
+      "- classification: elements grouped by inferred action type (search, create, " +
+      "  filter, export, login, delete, navigate) with confidence levels; any " +
+      "  data-agent-action elements are emitted as authoritative high-confidence actions" +
+      "Use this on sites that don't publish agent.json (level 0) — the result helps " +
+      "you propose domain skills and helpers. Flags: mode ('passive' default, or " +
+      "'active' to also observe network), includeNetwork (default false, subscribes " +
+      "to CDP), includeScripting (default true), includeUrlAnalysis (default true).",
+    parameters: Type.Object({
+      mode: Type.Optional(Type.String()),
+      includeNetwork: Type.Optional(Type.Boolean()),
+      includeScripting: Type.Optional(Type.Boolean()),
+      includeUrlAnalysis: Type.Optional(Type.Boolean()),
+    }),
+    execute: async (_id, params) =>
+      bridge("learnPageActions", params as Record<string, unknown>),
+  });
+
+  // ─── Save proposal ────────────────────────────────────────────────
+  pi.registerTool({
+    name: "browser_propose_save",
+    label: "Propose a save",
+    description:
+      "Surface a draft to the user for confirmation when they ask to save what they learned or did. " +
+      "You do NOT save directly — the user reviews and confirms in the UI. " +
+      "kind='skill' for per-site knowledge (markdown 'content' + optional 'host', defaults to the active site); " +
+      "kind='action' for a re-runnable request ('name' + a 'content' prompt + 'attach'=activeTab|allTabs|none). " +
+      "Pick the single most useful thing to save and give it a short, clear name.",
+    parameters: Type.Object({
+      kind: Type.Union([Type.Literal("skill"), Type.Literal("action")]),
+      name: Type.String(),
+      content: Type.String(),
+      host: Type.Optional(Type.String()),
+      attach: Type.Optional(
+        Type.Union([Type.Literal("activeTab"), Type.Literal("allTabs"), Type.Literal("none")]),
+      ),
+    }),
+    execute: async (_id, params) =>
+      bridge("proposeSave", params as Record<string, unknown>),
+  });
+
   // ─── Conversation maintenance ────────────────────────────────────────
   pi.registerTool({
     name: "browser_compact",

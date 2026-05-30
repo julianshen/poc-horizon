@@ -15,6 +15,7 @@ import { AIPanel } from "./components/overlays/AIPanel";
 import { CommandPalette } from "./components/overlays/CommandPalette";
 import { PermissionPrompt } from "./components/overlays/PermissionPrompt";
 import { AiActionPrompt } from "./components/overlays/AiActionPrompt";
+import { SaveProposalCard } from "./components/overlays/SaveProposalCard";
 import { useBrowserStore } from "./stores/browserStore";
 import { useTabs } from "./hooks/useTabs";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -80,6 +81,7 @@ const App: React.FC = () => {
       <CommandPalette />
       <PermissionPrompt />
       <AiActionPrompt />
+      <SaveProposalCard />
     </div>
   );
 };

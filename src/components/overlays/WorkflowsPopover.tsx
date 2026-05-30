@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { SiteSkillsSection } from "./SiteSkillsSection";
 
 interface Workflow {
   id: string;
@@ -164,6 +165,7 @@ export const WorkflowsPopover: React.FC<Props> = ({
           </div>
         ))}
       </div>
+      <SiteSkillsSection />
       {lastPrompt && (
         <div
           className="px-3 py-2"

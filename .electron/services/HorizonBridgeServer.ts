@@ -8,6 +8,8 @@ import type { ActionRecorder } from "./ActionRecorder";
 import { AgentPolicyResolver } from "./AgentPolicyResolver";
 import { computeConformanceLevel } from "./agentPolicy";
 import { readerExtract } from "./readerExtract";
+import type { StructuredActionInvoker } from "./StructuredActionInvoker";
+import type { PageLearner } from "./PageLearner";
 
 interface ToolRequest {
   id: string;
@@ -35,6 +37,11 @@ interface ToolResponse {
 export class HorizonBridgeServer {
   private server: Server | null = null;
   private connections = new Set<Socket>();
+  private proposalSeq = 0;
+  private nextProposalSeq(): number {
+    this.proposalSeq += 1;
+    return this.proposalSeq;
+  }
 
   constructor(
     private readonly harness: BrowserHarness,
@@ -47,6 +54,18 @@ export class HorizonBridgeServer {
      *  the currently-active PiSession. */
     private readonly compactSession?: (customInstructions?: string) => void,
     private readonly policyResolver?: AgentPolicyResolver,
+    private readonly structuredInvoker?: StructuredActionInvoker,
+    private readonly pageLearner?: PageLearner,
+    /** Surfaces an agent-drafted save proposal to the renderer. Wired by
+     *  main to broadcast ai:saveProposal. */
+    private readonly onSaveProposal?: (proposal: {
+      id: string;
+      kind: "skill" | "action";
+      name: string;
+      content: string;
+      host?: string;
+      attach?: "activeTab" | "allTabs" | "none";
+    }) => void,
   ) {}
 
   /**
@@ -393,6 +412,81 @@ export class HorizonBridgeServer {
         // stale policy the guard happens to hold.
         this.guard?.setSitePolicy(policy);
         return { level: computeConformanceLevel(policy), origin, policy };
+      }
+      // ─── Structured action invocation ────────────────────────
+      case "invokeStructuredAction": {
+        const actionName = String(args.actionName ?? "");
+        const actionArgs =
+          args.args && typeof args.args === "object"
+            ? (args.args as Record<string, unknown>)
+            : {};
+        if (!this.policyResolver)
+          throw new Error("policy resolver not enabled");
+        if (!this.structuredInvoker)
+          throw new Error("structured invoker not enabled");
+        const url = await this.harness.getUrl();
+        const policy = await this.policyResolver.resolve(url);
+        if (!policy)
+          throw new Error(`no agent.json found for ${url}`);
+        return await this.structuredInvoker.invoke(
+          this.harness,
+          policy,
+          actionName,
+          actionArgs,
+        );
+      }
+      // ─── Page learning ───────────────────────────────────────
+      case "learnPageActions": {
+        if (!this.pageLearner)
+          throw new Error("page learner not enabled");
+        const mode =
+          args.mode === "active"
+            ? "active"
+            : args.mode === "passive"
+              ? "passive"
+              : undefined;
+        const learnResult = await this.pageLearner.learn(this.harness, {
+          mode,
+          includeNetwork: args.includeNetwork === true,
+          includeScripting: args.includeScripting !== false,
+          includeUrlAnalysis: args.includeUrlAnalysis !== false,
+        });
+        // The learner is policy-agnostic; the bridge owns policy
+        // resolution, so fill in the conformance level here. Best-effort:
+        // a resolver miss leaves the learner's default (0).
+        if (this.policyResolver) {
+          try {
+            const policy = await this.policyResolver.resolve(learnResult.url);
+            learnResult.agentPolicyLevel = computeConformanceLevel(policy);
+          } catch {
+            /* leave default level 0 */
+          }
+        }
+        return learnResult;
+      }
+      // ─── Save proposal (agent drafts, user confirms in UI) ───────────
+      case "proposeSave": {
+        if (!this.onSaveProposal) throw new Error("save proposal sink not enabled");
+        const kind = args.kind;
+        if (kind !== "skill" && kind !== "action")
+          throw new Error("proposeSave: kind must be 'skill' or 'action'");
+        const name = String(args.name ?? "").trim();
+        if (!name) throw new Error("proposeSave: name required");
+        const content = String(args.content ?? "");
+        if (!content.trim()) throw new Error("proposeSave: content required");
+        const host = typeof args.host === "string" ? args.host : undefined;
+        const attach =
+          kind === "action" &&
+          (args.attach === "activeTab" || args.attach === "allTabs" || args.attach === "none")
+            ? args.attach
+            : undefined;
+        let resolvedHost = host;
+        if (kind === "skill" && !resolvedHost) {
+          resolvedHost = this.hostFromUrl(await this.harness.getUrl()) ?? undefined;
+        }
+        const id = `save-${this.nextProposalSeq()}`;
+        this.onSaveProposal({ id, kind, name, content, host: resolvedHost, attach });
+        return { proposed: true, id };
       }
       // ─── Conversation maintenance ───────────────────────────────
       case "compact": {

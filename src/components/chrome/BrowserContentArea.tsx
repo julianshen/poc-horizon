@@ -28,7 +28,8 @@ export const BrowserContentArea: React.FC = () => {
       s.showDownloads ||
       s.showFindBar ||
       s.showAppMenu ||
-      s.showTabContextMenu,
+      s.showTabContextMenu ||
+      s.saveProposalOpen,
   );
 
   useLayoutEffect(() => {

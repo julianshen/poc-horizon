@@ -40,8 +40,10 @@ import { PiSession } from "./services/PiSession";
 import { LlmsTxtResolver } from "./services/LlmsTxtResolver";
 import { LlmsTxtCacheStore } from "./services/LlmsTxtCacheStore";
 import { parseLlmsTxt } from "./services/llmsTxtParser";
-import { writePiSkill } from "./services/piSkillWriter";
-import { buildAugmentedPrompt } from "./services/promptHelper";
+import {
+  buildAugmentedPrompt,
+  summarizeLlmsGuide,
+} from "./services/promptHelper";
 import { WorkflowsManager } from "./services/WorkflowsManager";
 import { HelperRegistry } from "./services/HelperRegistry";
 import { HibernationController } from "./services/HibernationController";
@@ -54,9 +56,12 @@ import {
 } from "./services/AiActionGuard";
 import { ActionRecorder } from "./services/ActionRecorder";
 import { AgentPolicyResolver } from "./services/AgentPolicyResolver";
+import { shouldAdvertiseAgent } from "./services/agentTraffic";
 // translateText / translatePage / restorePage are imported by
 // .electron/ipc/main-handlers.ts where their IPC handlers live.
 import { HorizonBridgeServer } from "./services/HorizonBridgeServer";
+import { StructuredActionInvoker } from "./services/StructuredActionInvoker";
+import { PageLearner } from "./services/PageLearner";
 import type { AgentEvent } from "../src/types/ai";
 import type { Tab } from "../src/types/browser";
 
@@ -121,7 +126,6 @@ type AiSessionKind = "default" | "incognito";
 function aiSessionKindFor(tm: TabManager): AiSessionKind {
   return tm.isIncognito() ? "incognito" : "default";
 }
-/** XML-escape for use inside an attribute value (mention <page> tags). */
 /**
  * Agent Policy v1 § 7 — identify agent-driven traffic via header.
  * Spec § 7: "User agents that act on behalf of an AI agent SHOULD
@@ -154,7 +158,16 @@ function installAgentIdentificationHeader(s: Electron.Session): void {
       (settingsManager?.get("aiAdvertiseAgent" as never) as
         | boolean
         | undefined) ?? true;
-    if (!enabled || !isAgentDriving()) {
+    // Only advertise to origins that opted in via /agent.json — never to
+    // sites that haven't (e.g. Google sign-in rejects advertised agent
+    // traffic as "high risk"). agentPolicyResolver may be unset very early.
+    const advertise = shouldAdvertiseAgent(
+      details.url,
+      enabled,
+      isAgentDriving(),
+      (origin) => agentPolicyResolver?.cached(origin) ?? null,
+    );
+    if (!advertise) {
       callback({ requestHeaders: details.requestHeaders });
       return;
     }
@@ -162,14 +175,6 @@ function installAgentIdentificationHeader(s: Electron.Session): void {
       requestHeaders: { ...details.requestHeaders, "X-Horizon-Agent": "true" },
     });
   });
-}
-
-function escapeAttr(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 /**
@@ -201,6 +206,14 @@ async function ensurePiSession(
       // is unambiguously its own.
       (customInstructions) => activePiSession?.compact(customInstructions),
       agentPolicyResolver,
+      new StructuredActionInvoker(),
+      new PageLearner(),
+      (proposal) => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed())
+            w.webContents.send(IPC_CHANNELS.AI_SAVE_PROPOSAL, proposal);
+        }
+      },
     );
     bridgePort = await bridgeServer.listen();
   }
@@ -295,15 +308,13 @@ async function handleNavigateForLlmsTxt(
   }
   // Parse the index (prefer llms.txt; fall back to first lines of llms-full.txt).
   const parsed = parseLlmsTxt(llmsTxt ?? llmsFullTxt ?? "");
-  let skillFile: string | undefined;
-  if (llmsTxt || llmsFullTxt) {
-    const path = await writePiSkill(
-      origin,
-      llmsTxt ?? "",
-      llmsFullTxt ?? undefined,
-    );
-    if (path) skillFile = path;
-  }
+  // NOTE: we deliberately no longer write per-site Pi skill files from
+  // llms.txt. Pi auto-loads every ~/.pi/agent/skills file into context on
+  // startup, so one file per visited site accumulated into a large, hidden
+  // token cost on every request. The parsed guide below (panel) + a compact
+  // summary injected at turn time (see ai:start) cover the useful parts
+  // without dumping raw llms content into the token budget.
+  const skillFile: string | undefined = undefined;
   if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
     win.webContents.send(IPC_CHANNELS.AI_LLMS_TXT_FOUND, {
       origin,
@@ -487,7 +498,11 @@ function registerHandlers(): void {
       if (useLlmsTxt) {
         try {
           origin = new URL(view.webContents.getURL()).origin;
-          skills = await llmsTxtResolver.fetch(origin);
+          // Inject ONLY a compact, useful summary (title + section nav links)
+          // — never the raw llms.txt / llms-full.txt body, which can be huge.
+          const both = await llmsTxtResolver.fetchBoth(origin);
+          const raw = both.llmsTxt ?? both.llmsFullTxt;
+          skills = raw ? summarizeLlmsGuide(parseLlmsTxt(raw)) : null;
         } catch {
           /* invalid URL (horizon:// etc.) — skip */
         }
@@ -534,6 +549,15 @@ function registerHandlers(): void {
         pages,
       });
 
+      // Diagnostic: surface how much context we send into Pi each turn so an
+      // oversized prompt (→ 400 "prompt too long") is visible. ~4 chars/token.
+      const pageChars = pages.reduce((n, p) => n + p.text.length, 0);
+      console.warn(
+        `[ai:start] prompt ${augmentedPrompt.length} chars (~${Math.round(
+          augmentedPrompt.length / 4,
+        )} tok) — skills ${skills ? skills.length : 0}, ${pages.length} mentioned page(s) ${pageChars} chars`,
+      );
+
       activePiSession = piSession;
       lastAgentActivityAt = Date.now();
       void piSession.startTurn(augmentedPrompt);
@@ -570,6 +594,30 @@ function registerHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.WORKFLOW_DELETE,
     (_event, { id }: { id: string }) => workflowsManager.delete(id),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.DOMAIN_SKILL_SAVE,
+    (_event, { host, name, content }: { host: string; name: string; content: string }) => {
+      if (!host || !name) throw new Error("domainSkill:save requires host and name");
+      const fileName = name.endsWith(".md") ? name : `${name}.md`;
+      return domainSkills.save(host, fileName, content ?? "");
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.DOMAIN_SKILL_LIST,
+    async (_event, { host }: { host?: string }) => {
+      const hosts = host ? [host] : await domainSkills.listHosts();
+      return Promise.all(
+        hosts.map(async (h) => ({ host: h, names: await domainSkills.list(h) })),
+      );
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.DOMAIN_SKILL_REMOVE,
+    (_event, { host, name }: { host: string; name: string }) => {
+      if (!host || !name) throw new Error("domainSkill:remove requires host and name");
+      return domainSkills.remove(host, name);
+    },
   );
 
   // Translation handlers (translate:page / translate:cancel / translate:restore
@@ -880,6 +928,13 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
 }
 
 app.whenReady().then(() => {
+  // Google and other sign-in flows reject Electron's default UA (it contains
+  // "Electron/<ver>" and the app name) as an insecure/embedded browser —
+  // surfacing as 400 "high risk" / "this browser may not be secure". Strip
+  // those tokens to present a plain Chrome UA. Must run before any page loads.
+  app.userAgentFallback = app.userAgentFallback
+    .replace(/ Electron\/[\d.]+/, "")
+    .replace(/ horizon-browser\/[\d.]+/, "");
   // Apply spell-check settings to every session that exists or will be
   // created. The default session is for regular windows; the incognito
   // partition is created in WindowManager when an incognito window opens.

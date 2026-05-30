@@ -204,6 +204,9 @@ const ACTION_TOOLS = new Set<string>([
   "scroll",
   "submit",
   "callHelper",
+  // Site-declared agent.json action invocation — a real state-changing
+  // action, so site requires_human / prohibited triggers must apply.
+  "invokeStructuredAction",
 ]);
 
 /**

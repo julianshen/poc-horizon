@@ -85,6 +85,11 @@ interface BrowserState {
   showTabContextMenu: boolean;
   setAppMenuOpen: (open: boolean) => void;
   setTabContextMenuOpen: (open: boolean) => void;
+  /** True while a SaveProposalCard is showing a pending proposal. Same
+   *  reason as the menus above: BrowserContentArea reads this to hide the
+   *  BrowserView so the card isn't painted behind the page. */
+  saveProposalOpen: boolean;
+  setSaveProposalOpen: (open: boolean) => void;
   toggleAI: () => void;
   setTabs: (tabs: Tab[]) => void;
   setActiveTab: (tabId: string) => void;
@@ -131,6 +136,8 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   showTabContextMenu: false,
   setAppMenuOpen: (open) => set({ showAppMenu: open }),
   setTabContextMenuOpen: (open) => set({ showTabContextMenu: open }),
+  saveProposalOpen: false,
+  setSaveProposalOpen: (open) => set({ saveProposalOpen: open }),
   toggleAI: () => set((state) => ({ showAI: !state.showAI })),
   pendingLlmsGuides: [],
   pushLlmsGuide: (g) =>

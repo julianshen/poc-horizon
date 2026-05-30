@@ -282,6 +282,23 @@ describe("StructuredActionInvoker", () => {
   });
 
   describe("invoke — path params and edge cases", () => {
+    it("sends the body as a JSON string, not a raw object literal", async () => {
+      let captured = "";
+      const harness = mockHarness((expr) => {
+        captured = expr;
+        return { ok: true };
+      });
+      const policy = makePolicy(); // create_page: POST with cookie auth
+      await invoker.invoke(harness as never, policy, "create_page", {
+        title: "T",
+        content: "C",
+      });
+      // The generated fetch must stringify the body — not interpolate a
+      // bare object literal (which would send "[object Object]").
+      expect(captured).toContain("body: JSON.stringify(");
+      expect(captured).not.toMatch(/body:\s*\{/);
+    });
+
     it("resolves :param path segments from args (URL-encoded)", async () => {
       let captured = "";
       const harness = mockHarness((expr) => {

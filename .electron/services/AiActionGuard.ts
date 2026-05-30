@@ -41,6 +41,9 @@ const RISKY_TOOLS = new Set<string>([
   "removeHelper",
   "cdpSubscribe",
   "cdpUnsubscribe",
+  // Calls a site-declared agent.json action over the page session — can be a
+  // cookie-auth POST/DELETE, so gate it like other state-mutating tools.
+  "invokeStructuredAction",
 ]);
 
 /**

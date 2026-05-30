@@ -838,4 +838,53 @@ describe("PageLearner", () => {
       expect(result.network!.totalRequests).toBe(6);
     });
   });
+
+  describe("PR-review regressions", () => {
+    it("reads submit label from a button's child text node (CDP null nodeValue)", async () => {
+      const harness = mockHarness({
+        getDom: {
+          nodeId: 1, nodeType: 9, nodeName: "#document",
+          childNodes: [{
+            nodeId: 10, nodeType: 1, nodeName: "FORM",
+            attributes: ["action", "/new", "method", "post"],
+            childNodes: [
+              { nodeId: 11, nodeType: 1, nodeName: "INPUT", attributes: ["type", "text", "name", "title"] },
+              {
+                nodeId: 12, nodeType: 1, nodeName: "BUTTON", attributes: ["type", "submit"],
+                // Real CDP element: no nodeValue; label lives in a child text node.
+                childNodes: [{ nodeId: 13, nodeType: 3, nodeName: "#text", nodeValue: "Create" }],
+              },
+            ],
+          }],
+        },
+      });
+      const result = await learner.learn(harness as never, {
+        includeScripting: false, includeUrlAnalysis: false, includeNetwork: false,
+      } as LearnOptions);
+      expect(result.perception.forms[0].submitLabel).toBe("Create");
+      expect(result.classification.some((a) => a.name === "create")).toBe(true);
+    });
+
+    it("finds a form nested deep in the DOM (depth fix)", async () => {
+      let node: Record<string, unknown> = {
+        nodeId: 999, nodeType: 1, nodeName: "FORM",
+        attributes: ["action", "/x", "method", "post"],
+        childNodes: [{
+          nodeId: 998, nodeType: 1, nodeName: "BUTTON", attributes: ["type", "submit"],
+          childNodes: [{ nodeId: 997, nodeType: 3, nodeName: "#text", nodeValue: "Create" }],
+        }],
+      };
+      for (let i = 0; i < 12; i += 1) {
+        node = { nodeId: i, nodeType: 1, nodeName: "DIV", childNodes: [node] };
+      }
+      const harness = mockHarness({
+        getDom: { nodeId: 1, nodeType: 9, nodeName: "#document", childNodes: [node] },
+      });
+      const result = await learner.learn(harness as never, {
+        includeScripting: false, includeUrlAnalysis: false, includeNetwork: false,
+      } as LearnOptions);
+      expect(result.perception.forms).toHaveLength(1);
+      expect(result.classification.some((a) => a.name === "create")).toBe(true);
+    });
+  });
 });

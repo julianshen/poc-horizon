@@ -201,7 +201,11 @@ export class PageLearner {
     const [marked, , dom] = await Promise.all([
       harness.screenshotMarked({ order: "reading", format: "jpeg", quality: 50 }),
       harness.getAxTree(),
-      harness.getDom(2),
+      // Full tree (-1): forms/navs are nested deep under body/app roots, so
+      // a shallow snapshot (the old depth=2) only returned the document shell
+      // and missed them. This DOM stays in-process (not sent to the LLM), so
+      // depth costs no agent tokens.
+      harness.getDom(-1),
     ]);
 
     const marks = marked.marks;
@@ -360,14 +364,19 @@ export class PageLearner {
     await harness.subscribeEvent("Network.requestWillBeSent");
     await harness.subscribeEvent("Network.responseReceived");
 
-    await new Promise((r) => setTimeout(r, durationMs));
-
-    // collectEvents is synchronous (drains an in-memory ring buffer).
-    const reqEvents = harness.collectEvents("Network.requestWillBeSent");
-    const resEvents = harness.collectEvents("Network.responseReceived");
-
-    harness.unsubscribeEvent("Network.requestWillBeSent");
-    harness.unsubscribeEvent("Network.responseReceived");
+    // collectEvents is synchronous (drains an in-memory ring buffer). Always
+    // unsubscribe, even if the observation window throws, to avoid leaking
+    // CDP subscriptions.
+    let reqEvents: unknown[] = [];
+    let resEvents: unknown[] = [];
+    try {
+      await new Promise((r) => setTimeout(r, durationMs));
+      reqEvents = harness.collectEvents("Network.requestWillBeSent");
+      resEvents = harness.collectEvents("Network.responseReceived");
+    } finally {
+      harness.unsubscribeEvent("Network.requestWillBeSent");
+      harness.unsubscribeEvent("Network.responseReceived");
+    }
 
     // Index requests by requestId so each response can recover its real
     // HTTP method and post body (for GraphQL detection).
@@ -624,9 +633,13 @@ function classifyUrlPattern(url: string): string {
   }
 }
 
+// Generous traversal cap — real forms/navs nest deep; bounded only to
+// guard against pathological trees.
+const MAX_DOM_WALK_DEPTH = 40;
+
 function extractForms(dom: DomNode, depth = 0): PerceivedForm[] {
   // Only scan top-level children (depth limited).
-  if (depth > 2 || !dom.childNodes) return [];
+  if (depth > MAX_DOM_WALK_DEPTH || !dom.childNodes) return [];
 
   const forms: PerceivedForm[] = [];
 
@@ -642,6 +655,14 @@ function extractForms(dom: DomNode, depth = 0): PerceivedForm[] {
 }
 
 function parseForm(formNode: DomNode): PerceivedForm {
+  // Real CDP element nodes (e.g. <button>) have a null nodeValue — the
+  // visible label lives in child text nodes — so gather text recursively.
+  const collectText = (node: DomNode): string => {
+    if (node.nodeValue) return node.nodeValue;
+    if (node.childNodes) return node.childNodes.map(collectText).join(" ");
+    return "";
+  };
+
   const attrs = formNode.attributes ?? [];
   let action = "";
   let method = "get";
@@ -666,7 +687,7 @@ function parseForm(formNode: DomNode): PerceivedForm {
       if (name) fields.push({ name, type, required, placeholder });
     }
     if (node.nodeName === "BUTTON" && (node.attributes ?? []).includes("submit")) {
-      submitLabel = node.nodeValue ?? "Submit";
+      submitLabel = collectText(node).trim() || "Submit";
     }
     if (node.childNodes) {
       for (const c of node.childNodes) walk(c);
@@ -675,15 +696,9 @@ function parseForm(formNode: DomNode): PerceivedForm {
 
   walk(formNode);
 
-  // If no explicit submit button found, check for button text in child text nodes.
+  // If no explicit submit button found, scan the form's text for a verb.
   if (submitLabel === "Submit") {
-    const collectText = (node: DomNode): string => {
-      if (node.nodeValue) return node.nodeValue;
-      if (node.childNodes) return node.childNodes.map(collectText).join(" ");
-      return "";
-    };
-    const allText = collectText(formNode);
-    const match = allText.match(CREATE_LABELS);
+    const match = collectText(formNode).match(CREATE_LABELS);
     if (match) submitLabel = match[0];
   }
 
@@ -702,7 +717,7 @@ function extractNavSections(
 ): PerceivedNavSection[] {
   // Find <nav> elements in DOM and match their link children to marks.
   const findNavs = (node: DomNode, depth: number): DomNode[] => {
-    if (depth > 2) return [];
+    if (depth > MAX_DOM_WALK_DEPTH) return [];
     const result: DomNode[] = [];
     if (node.nodeName === "NAV") result.push(node);
     if (node.childNodes) {

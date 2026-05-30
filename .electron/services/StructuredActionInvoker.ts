@@ -132,9 +132,12 @@ export class StructuredActionInvoker {
     const path = pathParts.join(" ");
     const useCredentials = (action.auth ?? "none") === "cookie";
 
+    // Emit `JSON.stringify({...})` into the generated code so the fetch
+    // body is a JSON *string*, not an object literal (which would send
+    // "[object Object]").
     const bodyLiteral = method === "GET" || method === "HEAD"
       ? "undefined"
-      : JSON.stringify(args);
+      : `JSON.stringify(${JSON.stringify(args)})`;
 
     const headersLiteral = (method === "GET" || method === "HEAD")
       ? "undefined"

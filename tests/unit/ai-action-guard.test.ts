@@ -133,6 +133,19 @@ describe("AiActionGuard", () => {
     policy = "risky";
     expect(g.needsApproval("click")).toBe(true);
   });
+
+  it("gates invokeStructuredAction as risky (cookie-auth agent.json action)", () => {
+    // A site-declared POST/DELETE must prompt in 'risky' mode, not slip
+    // through unguarded.
+    expect(
+      new AiActionGuard(() => "risky").evaluate("invokeStructuredAction", {})
+        .kind,
+    ).toBe("prompt");
+    expect(
+      new AiActionGuard(() => "never").evaluate("invokeStructuredAction", {})
+        .kind,
+    ).toBe("allow");
+  });
 });
 
 describe("HorizonBridgeServer + AiActionGuard integration", () => {

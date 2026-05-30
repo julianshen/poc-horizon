@@ -116,4 +116,37 @@ describe("DomainSkills", () => {
     const hosts = await ds.listHosts();
     expect(hosts).toEqual(["a.com", "b.com"]);
   });
+
+  describe("path traversal is rejected", () => {
+    it("rejects host '..' (would escape the skills root)", async () => {
+      await expect(ds.save("..", "evil.md", "x")).rejects.toThrow(/invalid host/);
+    });
+
+    it("rejects host '.'", async () => {
+      await expect(ds.save(".", "evil.md", "x")).rejects.toThrow(/invalid host/);
+    });
+
+    it("rejects hosts with slashes or NUL", async () => {
+      await expect(ds.save("../etc", "evil.md", "x")).rejects.toThrow(/invalid host/);
+      await expect(ds.save("a\\b", "evil.md", "x")).rejects.toThrow(/invalid host/);
+      await expect(ds.save("a\u0000b", "evil.md", "x")).rejects.toThrow(/invalid host/);
+    });
+
+    it("rejects names with slashes, NUL, or a leading dot", async () => {
+      await expect(ds.save("a.com", "../e.md", "x")).rejects.toThrow(/invalid skill name/);
+      await expect(ds.save("a.com", "a\u0000.md", "x")).rejects.toThrow(/invalid skill name/);
+      await expect(ds.save("a.com", ".hidden.md", "x")).rejects.toThrow(/invalid skill name/);
+    });
+
+    it("writes nothing outside the skills root when given a traversal host", async () => {
+      await expect(ds.save("..", "evil.md", "pwned")).rejects.toThrow();
+      // The parent of root must not have gained an evil.md.
+      const parent = path.dirname(root);
+      const escaped = await fs
+        .readFile(path.join(parent, "evil.md"), "utf8")
+        .then(() => true)
+        .catch(() => false);
+      expect(escaped).toBe(false);
+    });
+  });
 });

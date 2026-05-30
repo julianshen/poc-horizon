@@ -430,4 +430,54 @@ describe("PiSession", () => {
     // And it should still be running
     expect(session.isRunning).toBe(true);
   });
+
+  it("re-queues with streamingBehavior when Pi rejects a prompt as 'already processing'", async () => {
+    await session.startTurn("hi");
+    emit({
+      type: "response",
+      success: false,
+      command: "prompt",
+      error:
+        "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.",
+    });
+    const steer = lastProc!.writes
+      .map((w) => JSON.parse(w))
+      .find((m) => m.type === "prompt" && m.streamingBehavior === "steer");
+    expect(steer).toMatchObject({
+      type: "prompt",
+      message: "hi",
+      streamingBehavior: "steer",
+    });
+    // The confusing raw rejection must NOT reach the panel.
+    expect(
+      events.some(
+        (e) =>
+          e.type === "error" &&
+          /already processing/i.test((e as { message?: string }).message ?? ""),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not loop: a second 'already processing' surfaces the error", async () => {
+    await session.startTurn("hi");
+    emit({
+      type: "response",
+      success: false,
+      command: "prompt",
+      error: "Agent is already processing",
+    });
+    emit({
+      type: "response",
+      success: false,
+      command: "prompt",
+      error: "Agent is already processing",
+    });
+    expect(
+      events.some(
+        (e) =>
+          e.type === "error" &&
+          /already processing/i.test((e as { message?: string }).message ?? ""),
+      ),
+    ).toBe(true);
+  });
 });

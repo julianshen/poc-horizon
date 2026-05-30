@@ -579,6 +579,8 @@ export const AIPanel: React.FC = () => {
             m={m}
             isLastAndStreaming={running && i === messages.length - 1}
             onPreset={runPreset}
+            onSave={saveWhatWeLearned}
+            saveDisabled={running}
           />
         ))}
       </div>
@@ -734,7 +736,9 @@ const MessageBubbleInner: React.FC<{
   m: Message;
   isLastAndStreaming?: boolean;
   onPreset?: (label: string) => void;
-}> = ({ m, isLastAndStreaming, onPreset }) => {
+  onSave?: () => void;
+  saveDisabled?: boolean;
+}> = ({ m, isLastAndStreaming, onPreset, onSave, saveDisabled }) => {
   if (m.who === "system" && m.guide) {
     return <LlmsTxtGuideCard guide={m.guide} />;
   }
@@ -807,7 +811,7 @@ const MessageBubbleInner: React.FC<{
       {m.tools && m.tools.length > 0 && (
         <div className="flex flex-col gap-1 w-[92%] max-w-[92%]">
           {m.tools.map((t) => (
-            <ToolChip key={t.id} tool={t} />
+            <ToolChip key={t.id} tool={t} onSave={onSave} saveDisabled={saveDisabled} />
           ))}
         </div>
       )}
@@ -850,7 +854,9 @@ const MessageBubble = React.memo(
   (prev, next) =>
     prev.m === next.m &&
     prev.isLastAndStreaming === next.isLastAndStreaming &&
-    prev.onPreset === next.onPreset,
+    prev.onPreset === next.onPreset &&
+    prev.onSave === next.onSave &&
+    prev.saveDisabled === next.saveDisabled,
 );
 
 /**
@@ -1147,24 +1153,29 @@ const LlmsTxtGuideCard: React.FC<{ guide: LlmsTxtGuide }> = ({ guide }) => {
   );
 };
 
-const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
+const ToolChip: React.FC<{ tool: ToolCall; onSave?: () => void; saveDisabled?: boolean }> = ({
+  tool,
+  onSave,
+  saveDisabled,
+}) => {
   const [open, setOpen] = useState(false);
   const isImage = isImageResult(tool.output);
   const isPending = tool.output === undefined;
 
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="text-left text-[11px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5 self-start"
-        style={{
-          background: tool.isError
-            ? "rgba(212,77,77,0.10)"
-            : "var(--surface-2)",
-          color: tool.isError ? "var(--insecure)" : "var(--chrome-fg-muted)",
-        }}
-      >
+      <div className="flex items-center gap-1.5 self-start">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-left text-[11px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5"
+          style={{
+            background: tool.isError
+              ? "rgba(212,77,77,0.10)"
+              : "var(--surface-2)",
+            color: tool.isError ? "var(--insecure)" : "var(--chrome-fg-muted)",
+          }}
+        >
         <span style={{ opacity: 0.5, fontSize: 9 }}>{open ? "▾" : "▸"}</span>
         <span>{tool.name}</span>
         {isPending ? (
@@ -1183,7 +1194,21 @@ const ToolChip: React.FC<{ tool: ToolCall }> = ({ tool }) => {
             />
           </span>
         ) : null}
-      </button>
+        </button>
+        {onSave && (
+          <button
+            type="button"
+            aria-label="Save this action"
+            onClick={onSave}
+            disabled={saveDisabled}
+            className="text-xs shrink-0"
+            style={{ background: "transparent", border: 0, color: "var(--chrome-fg-subtle)", cursor: saveDisabled ? "default" : "pointer" }}
+            title="Save what the agent learned as a skill or reusable action"
+          >
+            ⤓
+          </button>
+        )}
+      </div>
       {open && (
         <div
           className="mt-1 text-[11px] rounded-md font-mono"

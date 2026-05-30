@@ -171,14 +171,6 @@ function installAgentIdentificationHeader(s: Electron.Session): void {
   });
 }
 
-function escapeAttr(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 /**
  * Get-or-create the PiSession for a window. Spawns the Pi subprocess +
  * bridge server (once per app session). Shared by ai:start, ai:preWarm,

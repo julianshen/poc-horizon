@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useBrowserStore } from "@/stores/browserStore";
 
 interface Proposal {
   id: string; // main-side correlation id; unused in the renderer (no round-trip)
@@ -25,12 +26,19 @@ export const SaveProposalCard: React.FC = () => {
   const [content, setContent] = useState("");
   const [attach, setAttach] = useState<"activeTab" | "allTabs" | "none">("activeTab");
   const [error, setError] = useState<string | null>(null);
+  const setSaveProposalOpen = useBrowserStore((s) => s.setSaveProposalOpen);
 
   useEffect(() => {
     return window.horizonAPI.on("ai:saveProposal", (p: Proposal) =>
       setQueue((q) => [...q, p]),
     );
   }, []);
+
+  // Tell BrowserContentArea to hide the BrowserView while the card shows —
+  // the view paints above DOM and would otherwise cover the card.
+  useEffect(() => {
+    setSaveProposalOpen(queue.length > 0);
+  }, [queue.length, setSaveProposalOpen]);
 
   useEffect(() => {
     if (!current) return;

@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { setupRendererTest } from "../helpers/fakeHorizonAPI";
 import { SaveProposalCard } from "@/components/overlays/SaveProposalCard";
+import { useBrowserStore } from "@/stores/browserStore";
 
 const skillProposal = {
   id: "save-1",
@@ -25,6 +26,15 @@ describe("SaveProposalCard", () => {
   it("renders nothing until a proposal arrives", () => {
     const { container } = render(<SaveProposalCard />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it("toggles saveProposalOpen so BrowserContentArea hides the BrowserView", () => {
+    render(<SaveProposalCard />);
+    expect(useBrowserStore.getState().saveProposalOpen).toBe(false);
+    act(() => api().emit("ai:saveProposal", skillProposal));
+    expect(useBrowserStore.getState().saveProposalOpen).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(useBrowserStore.getState().saveProposalOpen).toBe(false);
   });
 
   it("shows a skill proposal and saves via domainSkill:save with edited values", async () => {

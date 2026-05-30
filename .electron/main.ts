@@ -55,6 +55,7 @@ import {
 } from "./services/AiActionGuard";
 import { ActionRecorder } from "./services/ActionRecorder";
 import { AgentPolicyResolver } from "./services/AgentPolicyResolver";
+import { shouldAdvertiseAgent } from "./services/agentTraffic";
 // translateText / translatePage / restorePage are imported by
 // .electron/ipc/main-handlers.ts where their IPC handlers live.
 import { HorizonBridgeServer } from "./services/HorizonBridgeServer";
@@ -160,7 +161,16 @@ function installAgentIdentificationHeader(s: Electron.Session): void {
       (settingsManager?.get("aiAdvertiseAgent" as never) as
         | boolean
         | undefined) ?? true;
-    if (!enabled || !isAgentDriving()) {
+    // Only advertise to origins that opted in via /agent.json — never to
+    // sites that haven't (e.g. Google sign-in rejects advertised agent
+    // traffic as "high risk"). agentPolicyResolver may be unset very early.
+    const advertise = shouldAdvertiseAgent(
+      details.url,
+      enabled,
+      isAgentDriving(),
+      (origin) => agentPolicyResolver?.cached(origin) ?? null,
+    );
+    if (!advertise) {
       callback({ requestHeaders: details.requestHeaders });
       return;
     }
@@ -993,6 +1003,13 @@ function createWindow(opts: { incognito?: boolean } = {}): void {
 }
 
 app.whenReady().then(() => {
+  // Google and other sign-in flows reject Electron's default UA (it contains
+  // "Electron/<ver>" and the app name) as an insecure/embedded browser —
+  // surfacing as 400 "high risk" / "this browser may not be secure". Strip
+  // those tokens to present a plain Chrome UA. Must run before any page loads.
+  app.userAgentFallback = app.userAgentFallback
+    .replace(/ Electron\/[\d.]+/, "")
+    .replace(/ horizon-browser\/[\d.]+/, "");
   // Apply spell-check settings to every session that exists or will be
   // created. The default session is for regular windows; the incognito
   // partition is created in WindowManager when an incognito window opens.

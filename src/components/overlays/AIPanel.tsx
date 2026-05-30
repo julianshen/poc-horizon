@@ -157,6 +157,7 @@ export const AIPanel: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>(INITIAL);
   const [draft, setDraft] = useState("");
   const [running, setRunning] = useState(false);
+  const [hasReplied, setHasReplied] = useState(false);
   // @-mention chips queued for the next send.
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -280,6 +281,7 @@ export const AIPanel: React.FC = () => {
           case "turn_end":
             next[next.length - 1] = { ...last, loading: false };
             setRunning(false);
+            setHasReplied(true);
             return next;
           case "error":
             next[next.length - 1] = {
@@ -504,14 +506,14 @@ export const AIPanel: React.FC = () => {
         </button>
         <button
           onClick={saveWhatWeLearned}
-          disabled={running}
+          disabled={running || !hasReplied}
           aria-label="Save what we learned"
           title="Save a site skill or reusable action from this page"
           className="icon-btn"
           style={{ width: 26, height: 26 }}
         >
           <svg viewBox="0 0 24 24" aria-hidden>
-            <path d="M5 3h11l3 3v15a0 0 0 0 1 0 0H5z" fill="none" />
+            <path d="M5 3h11l3 3v15H5z" fill="none" />
             <path d="M8 3v6h7V3" />
             <rect x="8" y="13" width="8" height="5" fill="none" />
           </svg>

@@ -576,24 +576,25 @@ function registerHandlers(): void {
     IPC_CHANNELS.DOMAIN_SKILL_SAVE,
     (_event, { host, name, content }: { host: string; name: string; content: string }) => {
       if (!host || !name) throw new Error("domainSkill:save requires host and name");
-      return domainSkills.save(host, name, content ?? "");
+      const fileName = name.endsWith(".md") ? name : `${name}.md`;
+      return domainSkills.save(host, fileName, content ?? "");
     },
   );
   ipcMain.handle(
     IPC_CHANNELS.DOMAIN_SKILL_LIST,
     async (_event, { host }: { host?: string }) => {
-      if (host) return { host, names: await domainSkills.list(host) };
-      const hosts = await domainSkills.listHosts();
-      const byHost = await Promise.all(
+      const hosts = host ? [host] : await domainSkills.listHosts();
+      return Promise.all(
         hosts.map(async (h) => ({ host: h, names: await domainSkills.list(h) })),
       );
-      return byHost;
     },
   );
   ipcMain.handle(
     IPC_CHANNELS.DOMAIN_SKILL_REMOVE,
-    (_event, { host, name }: { host: string; name: string }) =>
-      domainSkills.remove(host, name),
+    (_event, { host, name }: { host: string; name: string }) => {
+      if (!host || !name) throw new Error("domainSkill:remove requires host and name");
+      return domainSkills.remove(host, name);
+    },
   );
 
   // Translation handlers (translate:page / translate:cancel / translate:restore

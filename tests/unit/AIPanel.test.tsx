@@ -672,11 +672,21 @@ describe("AIPanel", () => {
     expect(api().invokes.filter((i) => i.channel === "ai:start").length).toBe(1);
   });
 
-  it("'Save…' header button dispatches a propose-save prompt to the agent", async () => {
+  it("'Save…' header button is disabled until a turn has completed", () => {
     render(<AIPanel />);
+    expect(
+      (screen.getByRole("button", { name: "Save what we learned" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("'Save…' header button dispatches a propose-save prompt after a turn completes", async () => {
+    render(<AIPanel />);
+    fireEvent.change(screen.getByPlaceholderText(/Ask anything/), { target: { value: "hi" } });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Ask anything/), { key: "Enter" });
+    act(() => { api().emit("ai:event", { type: "turn_end" }); });
     fireEvent.click(screen.getByRole("button", { name: "Save what we learned" }));
     await waitFor(() => {
-      const start = api().invokes.find((i) => i.channel === "ai:start");
+      const start = api().invokes.filter((i) => i.channel === "ai:start").at(-1);
       expect((start!.payload as { prompt: string }).prompt).toContain("browser_propose_save");
     });
   });

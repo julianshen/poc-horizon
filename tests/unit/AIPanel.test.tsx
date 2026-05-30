@@ -614,6 +614,64 @@ describe("AIPanel", () => {
     expect(ta.value).toBe("one");
   });
 
+  it("drains pendingLearnRequest → ai:start with the learn prompt, then clears the flag", async () => {
+    render(<AIPanel />);
+    act(() => {
+      useBrowserStore.getState().requestLearnPage();
+    });
+    await waitFor(() => {
+      const start = api().invokes.find((i) => i.channel === "ai:start");
+      expect(start).toBeTruthy();
+      expect((start!.payload as { prompt: string }).prompt).toContain(
+        "browser_learn_page_actions",
+      );
+    });
+    expect(useBrowserStore.getState().pendingLearnRequest).toBe(false);
+  });
+
+  it("header 'Learn this page actions' button dispatches the learn prompt", async () => {
+    render(<AIPanel />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Learn this page actions" }),
+    );
+    await waitFor(() => {
+      const start = api().invokes.find((i) => i.channel === "ai:start");
+      expect((start!.payload as { prompt: string }).prompt).toContain(
+        "browser_learn_page_actions",
+      );
+    });
+  });
+
+  it("does not start a learn turn while another turn is running", async () => {
+    render(<AIPanel />);
+    fireEvent.change(screen.getByPlaceholderText(/Ask anything/), {
+      target: { value: "hi" },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Ask anything/), {
+      key: "Enter",
+    });
+    await waitFor(() =>
+      expect(
+        api().invokes.filter((i) => i.channel === "ai:start").length,
+      ).toBe(1),
+    );
+    // Precondition: a turn is in progress, so the header learn button is disabled.
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Learn this page actions",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    act(() => {
+      useBrowserStore.getState().requestLearnPage();
+    });
+    await waitFor(() =>
+      expect(useBrowserStore.getState().pendingLearnRequest).toBe(false),
+    );
+    expect(api().invokes.filter((i) => i.channel === "ai:start").length).toBe(1);
+  });
+
   // Suppress unused import warning.
   void api;
 });

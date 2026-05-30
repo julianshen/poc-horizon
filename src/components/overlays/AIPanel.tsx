@@ -73,6 +73,10 @@ const INITIAL: Message[] = [
   },
 ];
 
+/** Label shared by the learn-page header button, the toolbar button's
+ *  drained request, and the resolvePreset entry below. */
+const LEARN_LABEL = "Learn this page actions";
+
 /**
  * Known one-click presets. Maps the chip label (and the "Summarize"
  * header button) to a prompt + which tabs to auto-@-mention.
@@ -104,6 +108,15 @@ function resolvePreset(
       attach: "none",
     };
   }
+  if (label === LEARN_LABEL) {
+    return {
+      prompt:
+        "Learn what actions I can take on this page. Call browser_learn_page_actions, " +
+        "then give me a short summary of the available actions (search, create, navigation, " +
+        "filters, etc.), any forms, and any API endpoints you observed.",
+      attach: "activeTab",
+    };
+  }
   return null;
 }
 
@@ -122,6 +135,8 @@ export const AIPanel: React.FC = () => {
   const consumeGuides = useBrowserStore((s) => s.consumeLlmsGuides);
   const pendingSelection = useBrowserStore((s) => s.pendingSelection);
   const consumeSelection = useBrowserStore((s) => s.consumeSelection);
+  const pendingLearnRequest = useBrowserStore((s) => s.pendingLearnRequest);
+  const consumeLearnRequest = useBrowserStore((s) => s.consumeLearnRequest);
 
   // Hide Pi spawn latency: on first mount of the panel (which happens
   // when showAI flips true), kick off ai:preWarm so the subprocess is
@@ -359,6 +374,15 @@ export const AIPanel: React.FC = () => {
     [running, send],
   );
 
+  // Drain a "learn this page" request from a toolbar/command trigger.
+  // consumeLearnRequest() runs first so the flag always clears; runPreset
+  // no-ops if a turn is already running, so the request is simply dropped.
+  useEffect(() => {
+    if (!pendingLearnRequest) return;
+    consumeLearnRequest();
+    runPreset(LEARN_LABEL);
+  }, [pendingLearnRequest, consumeLearnRequest, runPreset]);
+
   const addMention = useCallback((tabId: string, title: string) => {
     setMentions((cur) =>
       cur.some((m) => m.tabId === tabId) ? cur : [...cur, { tabId, title }],
@@ -449,6 +473,20 @@ export const AIPanel: React.FC = () => {
             <polyline points="14 3 14 9 20 9" />
             <line x1="8" y1="13" x2="16" y2="13" />
             <line x1="8" y1="17" x2="14" y2="17" />
+          </svg>
+        </button>
+        <button
+          onClick={() => runPreset(LEARN_LABEL)}
+          disabled={running}
+          aria-label="Learn this page actions"
+          title="Learn what actions this page offers"
+          className="icon-btn"
+          style={{ width: 26, height: 26 }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden>
+            <circle cx="11" cy="11" r="6" />
+            <line x1="15.5" y1="15.5" x2="21" y2="21" />
+            <path d="M18.5 2.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z" fill="currentColor" stroke="none" />
           </svg>
         </button>
         <div className="relative" style={{ width: 26, height: 26 }}>

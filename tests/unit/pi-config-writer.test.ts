@@ -101,6 +101,22 @@ describe("writePiConfig", () => {
     expect(readAuth()).toEqual({ anthropic: { type: "oauth", key: "login-tok" } });
   });
 
+  it("keeps a once-managed key that was replaced with a different value", () => {
+    // Horizon writes sk-a (ownership hash recorded for that value)…
+    writePiConfig(dir, cfg({ apiKeys: { anthropic: "sk-a" } }));
+    // …then Pi/the user replaces the entry with a different api_key…
+    writeFileSync(
+      authPath(),
+      JSON.stringify({ anthropic: { type: "api_key", key: "sk-replaced" } }),
+    );
+    // …and the user clears the Horizon field. The value no longer matches
+    // what Horizon wrote, so it must be preserved.
+    writePiConfig(dir, cfg({ activeProvider: "anthropic" }));
+    expect(readAuth()).toEqual({
+      anthropic: { type: "api_key", key: "sk-replaced" },
+    });
+  });
+
   it("never deletes an api_key entry Horizon did not write", () => {
     // Simulates a Pi `/login` api_key created out-of-band.
     writeFileSync(

@@ -92,6 +92,11 @@ export class PiSession extends EventEmitter {
     const proc = spawn(this.opts.binary, this.opts.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...(this.opts.env ?? {}) },
+      // Hide the subprocess console on Windows. Belt-and-suspenders with the
+      // build's --windows-hide-console (which Bun can't apply to a Windows
+      // binary cross-compiled from Linux/macOS), so a GUI-spawned Pi never
+      // flashes a Command Prompt regardless of how the binary was built.
+      windowsHide: true,
       ...(this.opts.cwd ? { cwd: this.opts.cwd } : {}),
     });
     proc.stdout!.setEncoding("utf8");

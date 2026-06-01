@@ -6,6 +6,7 @@ import {
   rmSync,
   chmodSync,
 } from "fs";
+import { createHash } from "crypto";
 import path from "path";
 import {
   buildPiSettings,
@@ -43,33 +44,47 @@ function writeSecret(file: string, data: unknown): void {
 }
 
 /**
- * Sidecar (no secrets — provider ids only) recording which auth.json
- * `api_key` entries Horizon wrote, so a cleared key only ever removes
- * Horizon's own entry and never a Pi-created/`/login` credential.
+ * Sidecar mapping each provider Horizon wrote an `api_key` for to a SHA-256
+ * of that key (not the key itself). Lets the writer prune only an entry it
+ * still owns *by value* — if Pi/`/login` or the user later replaced the
+ * provider's credential with a different one, the hash won't match and it's
+ * left intact. A non-reversible digest of a high-entropy secret is safe to
+ * store; the file is 0600 regardless.
  */
 const MANAGED_AUTH_FILE = ".horizon-managed-auth.json";
 
-function readManagedProviders(file: string): Set<string> {
+function hashKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+function readManagedProviders(file: string): Record<string, string> {
   try {
     const parsed = JSON.parse(readFileSync(file, "utf-8")) as unknown;
-    return new Set(
-      Array.isArray(parsed)
-        ? parsed.filter((x): x is string => typeof x === "string")
-        : [],
-    );
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      // Legacy/unexpected shape → can't verify identity, so manage nothing.
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [provider, hash] of Object.entries(
+      parsed as Record<string, unknown>,
+    )) {
+      if (typeof hash === "string") out[provider] = hash;
+    }
+    return out;
   } catch {
     // Best-effort bookkeeping: a missing or unreadable marker degrades
     // safely to "Horizon manages nothing" — we never delete an entry we
     // cannot prove we wrote — so swallowing here can't strand a secret.
-    return new Set();
+    return {};
   }
 }
 
-function writeManagedProviders(file: string, providers: Set<string>): void {
-  if (providers.size > 0) {
-    writeFileSync(file, JSON.stringify([...providers], null, 2), {
-      mode: 0o600,
-    });
+function writeManagedProviders(
+  file: string,
+  managed: Record<string, string>,
+): void {
+  if (Object.keys(managed).length > 0) {
+    writeFileSync(file, JSON.stringify(managed, null, 2), { mode: 0o600 });
   } else if (existsSync(file)) {
     rmSync(file);
   }
@@ -137,17 +152,26 @@ export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
   const previouslyManaged = readManagedProviders(managedPath);
   const authObj = readJsonObject(authPath);
   const desired = buildPiAuth(cfg);
-  const nextManaged = new Set<string>();
+  const nextManaged: Record<string, string> = {};
   for (const [provider, entry] of Object.entries(desired)) {
     authObj[provider] = entry;
-    nextManaged.add(provider);
+    nextManaged[provider] = hashKey(entry.key);
   }
-  for (const provider of previouslyManaged) {
+  for (const [provider, hash] of Object.entries(previouslyManaged)) {
     if (desired[provider]) continue;
-    const entry = authObj[provider] as { type?: string } | undefined;
-    // Only remove an entry that is still the Horizon-written api_key shape;
-    // if Pi replaced it with an OAuth login under the same provider, keep it.
-    if (entry?.type === "api_key") delete authObj[provider];
+    const entry = authObj[provider] as
+      | { type?: string; key?: string }
+      | undefined;
+    // Remove only the exact api_key value Horizon wrote: if Pi/`/login` or
+    // the user replaced the entry (different key, or an OAuth login under the
+    // same provider), the hash won't match and it's preserved.
+    if (
+      entry?.type === "api_key" &&
+      typeof entry.key === "string" &&
+      hashKey(entry.key) === hash
+    ) {
+      delete authObj[provider];
+    }
   }
   if (Object.keys(authObj).length > 0) {
     writeSecret(authPath, authObj);

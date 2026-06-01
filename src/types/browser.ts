@@ -141,8 +141,9 @@ export interface Settings {
   aiProvider?: string;
   /** Default model id; empty → Pi default. */
   aiModel?: string;
-  /** API key for the selected provider; materialized into Pi's auth.json. */
-  aiApiKey?: string;
+  /** API keys per provider id; the active provider's key is materialized
+   *  into Pi's auth.json. */
+  aiApiKeys?: Record<string, string>;
   /** Optional custom provider endpoint. */
   aiBaseUrl?: string;
   /** Default target language for page/selection translation. */

@@ -254,11 +254,14 @@ async function ensurePiSession(
   );
   // Materialize Pi's provider/model/auth config into the app-local agent
   // dir before spawning so the subprocess reads the user's Settings.
+  const aiProvider =
+    (settingsManager.get("aiProvider" as never) as string) || "anthropic";
+  const aiApiKeys =
+    (settingsManager.get("aiApiKeys" as never) as Record<string, string>) ?? {};
   writePiConfig(piAgentDir, {
-    provider:
-      (settingsManager.get("aiProvider" as never) as string) || "anthropic",
+    provider: aiProvider,
     model: (settingsManager.get("aiModel" as never) as string) || undefined,
-    apiKey: (settingsManager.get("aiApiKey" as never) as string) || undefined,
+    apiKey: aiApiKeys[aiProvider] || undefined,
     baseUrl: (settingsManager.get("aiBaseUrl" as never) as string) || undefined,
   });
   mkdirSync(piWorkDir, { recursive: true });

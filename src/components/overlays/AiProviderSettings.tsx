@@ -31,6 +31,8 @@ interface Props {
 }
 
 export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
+  const provider = settings?.aiProvider ?? "anthropic";
+  const apiKeys = settings?.aiApiKeys ?? {};
   const onProvider = useCallback(
     (v: string) => update("aiProvider", v),
     [update],
@@ -39,9 +41,11 @@ export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
     (v: string) => update("aiModel", v),
     [update],
   );
+  // Keys are stored per provider so switching never carries one provider's
+  // secret over to another; write into the active provider's slot.
   const onApiKey = useCallback(
-    (v: string) => update("aiApiKey", v),
-    [update],
+    (v: string) => update("aiApiKeys", { ...apiKeys, [provider]: v }),
+    [update, apiKeys, provider],
   );
   const onBaseUrl = useCallback(
     (v: string) => update("aiBaseUrl", v),
@@ -51,11 +55,7 @@ export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
   return (
     <Section title="AI Provider">
       <Field label="Provider">
-        <Select
-          value={settings?.aiProvider ?? "anthropic"}
-          onChange={onProvider}
-          options={PROVIDERS}
-        />
+        <Select value={provider} onChange={onProvider} options={PROVIDERS} />
       </Field>
       <Field label="Model">
         <TextInput
@@ -66,7 +66,7 @@ export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
       </Field>
       <Field label="API key">
         <TextInput
-          value={settings?.aiApiKey ?? ""}
+          value={apiKeys[provider] ?? ""}
           onChange={onApiKey}
           placeholder="sk-…"
           type="password"

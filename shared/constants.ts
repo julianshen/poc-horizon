@@ -65,8 +65,12 @@ export const DEFAULT_SETTINGS = {
   aiProvider: "anthropic",
   /** Default model id; empty → Pi picks the provider default. */
   aiModel: "",
-  /** API key for the selected provider. Written to Pi's auth.json (0600). */
-  aiApiKey: "",
+  /**
+   * API keys per provider id, e.g. `{ anthropic: "sk-…", openai: "sk-…" }`.
+   * Keyed so switching providers never materializes one provider's secret
+   * under another. Written to Pi's auth.json (0600) for the active provider.
+   */
+  aiApiKeys: {} as Record<string, string>,
   /** Optional custom endpoint for the provider (proxy / gateway / self-host). */
   aiBaseUrl: "",
   /** Extra flags passed to `pi`. Session persists across app restarts via aiSessionPath. */

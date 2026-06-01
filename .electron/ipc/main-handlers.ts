@@ -48,7 +48,7 @@ const AI_RESPAWN_KEYS: ReadonlySet<string> = new Set([
   "aiPiBinary",
   "aiProvider",
   "aiModel",
-  "aiApiKey",
+  "aiApiKeys",
   "aiBaseUrl",
 ]);
 

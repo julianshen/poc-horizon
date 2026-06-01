@@ -43,6 +43,39 @@ function writeSecret(file: string, data: unknown): void {
 }
 
 /**
+ * Sidecar (no secrets — provider ids only) recording which auth.json
+ * `api_key` entries Horizon wrote, so a cleared key only ever removes
+ * Horizon's own entry and never a Pi-created/`/login` credential.
+ */
+const MANAGED_AUTH_FILE = ".horizon-managed-auth.json";
+
+function readManagedProviders(file: string): Set<string> {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf-8")) as unknown;
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((x): x is string => typeof x === "string")
+        : [],
+    );
+  } catch {
+    // Best-effort bookkeeping: a missing or unreadable marker degrades
+    // safely to "Horizon manages nothing" — we never delete an entry we
+    // cannot prove we wrote — so swallowing here can't strand a secret.
+    return new Set();
+  }
+}
+
+function writeManagedProviders(file: string, providers: Set<string>): void {
+  if (providers.size > 0) {
+    writeFileSync(file, JSON.stringify([...providers], null, 2), {
+      mode: 0o600,
+    });
+  } else if (existsSync(file)) {
+    rmSync(file);
+  }
+}
+
+/**
  * Materialize Pi's config files into `agentDir` (the directory Horizon
  * passes to the Pi subprocess via PI_CODING_AGENT_DIR), reconciling only
  * the Horizon-managed pieces so unrelated Pi/user state survives:
@@ -93,19 +126,23 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
   if (nextExtensions.length > 0) merged.extensions = nextExtensions;
   writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
 
-  // auth.json — merge in / remove only the managed provider's entry so a
-  // cleared key never leaves a stale secret, and other providers' creds
-  // (and OAuth/login tokens) are preserved.
+  // auth.json — merge in / remove only the entry Horizon itself wrote.
+  // Ownership is tracked in a sidecar (provider ids only, no secrets); the
+  // `api_key` shape is NOT unique to Horizon, so a Pi-created/login api_key
+  // for the same provider must never be deleted when the Horizon field is
+  // blank. Other providers' entries (and OAuth tokens) are always preserved.
   const authPath = path.join(agentDir, "auth.json");
+  const managedPath = path.join(agentDir, MANAGED_AUTH_FILE);
+  const managed = readManagedProviders(managedPath);
   const existingAuth = readJsonObject(authPath);
   const auth = buildPiAuth(cfg);
   if (auth) {
     writeSecret(authPath, { ...existingAuth, ...auth });
-  } else if (cfg.provider) {
-    // Clearing the key removes only a Horizon-managed `api_key` entry for
-    // this provider — an OAuth/login token (or any other type) for the
-    // same provider, and all other providers' entries, are left intact.
+    managed.add(cfg.provider);
+  } else if (cfg.provider && managed.has(cfg.provider)) {
     const entry = existingAuth[cfg.provider] as { type?: string } | undefined;
+    // Only a Horizon-written api_key entry is removed; if Pi has since
+    // replaced it (e.g. an OAuth login under the same provider), leave it.
     if (entry?.type === "api_key") {
       delete existingAuth[cfg.provider];
       if (Object.keys(existingAuth).length > 0) {
@@ -116,5 +153,7 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
         rmSync(authPath);
       }
     }
+    managed.delete(cfg.provider);
   }
+  writeManagedProviders(managedPath, managed);
 }

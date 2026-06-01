@@ -78,8 +78,12 @@ if (spawnSync("bun", ["--version"], { stdio: "ignore" }).status !== 0) {
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 
-// Compile. Mirrors the package's own `build:binary` entry points: the
-// Bun CLI shim plus the image-resize worker (spawned as a separate file).
+// Compile. Mirrors the package's own `build:binary` entry points exactly:
+// the Bun CLI shim plus the image-resize worker. Passing the worker as a
+// second entry to `--compile` *embeds* it in the executable's virtual fs
+// ($bunfs); Pi loads it via `new Worker(new URL("./image-resize-worker.js",
+// import.meta.url))`, which resolves against that embedded module — so a
+// single `--outfile` is correct and no separate worker file is needed.
 const cliEntry = path.join(distDir, "bun", "cli.js");
 const workerEntry = path.join(distDir, "utils", "image-resize-worker.js");
 const outFile = path.join(outDir, binName);

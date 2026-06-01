@@ -92,6 +92,19 @@ describe("writePiConfig", () => {
     });
   });
 
+  it("never deletes an api_key entry Horizon did not write", () => {
+    // Simulates a Pi `/login` api_key the user created out-of-band.
+    writeFileSync(
+      authPath(),
+      JSON.stringify({ anthropic: { type: "api_key", key: "pi-login-key" } }),
+    );
+    // Horizon never wrote anthropic's key, so a blank field must not touch it.
+    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
+    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
+      anthropic: { type: "api_key", key: "pi-login-key" },
+    });
+  });
+
   it("deletes auth.json only when it becomes empty after clearing", () => {
     writePiConfig(dir, { provider: "anthropic", apiKey: "sk-1" });
     expect(existsSync(authPath())).toBe(true);

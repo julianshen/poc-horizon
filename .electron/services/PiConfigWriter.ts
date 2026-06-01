@@ -109,6 +109,7 @@ function reconcileSettings(
   cfg: PiProvidersConfig,
   overridePath: string,
   overrideSrc: string | null,
+  authed: ReadonlySet<string>,
 ): void {
   const settingsPath = path.join(agentDir, "settings.json");
   const existing = readJsonObject(settingsPath);
@@ -125,7 +126,7 @@ function reconcileSettings(
   delete existing.extensions;
   const settings: Record<string, unknown> = {
     ...existing,
-    ...buildPiSettings(cfg),
+    ...buildPiSettings(cfg, authed),
   };
   if (nextExtensions.length > 0) settings.extensions = nextExtensions;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
@@ -136,8 +137,14 @@ function reconcileSettings(
  * model availability on auth), and prune only the exact entries Horizon
  * previously wrote — tracked by key hash in a secrets-free sidecar. Pi
  * `/login` credentials, OAuth tokens, and replaced keys are preserved.
+ *
+ * @returns the providers Pi can authenticate after reconciliation (every
+ *   remaining auth.json entry), so settings can pick a usable default.
  */
-function reconcileAuth(agentDir: string, cfg: PiProvidersConfig): void {
+function reconcileAuth(
+  agentDir: string,
+  cfg: PiProvidersConfig,
+): Set<string> {
   const authPath = path.join(agentDir, "auth.json");
   const managedPath = path.join(agentDir, MANAGED_AUTH_FILE);
   const previouslyManaged = readManagedProviders(managedPath);
@@ -169,6 +176,7 @@ function reconcileAuth(agentDir: string, cfg: PiProvidersConfig): void {
     rmSync(authPath);
   }
   writeManagedProviders(managedPath, nextManaged);
+  return new Set(Object.keys(authObj));
 }
 
 /**
@@ -183,6 +191,8 @@ export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
     agentDir,
     cfg,
   );
-  reconcileSettings(agentDir, cfg, overridePath, overrideSrc);
-  reconcileAuth(agentDir, cfg);
+  // Reconcile auth first so settings can pick a default among the providers
+  // Pi can actually authenticate (Horizon keys + preserved /login/OAuth).
+  const authed = reconcileAuth(agentDir, cfg);
+  reconcileSettings(agentDir, cfg, overridePath, overrideSrc, authed);
 }

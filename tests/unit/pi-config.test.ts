@@ -14,41 +14,53 @@ const cfg = (over: Partial<PiProvidersConfig> = {}): PiProvidersConfig => ({
   ...over,
 });
 
+const authed = (...providers: string[]) => new Set(providers);
+
 describe("buildPiSettings", () => {
   it("maps the active provider and its model to Pi's defaults", () => {
     expect(
       buildPiSettings(
-        cfg({
-          activeProvider: "anthropic",
-          apiKeys: { anthropic: "k" },
-          models: { anthropic: "claude-x" },
-        }),
+        cfg({ activeProvider: "anthropic", models: { anthropic: "claude-x" } }),
+        authed("anthropic"),
       ),
     ).toMatchObject({ defaultProvider: "anthropic", defaultModel: "claude-x" });
   });
 
   it("omits defaultModel when the active provider has no model", () => {
     expect(
-      buildPiSettings(cfg({ activeProvider: "openai", apiKeys: { openai: "k" } })),
+      buildPiSettings(cfg({ activeProvider: "openai" }), authed("openai")),
     ).toEqual({ defaultProvider: "openai" });
   });
 
   it("does not set a default for an unauthenticated active provider", () => {
-    // User selected openai but never entered its key → don't point Pi at it.
+    // User selected openai but it isn't authed anywhere → don't point Pi at it.
     const s = buildPiSettings(
       cfg({ activeProvider: "openai", models: { openai: "gpt-4o" } }),
+      authed(),
     );
     expect(s).not.toHaveProperty("defaultProvider");
     expect(s).not.toHaveProperty("defaultModel");
   });
 
-  it("falls back to an authed provider when the active one is unkeyed", () => {
+  it("honors an active provider authed outside Horizon (preserved auth.json)", () => {
+    // No Horizon key, but anthropic has a /login/OAuth entry → respect it.
+    const s = buildPiSettings(
+      cfg({ activeProvider: "anthropic", models: { anthropic: "claude-x" } }),
+      authed("anthropic"),
+    );
+    expect(s).toMatchObject({
+      defaultProvider: "anthropic",
+      defaultModel: "claude-x",
+    });
+  });
+
+  it("falls back to an authed provider when the active one is unauthed", () => {
     const s = buildPiSettings(
       cfg({
-        activeProvider: "openai", // no key
-        apiKeys: { anthropic: "k" },
+        activeProvider: "openai", // not authed
         models: { anthropic: "claude-x" },
       }),
+      authed("anthropic"),
     );
     expect(s).toMatchObject({
       defaultProvider: "anthropic",
@@ -60,26 +72,26 @@ describe("buildPiSettings", () => {
     const s = buildPiSettings(
       cfg({
         activeProvider: "anthropic",
-        apiKeys: { anthropic: "k1", openai: "k2", google: "k3" },
-        // google has a key but no model → excluded from the cycle
+        // google is authed but has no model → excluded from the cycle
         models: { anthropic: "claude-x", openai: "gpt-4o" },
       }),
+      authed("anthropic", "openai", "google"),
     );
     expect(s.enabledModels).toEqual(["claude-x", "gpt-4o"]);
   });
 
-  it("excludes models of providers without a key from the cycle", () => {
+  it("excludes models of providers that are not authed from the cycle", () => {
     const s = buildPiSettings(
-      cfg({
-        apiKeys: { anthropic: "k1" },
-        models: { anthropic: "claude-x", openai: "gpt-4o" },
-      }),
+      cfg({ models: { anthropic: "claude-x", openai: "gpt-4o" } }),
+      authed("anthropic"),
     );
     expect(s.enabledModels).toEqual(["claude-x"]);
   });
 
   it("omits enabledModels when no authed provider has a model", () => {
-    expect(buildPiSettings(cfg({ apiKeys: { anthropic: "k" } }))).not.toHaveProperty(
+    expect(
+      buildPiSettings(cfg({ activeProvider: "anthropic" }), authed("anthropic")),
+    ).not.toHaveProperty(
       "enabledModels",
     );
   });

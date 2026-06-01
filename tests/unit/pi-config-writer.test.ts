@@ -101,6 +101,22 @@ describe("writePiConfig", () => {
     expect(readAuth()).toEqual({ anthropic: { type: "oauth", key: "login-tok" } });
   });
 
+  it("uses a provider authed outside Horizon as the settings default", () => {
+    // anthropic authed via a preserved /login token, no Horizon key set.
+    writeFileSync(
+      authPath(),
+      JSON.stringify({ anthropic: { type: "oauth", key: "login-tok" } }),
+    );
+    writePiConfig(
+      dir,
+      cfg({ activeProvider: "anthropic", models: { anthropic: "claude-x" } }),
+    );
+    expect(readSettings()).toMatchObject({
+      defaultProvider: "anthropic",
+      defaultModel: "claude-x",
+    });
+  });
+
   it("keeps a once-managed key that was replaced with a different value", () => {
     // Horizon writes sk-a (ownership hash recorded for that value)…
     writePiConfig(dir, cfg({ apiKeys: { anthropic: "sk-a" } }));

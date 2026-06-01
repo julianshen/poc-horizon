@@ -220,6 +220,25 @@ function resolvePiBinary(): string {
   return "pi";
 }
 
+/**
+ * Materialize Pi's config (settings.json / auth.json / override extension)
+ * from the user's Settings into the app-local agent dir. Called before
+ * every spawn and immediately on AI-config changes so a cleared key is
+ * scrubbed from auth.json right away — not only on the next spawn.
+ */
+function writePiConfigFromSettings(): void {
+  const provider =
+    (settingsManager.get("aiProvider" as never) as string) || "anthropic";
+  const apiKeys =
+    (settingsManager.get("aiApiKeys" as never) as Record<string, string>) ?? {};
+  writePiConfig(piAgentDir, {
+    provider,
+    model: (settingsManager.get("aiModel" as never) as string) || undefined,
+    apiKey: apiKeys[provider] || undefined,
+    baseUrl: (settingsManager.get("aiBaseUrl" as never) as string) || undefined,
+  });
+}
+
 async function ensurePiSession(
   ctx: WindowContext,
   harness: BrowserHarness,
@@ -254,16 +273,7 @@ async function ensurePiSession(
   );
   // Materialize Pi's provider/model/auth config into the app-local agent
   // dir before spawning so the subprocess reads the user's Settings.
-  const aiProvider =
-    (settingsManager.get("aiProvider" as never) as string) || "anthropic";
-  const aiApiKeys =
-    (settingsManager.get("aiApiKeys" as never) as Record<string, string>) ?? {};
-  writePiConfig(piAgentDir, {
-    provider: aiProvider,
-    model: (settingsManager.get("aiModel" as never) as string) || undefined,
-    apiKey: aiApiKeys[aiProvider] || undefined,
-    baseUrl: (settingsManager.get("aiBaseUrl" as never) as string) || undefined,
-  });
+  writePiConfigFromSettings();
   mkdirSync(piWorkDir, { recursive: true });
   const sessions =
     (settingsManager.get("aiSessions" as never) as {
@@ -498,8 +508,19 @@ function registerHandlers(): void {
       passwordManager,
       autofillManager,
       onAiConfigChanged: () => {
-        // Respawn-on-next-start: dispose every Pi session so the new
-        // provider/model/auth config is read on the following ai:start.
+        // Reconcile the on-disk Pi config now so a cleared key/secret is
+        // scrubbed from auth.json immediately — even if the user quits or
+        // disables spawn before the next ai:start.
+        try {
+          writePiConfigFromSettings();
+        } catch (err) {
+          console.error(
+            "[main] reconciling Pi config on settings change failed:",
+            (err as Error).message,
+          );
+        }
+        // Dispose every Pi session so the new config is read on the next
+        // ai:start (the running subprocess won't pick it up live).
         for (const s of piSessions.values()) s.dispose();
         piSessions.clear();
       },

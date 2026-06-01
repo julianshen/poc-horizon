@@ -9,6 +9,7 @@ import {
   TextInput,
   Toggle,
 } from "./SettingsPanel.parts";
+import { AiProviderSettings } from "./AiProviderSettings";
 import { POPULAR_LANGUAGES } from "./TranslationBar";
 
 export const SettingsPanel: React.FC = () => {
@@ -116,6 +117,7 @@ export const SettingsPanel: React.FC = () => {
             onChange={(v) => update("doNotTrack", v)}
           />
         </Section>
+        <AiProviderSettings settings={settings} update={update} />
         <Section title="AI Agent">
           <Field label="Confirm agent actions">
             <Select

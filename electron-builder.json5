@@ -4,7 +4,26 @@
   directories: {
     output: "release",
   },
-  files: ["dist", "dist-electron", "resources"],
+  // Rebuild the bundled Pi binary for each packed arch (see hook). The
+  // `dist*` scripts run `build:pi` first so extraResources has a binary to
+  // copy; this hook then overwrites it with the arch-correct build.
+  afterPack: "./scripts/afterPack-pi.cjs",
+  files: [
+    "dist",
+    "dist-electron",
+    "resources",
+    "!resources/bin/**/*",
+    "!resources/pi-extension/**/*",
+  ],
+  // The Pi binary + its extension must be real on-disk paths so the
+  // external Pi subprocess can read them (asar is opaque to non-Electron
+  // processes). They ship only as extraResources — excluded from the asar
+  // above to avoid duplication; resolvePiResource() resolves both the
+  // Electron-side (skills) and subprocess-side reads to these copies.
+  extraResources: [
+    { from: "resources/bin", to: "bin" },
+    { from: "resources/pi-extension", to: "pi-extension" },
+  ],
   mac: {
     target: [
       { target: "dmg", arch: ["x64", "arm64"] },

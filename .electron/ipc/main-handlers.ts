@@ -35,7 +35,22 @@ export interface IpcDeps {
   downloadManager: DownloadManager;
   passwordManager: PasswordManager;
   autofillManager: AutofillManager;
+  /**
+   * Invoked after a Pi provider/model/auth setting changes so main can
+   * tear down running Pi sessions; the next ai:start respawns with the
+   * freshly written config. Optional so tests can omit it.
+   */
+  onAiConfigChanged?: () => void;
 }
+
+/** Settings keys that require respawning Pi to take effect. */
+const AI_RESPAWN_KEYS: ReadonlySet<string> = new Set([
+  "aiPiBinary",
+  "aiProvider",
+  "aiModels",
+  "aiApiKeys",
+  "aiBaseUrls",
+]);
 
 /** Resolves the per-event WindowContext from the sender's webContents. */
 export type ContextResolver = (event: IpcMainInvokeEvent) => WindowContext;
@@ -76,6 +91,7 @@ export function registerIpcHandlers(
     downloadManager,
     passwordManager,
     autofillManager,
+    onAiConfigChanged,
   } = deps;
 
   handle("tab:create", (event, { url }) =>
@@ -191,18 +207,26 @@ export function registerIpcHandlers(
         );
       }
     }
+    // Provider/model/auth changes only take effect on a fresh Pi spawn —
+    // tear down running sessions so the next ai:start picks up the new
+    // config materialized into PI_CODING_AGENT_DIR.
+    if (AI_RESPAWN_KEYS.has(key as string)) onAiConfigChanged?.();
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, {
       key,
       value,
     });
   });
-  handle("settings:reset", (_event, payload) =>
+  handle("settings:reset", (_event, payload) => {
+    const key = (payload as { key?: string }).key;
     settingsManager.reset(
-      (payload as { key?: string }).key as Parameters<
-        typeof settingsManager.reset
-      >[0],
-    ),
-  );
+      key as Parameters<typeof settingsManager.reset>[0],
+    );
+    // A reset of an AI key/provider field — or a full reset (no key) which
+    // also wipes them — must scrub Pi's on-disk config and respawn, exactly
+    // like settings:set. Without this the cleared settings diverge from the
+    // still-running subprocess and the materialized auth.json.
+    if (key === undefined || AI_RESPAWN_KEYS.has(key)) onAiConfigChanged?.();
+  });
 
   handle("bookmark:getTree", () => bookmarkManager.getTree());
   handle("bookmark:add", (_event, { url, title, parentId }) =>

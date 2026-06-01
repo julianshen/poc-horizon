@@ -50,6 +50,7 @@ export default defineConfig({
         "src/components/overlays/SidePanel.tsx",
         "shared/**/*.ts",
         ".electron/services/SettingsManager.ts",
+        ".electron/services/piConfig.ts",
         ".electron/services/pageTranslator.ts",
         ".electron/services/LlmTranslator.ts",
         ".electron/services/BookmarkManager.ts",

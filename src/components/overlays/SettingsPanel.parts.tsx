@@ -74,7 +74,9 @@ export const TextInput: React.FC<{
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-}> = ({ value, onChange, placeholder }) => {
+  /** Input type, e.g. "password" to mask secrets like API keys. */
+  type?: string;
+}> = ({ value, onChange, placeholder, type = "text" }) => {
   const [draft, setDraft] = React.useState(value);
   // Mirror draft in a ref so commit() reads the latest value without
   // re-binding on every keystroke (avoids stale-closure issues when
@@ -113,7 +115,7 @@ export const TextInput: React.FC<{
   );
   return (
     <input
-      type="text"
+      type={type}
       value={draft}
       placeholder={placeholder}
       onChange={onChangeInternal}

@@ -8,7 +8,7 @@ import {
   IpcMainInvokeEvent,
 } from "electron";
 import path from "path";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import { WindowManager } from "./services/WindowManager";
 import { TabManager } from "./services/TabManager";
 import { SessionManager } from "./services/SessionManager";
@@ -37,6 +37,7 @@ import {
 import { installAppMenu } from "./services/appMenu";
 import { BrowserHarness } from "./services/BrowserHarness";
 import { PiSession } from "./services/PiSession";
+import { writePiConfig } from "./services/PiConfigWriter";
 import { LlmsTxtResolver } from "./services/LlmsTxtResolver";
 import { LlmsTxtCacheStore } from "./services/LlmsTxtCacheStore";
 import { parseLlmsTxt } from "./services/llmsTxtParser";
@@ -114,6 +115,10 @@ let activePiSession: PiSession | null = null;
 let lastAgentActivityAt = 0;
 let bridgeServer: HorizonBridgeServer | null = null;
 let bridgePort = 0;
+/** Pi's app-local working directory (subprocess cwd). */
+let piWorkDir = "";
+/** Pi's app-local config directory (PI_CODING_AGENT_DIR). */
+let piAgentDir = "";
 let llmsTxtCacheStore: LlmsTxtCacheStore;
 let llmsTxtResolver: LlmsTxtResolver;
 
@@ -181,6 +186,60 @@ function escapeAttr(s: string): string {
  * createWindow's caller wraps in try/catch so a missing pi binary or
  * port-bind failure doesn't crash startup.
  */
+/**
+ * Resolve a packaged resource that the external Pi process must read from
+ * a real on-disk path. Prefers the electron-builder extraResources layout
+ * (`process.resourcesPath/<rel>`), falling back to the dev tree
+ * (`<repo>/resources/<rel>`). Returns the first existing candidate; when
+ * neither exists yet (e.g. the bundled binary hasn't been built in dev),
+ * the default is environment-aware so dev keeps using the repo tree.
+ */
+function resolvePiResource(rel: string): string {
+  const packaged = process.resourcesPath
+    ? path.join(process.resourcesPath, rel)
+    : "";
+  const dev = path.join(__dirname, "..", "resources", rel);
+  for (const c of [packaged, dev]) if (c && existsSync(c)) return c;
+  return app.isPackaged && packaged ? packaged : dev;
+}
+
+/**
+ * Resolve the Pi binary. An explicit `aiPiBinary` override (anything other
+ * than the default "pi") is respected verbatim — whether it's an absolute
+ * path or a name on $PATH — so a custom binary is never silently swapped
+ * for the bundled one. Otherwise prefer the bundled single-file binary
+ * (built via `npm run build:pi`), then fall back to a `pi` on $PATH.
+ */
+function resolvePiBinary(): string {
+  const override =
+    (settingsManager.get("aiPiBinary" as never) as string) ?? "pi";
+  if (override && override !== "pi") return override;
+  const binName = process.platform === "win32" ? "pi.exe" : "pi";
+  const bundled = resolvePiResource(path.join("bin", binName));
+  if (existsSync(bundled)) return bundled;
+  return "pi";
+}
+
+/**
+ * Materialize Pi's config (settings.json / auth.json / override extension)
+ * from the user's Settings into the app-local agent dir. Called before
+ * every spawn and immediately on AI-config changes so a cleared key is
+ * scrubbed from auth.json right away — not only on the next spawn.
+ */
+function writePiConfigFromSettings(): void {
+  const byProvider = (key: string): Record<string, string> =>
+    (settingsManager.get(key as never) as Record<string, string>) ?? {};
+  // Materialize every configured provider so they co-exist in Pi; the
+  // active provider is just the default the session opens on.
+  writePiConfig(piAgentDir, {
+    activeProvider:
+      (settingsManager.get("aiProvider" as never) as string) || "anthropic",
+    apiKeys: byProvider("aiApiKeys"),
+    models: byProvider("aiModels"),
+    baseUrls: byProvider("aiBaseUrls"),
+  });
+}
+
 async function ensurePiSession(
   ctx: WindowContext,
   harness: BrowserHarness,
@@ -205,15 +264,18 @@ async function ensurePiSession(
     bridgePort = await bridgeServer.listen();
   }
   const kind = aiSessionKindFor(ctx.tabManager);
-  const binary = (settingsManager.get("aiPiBinary" as never) as string) ?? "pi";
+  const binary = resolvePiBinary();
   const baseArgs = (settingsManager.get("aiPiArgs" as never) as string[]) ?? [
     "--mode",
     "rpc",
   ];
-  const extensionPath = path.join(
-    __dirname,
-    "../resources/pi-extension/horizon-bridge.ts",
+  const extensionPath = resolvePiResource(
+    path.join("pi-extension", "horizon-bridge.ts"),
   );
+  // Materialize Pi's provider/model/auth config into the app-local agent
+  // dir before spawning so the subprocess reads the user's Settings.
+  writePiConfigFromSettings();
+  mkdirSync(piWorkDir, { recursive: true });
   const sessions =
     (settingsManager.get("aiSessions" as never) as {
       default?: string;
@@ -230,7 +292,11 @@ async function ensurePiSession(
       binary,
       args,
       maxIterations,
-      env: { HORIZON_BRIDGE_PORT: String(bridgePort) },
+      cwd: piWorkDir,
+      env: {
+        HORIZON_BRIDGE_PORT: String(bridgePort),
+        PI_CODING_AGENT_DIR: piAgentDir,
+      },
     },
     harness,
   );
@@ -319,6 +385,11 @@ async function handleNavigateForLlmsTxt(
 function initSingletons(): void {
   if (settingsManager) return;
   const data = app.getPath("userData");
+  // Keep Pi entirely inside the app's data dir: its workspace (cwd) and
+  // its config dir (PI_CODING_AGENT_DIR) both live under userData rather
+  // than the user's home, so provider/model/auth config is app-local.
+  piWorkDir = path.join(data, "pi");
+  piAgentDir = path.join(piWorkDir, "agent");
   settingsManager = new SettingsManager(path.join(data, "settings.json"));
   bookmarkManager = new BookmarkManager(path.join(data, "bookmarks.json"));
   historyManager = new HistoryManager(path.join(data, "history.json"));
@@ -333,7 +404,7 @@ function initSingletons(): void {
   helperRegistry = new HelperRegistry(path.join(data, "js-helpers.json"));
   domainSkills = new DomainSkills(path.join(data, "domain-skills"));
   skillsLibrary = new SkillsLibrary(
-    path.join(__dirname, "../resources/pi-extension/skills"),
+    resolvePiResource(path.join("pi-extension", "skills")),
   );
   actionRecorder = new ActionRecorder(path.join(data, "action-workflows.json"));
   agentPolicyResolver = new AgentPolicyResolver();
@@ -437,6 +508,23 @@ function registerHandlers(): void {
       downloadManager,
       passwordManager,
       autofillManager,
+      onAiConfigChanged: () => {
+        // Reconcile the on-disk Pi config now so a cleared key/secret is
+        // scrubbed from auth.json immediately — even if the user quits or
+        // disables spawn before the next ai:start.
+        try {
+          writePiConfigFromSettings();
+        } catch (err) {
+          console.error(
+            "[main] reconciling Pi config on settings change failed:",
+            (err as Error).message,
+          );
+        }
+        // Dispose every Pi session so the new config is read on the next
+        // ai:start (the running subprocess won't pick it up live).
+        for (const s of piSessions.values()) s.dispose();
+        piSessions.clear();
+      },
     },
     resolve,
   );

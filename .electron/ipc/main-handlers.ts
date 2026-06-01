@@ -35,7 +35,22 @@ export interface IpcDeps {
   downloadManager: DownloadManager;
   passwordManager: PasswordManager;
   autofillManager: AutofillManager;
+  /**
+   * Invoked after a Pi provider/model/auth setting changes so main can
+   * tear down running Pi sessions; the next ai:start respawns with the
+   * freshly written config. Optional so tests can omit it.
+   */
+  onAiConfigChanged?: () => void;
 }
+
+/** Settings keys that require respawning Pi to take effect. */
+const AI_RESPAWN_KEYS: ReadonlySet<string> = new Set([
+  "aiPiBinary",
+  "aiProvider",
+  "aiModel",
+  "aiApiKey",
+  "aiBaseUrl",
+]);
 
 /** Resolves the per-event WindowContext from the sender's webContents. */
 export type ContextResolver = (event: IpcMainInvokeEvent) => WindowContext;
@@ -76,6 +91,7 @@ export function registerIpcHandlers(
     downloadManager,
     passwordManager,
     autofillManager,
+    onAiConfigChanged,
   } = deps;
 
   handle("tab:create", (event, { url }) =>
@@ -191,6 +207,10 @@ export function registerIpcHandlers(
         );
       }
     }
+    // Provider/model/auth changes only take effect on a fresh Pi spawn —
+    // tear down running sessions so the next ai:start picks up the new
+    // config materialized into PI_CODING_AGENT_DIR.
+    if (AI_RESPAWN_KEYS.has(key as string)) onAiConfigChanged?.();
     ctx(event).window.webContents.send(IPC_CHANNELS.SETTINGS_CHANGED, {
       key,
       value,

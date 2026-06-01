@@ -135,6 +135,16 @@ export interface Settings {
   aiConfirmActions?: "never" | "risky" | "all";
   /** Send X-Horizon-Agent header on outgoing requests. Agent Policy v1 § 7. */
   aiAdvertiseAgent?: boolean;
+  /** Path or name of the `pi` binary (empty → bundled binary). */
+  aiPiBinary?: string;
+  /** Pi LLM provider id (also the auth.json key). */
+  aiProvider?: string;
+  /** Default model id; empty → Pi default. */
+  aiModel?: string;
+  /** API key for the selected provider; materialized into Pi's auth.json. */
+  aiApiKey?: string;
+  /** Optional custom provider endpoint. */
+  aiBaseUrl?: string;
   /** Default target language for page/selection translation. */
   translateTargetLang?: string;
 }

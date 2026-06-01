@@ -8,6 +8,8 @@ export default tseslint.config(
       "node_modules",
       "dist",
       "dist-electron",
+      "resources/bin",
+      "release",
       ".electron/main.ts.timestamp-*",
       "coverage",
       "*.config.ts",

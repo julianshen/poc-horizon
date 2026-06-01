@@ -7,10 +7,11 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux",
+    "build:pi": "node scripts/build-pi.mjs",
+    "dist": "npm run build:pi && electron-builder",
+    "dist:mac": "npm run build:pi && electron-builder --mac",
+    "dist:win": "npm run build:pi && electron-builder --win",
+    "dist:linux": "npm run build:pi && electron-builder --linux",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
@@ -27,6 +28,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.78.0",
     "@playwright/test": "^1.49.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

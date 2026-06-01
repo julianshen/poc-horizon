@@ -55,8 +55,20 @@ export const DEFAULT_SETTINGS = {
   // ─── AI / Pi agent (POC) ─────────────────────────────────────────
   /** Master toggle for the Pi agent integration. */
   aiEnabled: false,
-  /** Path or name of the `pi` binary; if not on $PATH, an absolute path. */
+  /**
+   * Path or name of the `pi` binary. Empty/"pi" → use the binary bundled
+   * in resources/bin (built via `npm run build:pi`), falling back to a
+   * `pi` on $PATH. An absolute path here overrides the bundled binary.
+   */
   aiPiBinary: "pi",
+  /** Pi LLM provider id (auth.json key): "anthropic", "openai", "google", … */
+  aiProvider: "anthropic",
+  /** Default model id; empty → Pi picks the provider default. */
+  aiModel: "",
+  /** API key for the selected provider. Written to Pi's auth.json (0600). */
+  aiApiKey: "",
+  /** Optional custom endpoint for the provider (proxy / gateway / self-host). */
+  aiBaseUrl: "",
   /** Extra flags passed to `pi`. Session persists across app restarts via aiSessionPath. */
   aiPiArgs: ["--mode", "rpc"],
   /**

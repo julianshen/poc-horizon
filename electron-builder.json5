@@ -4,7 +4,14 @@
   directories: {
     output: "release",
   },
-  files: ["dist", "dist-electron", "resources"],
+  files: ["dist", "dist-electron", "resources", "!resources/bin/**/*"],
+  // The Pi binary + its extension must be real on-disk paths so the
+  // external Pi subprocess can read them (asar is opaque to non-Electron
+  // processes). resolvePiResource() prefers these resourcesPath copies.
+  extraResources: [
+    { from: "resources/bin", to: "bin" },
+    { from: "resources/pi-extension", to: "pi-extension" },
+  ],
   mac: {
     target: [
       { target: "dmg", arch: ["x64", "arm64"] },

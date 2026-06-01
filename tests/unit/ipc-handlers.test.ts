@@ -319,6 +319,27 @@ describe("IPC handlers", () => {
       invoke(IPC_CHANNELS.SETTINGS_RESET, { key: "accentColor" });
       expect(s.settingsManager.reset).toHaveBeenCalledWith("accentColor");
     });
+
+    it("settings:set fires onAiConfigChanged for a Pi provider key", () => {
+      const onAiConfigChanged = vi.fn();
+      handlers.clear();
+      registerIpcHandlers(
+        {
+          settingsManager: s.settingsManager as never,
+          bookmarkManager: s.bookmarkManager as never,
+          historyManager: s.historyManager as never,
+          downloadManager: s.downloadManager as never,
+          passwordManager: s.passwordManager as never,
+          autofillManager: s.autofillManager as never,
+          onAiConfigChanged,
+        },
+        () => ({ tabManager: s.tabManager as never, window: s.window as never }),
+      );
+      invoke(IPC_CHANNELS.SETTINGS_SET, { key: "aiProvider", value: "openai" });
+      expect(onAiConfigChanged).toHaveBeenCalledTimes(1);
+      invoke(IPC_CHANNELS.SETTINGS_SET, { key: "accentColor", value: "#abc" });
+      expect(onAiConfigChanged).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("bookmarks", () => {

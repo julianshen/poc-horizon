@@ -244,6 +244,15 @@ The agent can also pull the full policy on demand via `browser_get_agent_policy`
 
 Spec coverage today: site-wide `/agent.json` resolution, conformance level reporting (0–3), `requires_human` → prompt gating, `prohibited` → hard deny gating, agent identification header. Per-page `<meta>` / per-element `data-agent-*` reading and structured action invocation (`actions[]`) are tracked in the status doc as next-up.
 
+## Packaging & provider configuration
+
+Pi ships **bundled** — no global install required.
+
+- **Build:** `npm run build:pi` (in `scripts/build-pi.mjs`) uses `bun build --compile` to pack `@earendil-works/pi-coding-agent` into a single executable at `resources/bin/pi` (git-ignored), copying the assets Pi loads relative to the binary (`package.json`, `theme/`, `assets/`, `export-html/`, `docs/`, photon WASM). The `dist*` scripts run it automatically; cross-compile with `--target=bun-<os>-<arch>`.
+- **Packaging:** `electron-builder.json5` ships `resources/bin` and `resources/pi-extension` as `extraResources` (real on-disk paths, since the external Pi process can't read inside `app.asar`). `resolvePiResource()` in `main.ts` prefers the `process.resourcesPath` copy and falls back to the dev tree. `resolvePiBinary()` prefers an absolute `aiPiBinary` override, then the bundled binary, then `pi` on `$PATH`.
+- **App-local config + workspace:** the Pi subprocess runs with `cwd` = `<userData>/pi` and `PI_CODING_AGENT_DIR` = `<userData>/pi/agent`, so all of Pi's config/auth/sessions live inside the app's data dir rather than `~/.pi`.
+- **Provider/model setup:** Settings → *AI Provider* writes `aiProvider` / `aiModel` / `aiApiKey` / `aiBaseUrl`. `PiConfigWriter.writePiConfig()` (pure builders in `piConfig.ts`) materializes them into the agent dir before each spawn: `settings.json` (`defaultProvider`/`defaultModel`), `auth.json` (`{provider: {type:"api_key", key}}`, `0600`), and — when a custom base URL is set — a generated `registerProvider` override extension. Changing any of these keys disposes running Pi sessions (`onAiConfigChanged`) so the next `ai:start` respawns with fresh config.
+
 ## Inspirations
 
 - **Anthropic Computer Use** — Set-of-Marks perception pattern (numbered overlays on clickable targets).

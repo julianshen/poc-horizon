@@ -9,6 +9,8 @@ interface PiOptions {
   maxIterations: number;
   /** Extra env vars merged into the subprocess (e.g. HORIZON_BRIDGE_PORT). */
   env?: Record<string, string>;
+  /** Working directory for the subprocess (Pi's app-local workspace). */
+  cwd?: string;
 }
 
 /**
@@ -90,6 +92,7 @@ export class PiSession extends EventEmitter {
     const proc = spawn(this.opts.binary, this.opts.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...(this.opts.env ?? {}) },
+      ...(this.opts.cwd ? { cwd: this.opts.cwd } : {}),
     });
     proc.stdout!.setEncoding("utf8");
     proc.stderr!.setEncoding("utf8");

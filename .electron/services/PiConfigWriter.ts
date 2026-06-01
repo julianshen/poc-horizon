@@ -24,7 +24,11 @@ import {
  */
 function readJsonObject(file: string): Record<string, unknown> {
   try {
-    return JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
+    const parsed = JSON.parse(readFileSync(file, "utf-8")) as unknown;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new TypeError(`${file} must contain a JSON object`);
+    }
+    return parsed as Record<string, unknown>;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw err;
@@ -62,11 +66,9 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
   if (overrideSrc) {
     writeFileSync(overridePath, overrideSrc, "utf-8");
   } else if (existsSync(overridePath)) {
-    try {
-      rmSync(overridePath);
-    } catch {
-      /* best-effort cleanup */
-    }
+    // Let removal failures surface — a lingering override would silently
+    // keep pointing Pi at a stale endpoint.
+    rmSync(overridePath);
   }
 
   // settings.json — drop managed scalar keys, then reconcile extensions so
@@ -109,11 +111,9 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
       if (Object.keys(existingAuth).length > 0) {
         writeSecret(authPath, existingAuth);
       } else if (existsSync(authPath)) {
-        try {
-          rmSync(authPath);
-        } catch {
-          /* best-effort cleanup */
-        }
+        // Surface failures: a swallowed error here would leave the cleared
+        // secret on disk to be reused on the next spawn.
+        rmSync(authPath);
       }
     }
   }

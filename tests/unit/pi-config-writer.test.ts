@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "fs";
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  statSync,
+} from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { writePiConfig } from "@electron/services/PiConfigWriter";
@@ -31,6 +38,8 @@ describe("writePiConfig", () => {
     expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
       anthropic: { type: "api_key", key: "sk-1" },
     });
+    // auth.json must be owner-read/write only (0600).
+    expect(statSync(authPath()).mode & 0o777).toBe(0o600);
   });
 
   it("drops a previously-set model when the Model field is cleared", () => {
@@ -113,5 +122,13 @@ describe("writePiConfig", () => {
     expect(() => writePiConfig(dir, { provider: "openai" })).toThrow();
     // The unreadable file is left intact for recovery.
     expect(readFileSync(settingsPath(), "utf-8")).toBe("{ not valid json");
+  });
+
+  it("rejects a settings.json that is valid JSON but not an object", () => {
+    writeFileSync(settingsPath(), "[1, 2, 3]");
+    expect(() => writePiConfig(dir, { provider: "openai" })).toThrow(
+      /must contain a JSON object/,
+    );
+    expect(readFileSync(settingsPath(), "utf-8")).toBe("[1, 2, 3]");
   });
 });

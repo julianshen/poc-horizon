@@ -9,8 +9,19 @@
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 
-// builder-util Arch enum → bun --target arch suffix.
-const ARCH = { 0: "ia32", 1: "x64", 2: "armv7l", 3: "arm64", 4: "universal" };
+// builder-util Arch enum values → bun --target arch suffix.
+const ARCH_IA32 = 0;
+const ARCH_X64 = 1;
+const ARCH_ARMV7L = 2;
+const ARCH_ARM64 = 3;
+const ARCH_UNIVERSAL = 4;
+const ARCH = {
+  [ARCH_IA32]: "ia32",
+  [ARCH_X64]: "x64",
+  [ARCH_ARMV7L]: "armv7l",
+  [ARCH_ARM64]: "arm64",
+  [ARCH_UNIVERSAL]: "universal",
+};
 const BUN_OS = { darwin: "darwin", win32: "windows", linux: "linux" };
 
 module.exports = async function afterPack(context) {

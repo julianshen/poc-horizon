@@ -340,6 +340,30 @@ describe("IPC handlers", () => {
       invoke(IPC_CHANNELS.SETTINGS_SET, { key: "accentColor", value: "#abc" });
       expect(onAiConfigChanged).toHaveBeenCalledTimes(1);
     });
+
+    it("settings:reset fires onAiConfigChanged for an AI key and a full reset", () => {
+      const onAiConfigChanged = vi.fn();
+      handlers.clear();
+      registerIpcHandlers(
+        {
+          settingsManager: s.settingsManager as never,
+          bookmarkManager: s.bookmarkManager as never,
+          historyManager: s.historyManager as never,
+          downloadManager: s.downloadManager as never,
+          passwordManager: s.passwordManager as never,
+          autofillManager: s.autofillManager as never,
+          onAiConfigChanged,
+        },
+        () => ({ tabManager: s.tabManager as never, window: s.window as never }),
+      );
+      invoke(IPC_CHANNELS.SETTINGS_RESET, { key: "aiApiKeys" });
+      expect(onAiConfigChanged).toHaveBeenCalledTimes(1);
+      invoke(IPC_CHANNELS.SETTINGS_RESET, { key: "accentColor" });
+      expect(onAiConfigChanged).toHaveBeenCalledTimes(1);
+      // Full reset (no key) also wipes AI fields → must reconcile.
+      invoke(IPC_CHANNELS.SETTINGS_RESET, {});
+      expect(onAiConfigChanged).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("bookmarks", () => {

@@ -216,13 +216,17 @@ export function registerIpcHandlers(
       value,
     });
   });
-  handle("settings:reset", (_event, payload) =>
+  handle("settings:reset", (_event, payload) => {
+    const key = (payload as { key?: string }).key;
     settingsManager.reset(
-      (payload as { key?: string }).key as Parameters<
-        typeof settingsManager.reset
-      >[0],
-    ),
-  );
+      key as Parameters<typeof settingsManager.reset>[0],
+    );
+    // A reset of an AI key/provider field — or a full reset (no key) which
+    // also wipes them — must scrub Pi's on-disk config and respawn, exactly
+    // like settings:set. Without this the cleared settings diverge from the
+    // still-running subprocess and the materialized auth.json.
+    if (key === undefined || AI_RESPAWN_KEYS.has(key)) onAiConfigChanged?.();
+  });
 
   handle("bookmark:getTree", () => bookmarkManager.getTree());
   handle("bookmark:add", (_event, { url, title, parentId }) =>

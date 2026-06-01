@@ -4,10 +4,18 @@
   directories: {
     output: "release",
   },
-  files: ["dist", "dist-electron", "resources", "!resources/bin/**/*"],
+  files: [
+    "dist",
+    "dist-electron",
+    "resources",
+    "!resources/bin/**/*",
+    "!resources/pi-extension/**/*",
+  ],
   // The Pi binary + its extension must be real on-disk paths so the
   // external Pi subprocess can read them (asar is opaque to non-Electron
-  // processes). resolvePiResource() prefers these resourcesPath copies.
+  // processes). They ship only as extraResources — excluded from the asar
+  // above to avoid duplication; resolvePiResource() resolves both the
+  // Electron-side (skills) and subprocess-side reads to these copies.
   extraResources: [
     { from: "resources/bin", to: "bin" },
     { from: "resources/pi-extension", to: "pi-extension" },

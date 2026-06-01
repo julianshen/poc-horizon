@@ -58,11 +58,18 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
   if (extensions.length === 0) delete merged.extensions;
   writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
 
-  // auth.json — only when an API key is configured; 0600.
+  // auth.json — written 0600 when an API key is configured, otherwise
+  // removed so a cleared key never leaves stale credentials on disk (the
+  // user may have switched to env vars or OAuth).
   const auth = buildPiAuth(cfg);
+  const authPath = path.join(agentDir, "auth.json");
   if (auth) {
-    writeFileSync(path.join(agentDir, "auth.json"), JSON.stringify(auth, null, 2), {
-      mode: 0o600,
-    });
+    writeFileSync(authPath, JSON.stringify(auth, null, 2), { mode: 0o600 });
+  } else if (existsSync(authPath)) {
+    try {
+      rmSync(authPath);
+    } catch {
+      /* best-effort cleanup */
+    }
   }
 }

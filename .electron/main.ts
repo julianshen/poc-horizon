@@ -190,31 +190,34 @@ function escapeAttr(s: string): string {
  * Resolve a packaged resource that the external Pi process must read from
  * a real on-disk path. Prefers the electron-builder extraResources layout
  * (`process.resourcesPath/<rel>`), falling back to the dev tree
- * (`<repo>/resources/<rel>`). Returns the first existing candidate, or the
- * resourcesPath candidate as a default.
+ * (`<repo>/resources/<rel>`). Returns the first existing candidate; when
+ * neither exists yet (e.g. the bundled binary hasn't been built in dev),
+ * the default is environment-aware so dev keeps using the repo tree.
  */
 function resolvePiResource(rel: string): string {
-  const candidates = [
-    process.resourcesPath ? path.join(process.resourcesPath, rel) : "",
-    path.join(__dirname, "..", "resources", rel),
-  ].filter(Boolean);
-  for (const c of candidates) if (existsSync(c)) return c;
-  return candidates[0] ?? path.join(__dirname, "..", "resources", rel);
+  const packaged = process.resourcesPath
+    ? path.join(process.resourcesPath, rel)
+    : "";
+  const dev = path.join(__dirname, "..", "resources", rel);
+  for (const c of [packaged, dev]) if (c && existsSync(c)) return c;
+  return app.isPackaged && packaged ? packaged : dev;
 }
 
 /**
- * Resolve the Pi binary. An absolute `aiPiBinary` override that exists
- * wins; otherwise prefer the bundled single-file binary (built via
- * `npm run build:pi`); otherwise fall back to a `pi` on $PATH.
+ * Resolve the Pi binary. An explicit `aiPiBinary` override (anything other
+ * than the default "pi") is respected verbatim — whether it's an absolute
+ * path or a name on $PATH — so a custom binary is never silently swapped
+ * for the bundled one. Otherwise prefer the bundled single-file binary
+ * (built via `npm run build:pi`), then fall back to a `pi` on $PATH.
  */
 function resolvePiBinary(): string {
   const override =
     (settingsManager.get("aiPiBinary" as never) as string) ?? "pi";
-  if (override && override !== "pi" && existsSync(override)) return override;
+  if (override && override !== "pi") return override;
   const binName = process.platform === "win32" ? "pi.exe" : "pi";
   const bundled = resolvePiResource(path.join("bin", binName));
   if (existsSync(bundled)) return bundled;
-  return override || "pi";
+  return "pi";
 }
 
 async function ensurePiSession(
@@ -387,7 +390,7 @@ function initSingletons(): void {
   helperRegistry = new HelperRegistry(path.join(data, "js-helpers.json"));
   domainSkills = new DomainSkills(path.join(data, "domain-skills"));
   skillsLibrary = new SkillsLibrary(
-    path.join(__dirname, "../resources/pi-extension/skills"),
+    resolvePiResource(path.join("pi-extension", "skills")),
   );
   actionRecorder = new ActionRecorder(path.join(data, "action-workflows.json"));
   agentPolicyResolver = new AgentPolicyResolver();

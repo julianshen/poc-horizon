@@ -18,14 +18,41 @@ describe("buildPiSettings", () => {
   it("maps the active provider and its model to Pi's defaults", () => {
     expect(
       buildPiSettings(
-        cfg({ activeProvider: "anthropic", models: { anthropic: "claude-x" } }),
+        cfg({
+          activeProvider: "anthropic",
+          apiKeys: { anthropic: "k" },
+          models: { anthropic: "claude-x" },
+        }),
       ),
     ).toMatchObject({ defaultProvider: "anthropic", defaultModel: "claude-x" });
   });
 
   it("omits defaultModel when the active provider has no model", () => {
-    expect(buildPiSettings(cfg({ activeProvider: "openai" }))).toEqual({
-      defaultProvider: "openai",
+    expect(
+      buildPiSettings(cfg({ activeProvider: "openai", apiKeys: { openai: "k" } })),
+    ).toEqual({ defaultProvider: "openai" });
+  });
+
+  it("does not set a default for an unauthenticated active provider", () => {
+    // User selected openai but never entered its key → don't point Pi at it.
+    const s = buildPiSettings(
+      cfg({ activeProvider: "openai", models: { openai: "gpt-4o" } }),
+    );
+    expect(s).not.toHaveProperty("defaultProvider");
+    expect(s).not.toHaveProperty("defaultModel");
+  });
+
+  it("falls back to an authed provider when the active one is unkeyed", () => {
+    const s = buildPiSettings(
+      cfg({
+        activeProvider: "openai", // no key
+        apiKeys: { anthropic: "k" },
+        models: { anthropic: "claude-x" },
+      }),
+    );
+    expect(s).toMatchObject({
+      defaultProvider: "anthropic",
+      defaultModel: "claude-x",
     });
   });
 

@@ -61,17 +61,25 @@ export function buildPiSettings(
   cfg: PiProvidersConfig,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  if (cfg.activeProvider) out.defaultProvider = cfg.activeProvider;
-  const activeModel = cfg.models[cfg.activeProvider];
-  if (activeModel) out.defaultModel = activeModel;
+  const authed = authedProviders(cfg);
+  // Pi opens on `defaultProvider`, so only point it at a provider that has
+  // auth — otherwise the first turn is a guaranteed auth failure. Prefer the
+  // user's active selection when it's keyed, else fall back to an authed
+  // provider (one with a model, if any).
+  const defaultProvider =
+    cfg.activeProvider && authed.includes(cfg.activeProvider)
+      ? cfg.activeProvider
+      : (authed.find((p) => cfg.models[p]) ?? authed[0] ?? "");
+  if (defaultProvider) {
+    out.defaultProvider = defaultProvider;
+    if (cfg.models[defaultProvider]) out.defaultModel = cfg.models[defaultProvider];
+  }
   // Cycle over the explicit models of authed providers (a model needs both
   // a usable provider and a known id). De-duplicated and ordered for a
   // stable rotation.
   const enabled = [
     ...new Set(
-      authedProviders(cfg)
-        .map((p) => cfg.models[p])
-        .filter((m): m is string => Boolean(m)),
+      authed.map((p) => cfg.models[p]).filter((m): m is string => Boolean(m)),
     ),
   ];
   if (enabled.length > 0) out.enabledModels = enabled;

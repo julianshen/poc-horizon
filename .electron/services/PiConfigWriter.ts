@@ -58,25 +58,14 @@ function hashKey(key: string): string {
 }
 
 function readManagedProviders(file: string): Record<string, string> {
-  try {
-    const parsed = JSON.parse(readFileSync(file, "utf-8")) as unknown;
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      // Legacy/unexpected shape → can't verify identity, so manage nothing.
-      return {};
-    }
-    const out: Record<string, string> = {};
-    for (const [provider, hash] of Object.entries(
-      parsed as Record<string, unknown>,
-    )) {
-      if (typeof hash === "string") out[provider] = hash;
-    }
-    return out;
-  } catch {
-    // Best-effort bookkeeping: a missing or unreadable marker degrades
-    // safely to "Horizon manages nothing" — we never delete an entry we
-    // cannot prove we wrote — so swallowing here can't strand a secret.
-    return {};
+  // Reuse readJsonObject's contract: {} only on ENOENT; a malformed or
+  // unreadable sidecar surfaces (aborts the write) rather than silently
+  // degrading to "nothing managed", which would strand a cleared secret.
+  const out: Record<string, string> = {};
+  for (const [provider, hash] of Object.entries(readJsonObject(file))) {
+    if (typeof hash === "string") out[provider] = hash;
   }
+  return out;
 }
 
 function writeManagedProviders(
@@ -91,25 +80,13 @@ function writeManagedProviders(
 }
 
 /**
- * Materialize Pi's config files into `agentDir` (the directory Horizon
- * passes to the Pi subprocess via PI_CODING_AGENT_DIR), reconciling only
- * the Horizon-managed pieces so unrelated Pi/user state survives:
- *
- *  - settings.json: rewrite the managed keys (defaultProvider/Model,
- *    enabledModels), drop them when cleared, and merge the generated
- *    base-URL override into `extensions` without disturbing other ones.
- *  - auth.json: write an api_key for every configured provider so they
- *    co-exist (Pi gates model availability on auth), and prune only the
- *    Horizon-owned entries that are no longer configured — preserving other
- *    providers' credentials and OAuth/login tokens.
- *  - the provider-override extension file: written or pruned to match.
- *
- * I/O wrapper around the pure builders in piConfig.ts.
+ * Write or prune the generated base-URL override extension. Returns its path
+ * and source so settings reconciliation can register/deregister it.
  */
-export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
-  mkdirSync(agentDir, { recursive: true });
-
-  // Provider base-URL override extension (created or pruned).
+function reconcileOverrideExtension(
+  agentDir: string,
+  cfg: PiProvidersConfig,
+): { overridePath: string; overrideSrc: string | null } {
   const overridePath = path.join(agentDir, PROVIDER_OVERRIDE_FILE);
   const overrideSrc = buildProviderOverrideExtension(cfg);
   if (overrideSrc) {
@@ -119,9 +96,20 @@ export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
     // keep pointing Pi at a stale endpoint.
     rmSync(overridePath);
   }
+  return { overridePath, overrideSrc };
+}
 
-  // settings.json — drop managed keys, then reconcile extensions so
-  // non-Horizon entries survive while the generated override is toggled.
+/**
+ * Rewrite Horizon's managed settings.json keys (defaultProvider/Model,
+ * enabledModels) and reconcile the generated override into `extensions`,
+ * leaving unrelated keys and non-Horizon extensions untouched.
+ */
+function reconcileSettings(
+  agentDir: string,
+  cfg: PiProvidersConfig,
+  overridePath: string,
+  overrideSrc: string | null,
+): void {
   const settingsPath = path.join(agentDir, "settings.json");
   const existing = readJsonObject(settingsPath);
   for (const k of MANAGED_SETTINGS_KEYS) delete existing[k];
@@ -141,12 +129,15 @@ export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
   };
   if (nextExtensions.length > 0) settings.extensions = nextExtensions;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+}
 
-  // auth.json — write/merge an api_key entry for every configured provider
-  // so they co-exist, and prune the Horizon-owned entries that are no longer
-  // configured. Ownership is tracked in a secrets-free sidecar; the `api_key`
-  // shape is NOT unique to Horizon, so a Pi-created/`/login` credential is
-  // never deleted, and OAuth tokens / other entries are always preserved.
+/**
+ * Write an api_key for every configured provider so they co-exist (Pi gates
+ * model availability on auth), and prune only the exact entries Horizon
+ * previously wrote — tracked by key hash in a secrets-free sidecar. Pi
+ * `/login` credentials, OAuth tokens, and replaced keys are preserved.
+ */
+function reconcileAuth(agentDir: string, cfg: PiProvidersConfig): void {
   const authPath = path.join(agentDir, "auth.json");
   const managedPath = path.join(agentDir, MANAGED_AUTH_FILE);
   const previouslyManaged = readManagedProviders(managedPath);
@@ -162,9 +153,6 @@ export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
     const entry = authObj[provider] as
       | { type?: string; key?: string }
       | undefined;
-    // Remove only the exact api_key value Horizon wrote: if Pi/`/login` or
-    // the user replaced the entry (different key, or an OAuth login under the
-    // same provider), the hash won't match and it's preserved.
     if (
       entry?.type === "api_key" &&
       typeof entry.key === "string" &&
@@ -181,4 +169,20 @@ export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
     rmSync(authPath);
   }
   writeManagedProviders(managedPath, nextManaged);
+}
+
+/**
+ * Materialize Pi's config files into `agentDir` (the directory Horizon
+ * passes to the Pi subprocess via PI_CODING_AGENT_DIR), reconciling only the
+ * Horizon-managed pieces (override extension → settings.json → auth.json) so
+ * unrelated Pi/user state survives. I/O wrapper around piConfig.ts builders.
+ */
+export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
+  mkdirSync(agentDir, { recursive: true });
+  const { overridePath, overrideSrc } = reconcileOverrideExtension(
+    agentDir,
+    cfg,
+  );
+  reconcileSettings(agentDir, cfg, overridePath, overrideSrc);
+  reconcileAuth(agentDir, cfg);
 }

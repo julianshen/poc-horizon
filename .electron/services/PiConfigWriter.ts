@@ -99,15 +99,21 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
   const auth = buildPiAuth(cfg);
   if (auth) {
     writeSecret(authPath, { ...existingAuth, ...auth });
-  } else if (cfg.provider && existingAuth[cfg.provider] !== undefined) {
-    delete existingAuth[cfg.provider];
-    if (Object.keys(existingAuth).length > 0) {
-      writeSecret(authPath, existingAuth);
-    } else if (existsSync(authPath)) {
-      try {
-        rmSync(authPath);
-      } catch {
-        /* best-effort cleanup */
+  } else if (cfg.provider) {
+    // Clearing the key removes only a Horizon-managed `api_key` entry for
+    // this provider — an OAuth/login token (or any other type) for the
+    // same provider, and all other providers' entries, are left intact.
+    const entry = existingAuth[cfg.provider] as { type?: string } | undefined;
+    if (entry?.type === "api_key") {
+      delete existingAuth[cfg.provider];
+      if (Object.keys(existingAuth).length > 0) {
+        writeSecret(authPath, existingAuth);
+      } else if (existsSync(authPath)) {
+        try {
+          rmSync(authPath);
+        } catch {
+          /* best-effort cleanup */
+        }
       }
     }
   }

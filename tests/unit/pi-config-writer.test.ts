@@ -71,6 +71,18 @@ describe("writePiConfig", () => {
     });
   });
 
+  it("keeps a same-provider OAuth token when the api_key is cleared", () => {
+    writeFileSync(
+      authPath(),
+      JSON.stringify({ anthropic: { type: "oauth", key: "login-tok" } }),
+    );
+    // Provider is anthropic with a blank key — the OAuth login must survive.
+    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
+    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
+      anthropic: { type: "oauth", key: "login-tok" },
+    });
+  });
+
   it("deletes auth.json only when it becomes empty after clearing", () => {
     writePiConfig(dir, { provider: "anthropic", apiKey: "sk-1" });
     expect(existsSync(authPath())).toBe(true);

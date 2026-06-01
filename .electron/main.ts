@@ -227,15 +227,16 @@ function resolvePiBinary(): string {
  * scrubbed from auth.json right away — not only on the next spawn.
  */
 function writePiConfigFromSettings(): void {
-  const provider =
-    (settingsManager.get("aiProvider" as never) as string) || "anthropic";
   const byProvider = (key: string): Record<string, string> =>
     (settingsManager.get(key as never) as Record<string, string>) ?? {};
+  // Materialize every configured provider so they co-exist in Pi; the
+  // active provider is just the default the session opens on.
   writePiConfig(piAgentDir, {
-    provider,
-    model: byProvider("aiModels")[provider] || undefined,
-    apiKey: byProvider("aiApiKeys")[provider] || undefined,
-    baseUrl: byProvider("aiBaseUrls")[provider] || undefined,
+    activeProvider:
+      (settingsManager.get("aiProvider" as never) as string) || "anthropic",
+    apiKeys: byProvider("aiApiKeys"),
+    models: byProvider("aiModels"),
+    baseUrls: byProvider("aiBaseUrls"),
   });
 }
 

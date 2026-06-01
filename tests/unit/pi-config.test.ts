@@ -3,83 +3,110 @@ import {
   buildPiSettings,
   buildPiAuth,
   buildProviderOverrideExtension,
+  type PiProvidersConfig,
 } from "@electron/services/piConfig";
 
+const cfg = (over: Partial<PiProvidersConfig> = {}): PiProvidersConfig => ({
+  activeProvider: "anthropic",
+  apiKeys: {},
+  models: {},
+  baseUrls: {},
+  ...over,
+});
+
 describe("buildPiSettings", () => {
-  it("maps provider and model to Pi's defaults", () => {
+  it("maps the active provider and its model to Pi's defaults", () => {
     expect(
-      buildPiSettings({ provider: "anthropic", model: "claude-x" }),
-    ).toEqual({
-      defaultProvider: "anthropic",
-      defaultModel: "claude-x",
-    });
+      buildPiSettings(
+        cfg({ activeProvider: "anthropic", models: { anthropic: "claude-x" } }),
+      ),
+    ).toMatchObject({ defaultProvider: "anthropic", defaultModel: "claude-x" });
   });
 
-  it("omits defaultModel when no model is set", () => {
-    expect(buildPiSettings({ provider: "openai" })).toEqual({
+  it("omits defaultModel when the active provider has no model", () => {
+    expect(buildPiSettings(cfg({ activeProvider: "openai" }))).toEqual({
       defaultProvider: "openai",
     });
   });
 
-  it("omits defaultProvider when provider is empty", () => {
-    expect(buildPiSettings({ provider: "" })).toEqual({});
+  it("builds enabledModels from authed providers that have a model", () => {
+    const s = buildPiSettings(
+      cfg({
+        activeProvider: "anthropic",
+        apiKeys: { anthropic: "k1", openai: "k2", google: "k3" },
+        // google has a key but no model → excluded from the cycle
+        models: { anthropic: "claude-x", openai: "gpt-4o" },
+      }),
+    );
+    expect(s.enabledModels).toEqual(["claude-x", "gpt-4o"]);
   });
 
-  it("does not emit extensions (reconciled by the writer)", () => {
-    expect(buildPiSettings({ provider: "openai" })).not.toHaveProperty(
-      "extensions",
+  it("excludes models of providers without a key from the cycle", () => {
+    const s = buildPiSettings(
+      cfg({
+        apiKeys: { anthropic: "k1" },
+        models: { anthropic: "claude-x", openai: "gpt-4o" },
+      }),
+    );
+    expect(s.enabledModels).toEqual(["claude-x"]);
+  });
+
+  it("omits enabledModels when no authed provider has a model", () => {
+    expect(buildPiSettings(cfg({ apiKeys: { anthropic: "k" } }))).not.toHaveProperty(
+      "enabledModels",
     );
   });
 });
 
 describe("buildPiAuth", () => {
-  it("keys the api_key entry by provider id", () => {
+  it("emits an api_key entry for every provider that has a key", () => {
     expect(
-      buildPiAuth({ provider: "anthropic", apiKey: "sk-ant-123" }),
+      buildPiAuth(cfg({ apiKeys: { anthropic: "sk-a", openai: "sk-o" } })),
     ).toEqual({
-      anthropic: { type: "api_key", key: "sk-ant-123" },
+      anthropic: { type: "api_key", key: "sk-a" },
+      openai: { type: "api_key", key: "sk-o" },
     });
   });
 
-  it("returns null when no api key is configured", () => {
-    expect(buildPiAuth({ provider: "anthropic" })).toBeNull();
-  });
-
-  it("returns null when no provider is set", () => {
-    expect(buildPiAuth({ provider: "", apiKey: "x" })).toBeNull();
+  it("skips providers with an empty key and returns {} when none", () => {
+    expect(buildPiAuth(cfg({ apiKeys: { anthropic: "", openai: "sk-o" } }))).toEqual(
+      { openai: { type: "api_key", key: "sk-o" } },
+    );
+    expect(buildPiAuth(cfg())).toEqual({});
   });
 });
 
 describe("buildProviderOverrideExtension", () => {
-  it("emits a registerProvider override with the base URL", () => {
-    const src = buildProviderOverrideExtension({
-      provider: "openai",
-      baseUrl: "https://proxy.example.com/v1",
-    });
+  it("registers a base-URL override for every provider that has one", () => {
+    const src = buildProviderOverrideExtension(
+      cfg({
+        baseUrls: {
+          openai: "https://proxy.example.com/v1",
+          anthropic: "https://ac.example.com",
+        },
+      }),
+    );
     expect(src).toContain("export default function (pi)");
     expect(src).toContain(
       'pi.registerProvider("openai", { baseUrl: "https://proxy.example.com/v1" });',
     );
+    expect(src).toContain(
+      'pi.registerProvider("anthropic", { baseUrl: "https://ac.example.com" });',
+    );
   });
 
   it("JSON-escapes provider and base URL", () => {
-    const src = buildProviderOverrideExtension({
-      provider: 'ev"il',
-      baseUrl: 'http://x"y',
-    });
+    const src = buildProviderOverrideExtension(
+      cfg({ baseUrls: { 'ev"il': 'http://x"y' } }),
+    );
     expect(src).toContain('pi.registerProvider("ev\\"il"');
     expect(src).toContain('baseUrl: "http://x\\"y"');
   });
 
-  it("returns null without a base URL", () => {
+  it("returns null when no provider has a base URL", () => {
     expect(
-      buildProviderOverrideExtension({ provider: "openai" }),
+      buildProviderOverrideExtension(cfg({ baseUrls: { openai: "" } })),
     ).toBeNull();
-  });
-
-  it("returns null without a provider", () => {
-    expect(
-      buildProviderOverrideExtension({ provider: "", baseUrl: "http://x" }),
-    ).toBeNull();
+    expect(buildProviderOverrideExtension(cfg())).toBeNull();
   });
 });

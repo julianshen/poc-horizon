@@ -233,10 +233,16 @@ This is a **session command**, not a browser tool — it does *not* go through t
 
 ## 6. Concrete next steps
 
-- [ ] **Phase 1:** `PiConfigWriter` writes all `aiApiKeys` into `auth.json`, all
-      `aiBaseUrls` into `models.json`, and `enabledModels` into `settings.json`;
-      retire `horizon-provider-override.mjs`. Extend `writePiConfigFromSettings`
-      to pass the full per-provider maps. (Pure builders stay unit-testable.)
+- [x] **Phase 1 (done):** `PiConfigWriter` writes an `api_key` for every keyed
+      provider into `auth.json` (with a secrets-free ownership sidecar so it
+      only prunes its own), registers each provider's base URL in the generated
+      override extension, and sets `enabledModels` from the authed providers'
+      models in `settings.json`. `writePiConfigFromSettings` passes the full
+      per-provider maps. Pure builders stay unit-tested (100% covered).
+      _Deviation from the original sketch:_ base URLs are materialized via the
+      generated `registerProvider` extension (already Horizon-owned/reconciled)
+      rather than `models.json`, avoiding a second ownership-tracking mechanism;
+      `models.json` remains available if we later need declarative custom models.
 - [ ] **Phase 2a (main):** `PiSession.setModel/cycleModel/listAvailableModels`
       + response/event handling; IPC channels + handlers + preload wrappers.
 - [ ] **Phase 2b (renderer):** model picker in `AIPanel`, Ctrl+P binding,

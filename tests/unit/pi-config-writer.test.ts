@@ -10,6 +10,15 @@ import {
 import { tmpdir } from "os";
 import path from "path";
 import { writePiConfig } from "@electron/services/PiConfigWriter";
+import type { PiProvidersConfig } from "@electron/services/piConfig";
+
+const cfg = (over: Partial<PiProvidersConfig> = {}): PiProvidersConfig => ({
+  activeProvider: "anthropic",
+  apiKeys: {},
+  models: {},
+  baseUrls: {},
+  ...over,
+});
 
 describe("writePiConfig", () => {
   let dir: string;
@@ -17,6 +26,8 @@ describe("writePiConfig", () => {
   const authPath = () => path.join(dir, "auth.json");
   const readSettings = () =>
     JSON.parse(readFileSync(settingsPath(), "utf-8")) as Record<string, unknown>;
+  const readAuth = () =>
+    JSON.parse(readFileSync(authPath(), "utf-8")) as Record<string, unknown>;
 
   beforeEach(() => {
     dir = mkdtempSync(path.join(tmpdir(), "pi-cfg-"));
@@ -25,28 +36,31 @@ describe("writePiConfig", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("writes provider/model defaults and auth.json (0600)", () => {
-    writePiConfig(dir, {
-      provider: "anthropic",
-      model: "claude-x",
-      apiKey: "sk-1",
-    });
+  it("writes defaults + auth for every configured provider (0600)", () => {
+    writePiConfig(
+      dir,
+      cfg({
+        activeProvider: "anthropic",
+        apiKeys: { anthropic: "sk-a", openai: "sk-o" },
+        models: { anthropic: "claude-x", openai: "gpt-4o" },
+      }),
+    );
     expect(readSettings()).toMatchObject({
       defaultProvider: "anthropic",
       defaultModel: "claude-x",
+      enabledModels: ["claude-x", "gpt-4o"],
     });
-    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
-      anthropic: { type: "api_key", key: "sk-1" },
+    expect(readAuth()).toEqual({
+      anthropic: { type: "api_key", key: "sk-a" },
+      openai: { type: "api_key", key: "sk-o" },
     });
-    // auth.json must be owner-read/write only (0600).
     expect(statSync(authPath()).mode & 0o777).toBe(0o600);
   });
 
   it("drops a previously-set model when the Model field is cleared", () => {
-    writePiConfig(dir, { provider: "openai", model: "gpt-x", apiKey: "k" });
+    writePiConfig(dir, cfg({ apiKeys: { openai: "k" }, models: { openai: "gpt-x" }, activeProvider: "openai" }));
     expect(readSettings().defaultModel).toBe("gpt-x");
-    // User clears the model to fall back to the provider default.
-    writePiConfig(dir, { provider: "openai", model: "", apiKey: "k" });
+    writePiConfig(dir, cfg({ apiKeys: { openai: "k" }, activeProvider: "openai" }));
     expect(readSettings()).not.toHaveProperty("defaultModel");
     expect(readSettings().defaultProvider).toBe("openai");
   });
@@ -56,28 +70,26 @@ describe("writePiConfig", () => {
       settingsPath(),
       JSON.stringify({ sessionDir: ".pi/sessions", theme: "dark" }),
     );
-    writePiConfig(dir, { provider: "openai" });
+    writePiConfig(dir, cfg({ activeProvider: "openai", apiKeys: { openai: "k" } }));
     const s = readSettings();
     expect(s.sessionDir).toBe(".pi/sessions");
     expect(s.theme).toBe("dark");
     expect(s.defaultProvider).toBe("openai");
   });
 
-  it("removes only the managed provider entry when its key is cleared", () => {
-    writeFileSync(
-      authPath(),
-      JSON.stringify({ google: { type: "oauth", key: "tok" } }),
-    );
-    writePiConfig(dir, { provider: "anthropic", apiKey: "sk-1" });
-    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
-      google: { type: "oauth", key: "tok" },
-      anthropic: { type: "api_key", key: "sk-1" },
-    });
-    // Clear the Anthropic key: its entry goes, the OAuth token stays.
-    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
-    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
-      google: { type: "oauth", key: "tok" },
-    });
+  it("prunes a Horizon-written key for a provider whose key is cleared, keeping others", () => {
+    writePiConfig(dir, cfg({ apiKeys: { anthropic: "sk-a", openai: "sk-o" } }));
+    expect(Object.keys(readAuth()).sort()).toEqual(["anthropic", "openai"]);
+    // Clear anthropic only.
+    writePiConfig(dir, cfg({ apiKeys: { openai: "sk-o" } }));
+    expect(readAuth()).toEqual({ openai: { type: "api_key", key: "sk-o" } });
+  });
+
+  it("scrubs all Horizon-written keys on a full clear (and removes auth.json)", () => {
+    writePiConfig(dir, cfg({ apiKeys: { anthropic: "sk-a", openai: "sk-o" } }));
+    expect(existsSync(authPath())).toBe(true);
+    writePiConfig(dir, cfg()); // everything cleared
+    expect(existsSync(authPath())).toBe(false);
   });
 
   it("keeps a same-provider OAuth token when the api_key is cleared", () => {
@@ -85,63 +97,52 @@ describe("writePiConfig", () => {
       authPath(),
       JSON.stringify({ anthropic: { type: "oauth", key: "login-tok" } }),
     );
-    // Provider is anthropic with a blank key — the OAuth login must survive.
-    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
-    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
-      anthropic: { type: "oauth", key: "login-tok" },
-    });
+    writePiConfig(dir, cfg({ activeProvider: "anthropic" }));
+    expect(readAuth()).toEqual({ anthropic: { type: "oauth", key: "login-tok" } });
   });
 
   it("never deletes an api_key entry Horizon did not write", () => {
-    // Simulates a Pi `/login` api_key the user created out-of-band.
+    // Simulates a Pi `/login` api_key created out-of-band.
     writeFileSync(
       authPath(),
       JSON.stringify({ anthropic: { type: "api_key", key: "pi-login-key" } }),
     );
-    // Horizon never wrote anthropic's key, so a blank field must not touch it.
-    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
-    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
+    writePiConfig(dir, cfg({ activeProvider: "anthropic" }));
+    expect(readAuth()).toEqual({
       anthropic: { type: "api_key", key: "pi-login-key" },
     });
   });
 
-  it("deletes auth.json only when it becomes empty after clearing", () => {
-    writePiConfig(dir, { provider: "anthropic", apiKey: "sk-1" });
-    expect(existsSync(authPath())).toBe(true);
-    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
-    expect(existsSync(authPath())).toBe(false);
-  });
-
-  it("writes a base-URL override extension and prunes it without dropping others", () => {
-    writeFileSync(
-      settingsPath(),
-      JSON.stringify({ extensions: ["/user/ext.mjs"] }),
+  it("registers base-URL overrides for all providers and prunes when cleared", () => {
+    writeFileSync(settingsPath(), JSON.stringify({ extensions: ["/user/ext.mjs"] }));
+    writePiConfig(
+      dir,
+      cfg({
+        apiKeys: { openai: "k" },
+        baseUrls: { openai: "https://proxy.example.com/v1" },
+      }),
     );
-    writePiConfig(dir, {
-      provider: "openai",
-      baseUrl: "https://proxy.example.com/v1",
-    });
     const overridePath = path.join(dir, "horizon-provider-override.mjs");
     expect(existsSync(overridePath)).toBe(true);
+    expect(readFileSync(overridePath, "utf-8")).toContain(
+      'pi.registerProvider("openai"',
+    );
     expect(readSettings().extensions).toEqual(["/user/ext.mjs", overridePath]);
-    // Clearing the base URL removes only the generated override.
-    writePiConfig(dir, { provider: "openai", baseUrl: "" });
+    // Clear the base URL → override + managed extension entry go, user ext stays.
+    writePiConfig(dir, cfg({ apiKeys: { openai: "k" } }));
     expect(existsSync(overridePath)).toBe(false);
     expect(readSettings().extensions).toEqual(["/user/ext.mjs"]);
   });
 
   it("surfaces a malformed settings.json instead of clobbering it", () => {
     writeFileSync(settingsPath(), "{ not valid json");
-    expect(() => writePiConfig(dir, { provider: "openai" })).toThrow();
-    // The unreadable file is left intact for recovery.
+    expect(() => writePiConfig(dir, cfg())).toThrow();
     expect(readFileSync(settingsPath(), "utf-8")).toBe("{ not valid json");
   });
 
   it("rejects a settings.json that is valid JSON but not an object", () => {
     writeFileSync(settingsPath(), "[1, 2, 3]");
-    expect(() => writePiConfig(dir, { provider: "openai" })).toThrow(
-      /must contain a JSON object/,
-    );
+    expect(() => writePiConfig(dir, cfg())).toThrow(/must contain a JSON object/);
     expect(readFileSync(settingsPath(), "utf-8")).toBe("[1, 2, 3]");
   });
 });

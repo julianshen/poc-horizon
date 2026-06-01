@@ -13,7 +13,7 @@ import {
   buildProviderOverrideExtension,
   PROVIDER_OVERRIDE_FILE,
   MANAGED_SETTINGS_KEYS,
-  type AiProviderConfig,
+  type PiProvidersConfig,
 } from "./piConfig";
 
 /**
@@ -80,17 +80,18 @@ function writeManagedProviders(file: string, providers: Set<string>): void {
  * passes to the Pi subprocess via PI_CODING_AGENT_DIR), reconciling only
  * the Horizon-managed pieces so unrelated Pi/user state survives:
  *
- *  - settings.json: rewrite scalar managed keys (defaultProvider/Model),
- *    drop them when cleared, and merge the generated base-URL override
- *    into `extensions` without disturbing other extensions.
- *  - auth.json: merge the current provider's API key in (0600), or remove
- *    only that provider's entry when the key is cleared — preserving other
+ *  - settings.json: rewrite the managed keys (defaultProvider/Model,
+ *    enabledModels), drop them when cleared, and merge the generated
+ *    base-URL override into `extensions` without disturbing other ones.
+ *  - auth.json: write an api_key for every configured provider so they
+ *    co-exist (Pi gates model availability on auth), and prune only the
+ *    Horizon-owned entries that are no longer configured — preserving other
  *    providers' credentials and OAuth/login tokens.
  *  - the provider-override extension file: written or pruned to match.
  *
  * I/O wrapper around the pure builders in piConfig.ts.
  */
-export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
+export function writePiConfig(agentDir: string, cfg: PiProvidersConfig): void {
   mkdirSync(agentDir, { recursive: true });
 
   // Provider base-URL override extension (created or pruned).
@@ -104,7 +105,7 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
     rmSync(overridePath);
   }
 
-  // settings.json — drop managed scalar keys, then reconcile extensions so
+  // settings.json — drop managed keys, then reconcile extensions so
   // non-Horizon entries survive while the generated override is toggled.
   const settingsPath = path.join(agentDir, "settings.json");
   const existing = readJsonObject(settingsPath);
@@ -119,41 +120,41 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
     ? [...otherExtensions, overridePath]
     : otherExtensions;
   delete existing.extensions;
-  const merged: Record<string, unknown> = {
+  const settings: Record<string, unknown> = {
     ...existing,
     ...buildPiSettings(cfg),
   };
-  if (nextExtensions.length > 0) merged.extensions = nextExtensions;
-  writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
+  if (nextExtensions.length > 0) settings.extensions = nextExtensions;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
 
-  // auth.json — merge in / remove only the entry Horizon itself wrote.
-  // Ownership is tracked in a sidecar (provider ids only, no secrets); the
-  // `api_key` shape is NOT unique to Horizon, so a Pi-created/login api_key
-  // for the same provider must never be deleted when the Horizon field is
-  // blank. Other providers' entries (and OAuth tokens) are always preserved.
+  // auth.json — write/merge an api_key entry for every configured provider
+  // so they co-exist, and prune the Horizon-owned entries that are no longer
+  // configured. Ownership is tracked in a secrets-free sidecar; the `api_key`
+  // shape is NOT unique to Horizon, so a Pi-created/`/login` credential is
+  // never deleted, and OAuth tokens / other entries are always preserved.
   const authPath = path.join(agentDir, "auth.json");
   const managedPath = path.join(agentDir, MANAGED_AUTH_FILE);
-  const managed = readManagedProviders(managedPath);
-  const existingAuth = readJsonObject(authPath);
-  const auth = buildPiAuth(cfg);
-  if (auth) {
-    writeSecret(authPath, { ...existingAuth, ...auth });
-    managed.add(cfg.provider);
-  } else if (cfg.provider && managed.has(cfg.provider)) {
-    const entry = existingAuth[cfg.provider] as { type?: string } | undefined;
-    // Only a Horizon-written api_key entry is removed; if Pi has since
-    // replaced it (e.g. an OAuth login under the same provider), leave it.
-    if (entry?.type === "api_key") {
-      delete existingAuth[cfg.provider];
-      if (Object.keys(existingAuth).length > 0) {
-        writeSecret(authPath, existingAuth);
-      } else if (existsSync(authPath)) {
-        // Surface failures: a swallowed error here would leave the cleared
-        // secret on disk to be reused on the next spawn.
-        rmSync(authPath);
-      }
-    }
-    managed.delete(cfg.provider);
+  const previouslyManaged = readManagedProviders(managedPath);
+  const authObj = readJsonObject(authPath);
+  const desired = buildPiAuth(cfg);
+  const nextManaged = new Set<string>();
+  for (const [provider, entry] of Object.entries(desired)) {
+    authObj[provider] = entry;
+    nextManaged.add(provider);
   }
-  writeManagedProviders(managedPath, managed);
+  for (const provider of previouslyManaged) {
+    if (desired[provider]) continue;
+    const entry = authObj[provider] as { type?: string } | undefined;
+    // Only remove an entry that is still the Horizon-written api_key shape;
+    // if Pi replaced it with an OAuth login under the same provider, keep it.
+    if (entry?.type === "api_key") delete authObj[provider];
+  }
+  if (Object.keys(authObj).length > 0) {
+    writeSecret(authPath, authObj);
+  } else if (existsSync(authPath)) {
+    // Surface failures: a swallowed error would leave a cleared secret on
+    // disk to be reused on the next spawn.
+    rmSync(authPath);
+  }
+  writeManagedProviders(managedPath, nextManaged);
 }

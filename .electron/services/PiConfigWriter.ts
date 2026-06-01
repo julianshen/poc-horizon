@@ -11,6 +11,7 @@ import {
   buildPiAuth,
   buildProviderOverrideExtension,
   PROVIDER_OVERRIDE_FILE,
+  MANAGED_SETTINGS_KEYS,
   type AiProviderConfig,
 } from "./piConfig";
 
@@ -42,7 +43,10 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
     }
   }
 
-  // settings.json — preserve unknown keys Pi may have written.
+  // settings.json — preserve unknown keys Pi may have written, but drop
+  // every Horizon-managed key first so clearing a field in the UI (e.g.
+  // Model) actually removes the stale value instead of the shallow merge
+  // keeping it (buildPiSettings omits unset keys rather than nulling them).
   const settingsPath = path.join(agentDir, "settings.json");
   let existing: Record<string, unknown> = {};
   try {
@@ -53,9 +57,8 @@ export function writePiConfig(agentDir: string, cfg: AiProviderConfig): void {
   } catch {
     existing = {};
   }
+  for (const k of MANAGED_SETTINGS_KEYS) delete existing[k];
   const merged = { ...existing, ...buildPiSettings(cfg, extensions) };
-  // Drop a stale extensions entry when the override is no longer used.
-  if (extensions.length === 0) delete merged.extensions;
   writeFileSync(settingsPath, JSON.stringify(merged, null, 2), "utf-8");
 
   // auth.json — written 0600 when an API key is configured, otherwise

@@ -28,6 +28,18 @@ export interface AiProviderConfig {
 export const PROVIDER_OVERRIDE_FILE = "horizon-provider-override.mjs";
 
 /**
+ * settings.json keys Horizon owns and rewrites on every spawn. They are
+ * deleted before the read-merge so clearing a field in the UI removes the
+ * stale value (buildPiSettings omits unset keys rather than nulling them).
+ * Must stay in sync with the keys buildPiSettings can emit.
+ */
+export const MANAGED_SETTINGS_KEYS = [
+  "defaultProvider",
+  "defaultModel",
+  "extensions",
+] as const;
+
+/**
  * Build the subset of Pi's settings.json that Horizon manages.
  * `extensions` is threaded through so the writer can register the
  * generated base-URL override. Other settings.json keys are preserved

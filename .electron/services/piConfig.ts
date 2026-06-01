@@ -28,38 +28,39 @@ export interface AiProviderConfig {
 export const PROVIDER_OVERRIDE_FILE = "horizon-provider-override.mjs";
 
 /**
- * settings.json keys Horizon owns and rewrites on every spawn. They are
- * deleted before the read-merge so clearing a field in the UI removes the
+ * Scalar settings.json keys Horizon fully owns and rewrites on every spawn.
+ * Deleted before the read-merge so clearing a field in the UI removes the
  * stale value (buildPiSettings omits unset keys rather than nulling them).
- * Must stay in sync with the keys buildPiSettings can emit.
+ * `extensions` is NOT here — it's a shared array where only the generated
+ * override entry is Horizon-managed, so the writer reconciles it in place.
  */
-export const MANAGED_SETTINGS_KEYS = [
-  "defaultProvider",
-  "defaultModel",
-  "extensions",
-] as const;
+export const MANAGED_SETTINGS_KEYS = ["defaultProvider", "defaultModel"] as const;
 
 /**
- * Build the subset of Pi's settings.json that Horizon manages.
- * `extensions` is threaded through so the writer can register the
- * generated base-URL override. Other settings.json keys are preserved
- * by the writer's read-merge-write.
+ * Build the scalar subset of Pi's settings.json that Horizon manages
+ * (`defaultProvider` / `defaultModel`). The `extensions` array is NOT
+ * emitted here — the writer reconciles it so user/Pi-installed extensions
+ * survive. Unset fields are omitted so the writer can drop stale values.
+ *
+ * @param cfg - The user's provider/model/credential configuration.
+ * @returns A partial settings.json object with only the keys that are set.
  */
 export function buildPiSettings(
   cfg: AiProviderConfig,
-  extensions: string[] = [],
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (cfg.provider) out.defaultProvider = cfg.provider;
   if (cfg.model) out.defaultModel = cfg.model;
-  if (extensions.length > 0) out.extensions = extensions;
   return out;
 }
 
 /**
- * Build auth.json. Returns null when no API key is configured (e.g. the
- * user authenticates Pi via `/login`/OAuth or an external env var), so
- * the writer can leave any existing auth.json untouched.
+ * Build the auth.json entry for the configured provider.
+ *
+ * @param cfg - The user's provider/model/credential configuration.
+ * @returns A single-provider `{ [provider]: { type, key } }` map, or null
+ *   when no API key is set (e.g. the user uses `/login`/OAuth or an env
+ *   var) so the writer can leave other providers' credentials untouched.
  */
 export function buildPiAuth(
   cfg: AiProviderConfig,
@@ -72,9 +73,11 @@ export function buildPiAuth(
  * Build a tiny Pi extension that overrides the provider's base URL. Pi
  * exposes endpoint overrides only via `pi.registerProvider()` (see
  * custom-provider.md), not via settings.json, so a custom base URL is
- * materialized as a generated extension. Returns null when no base URL
- * is set. Plain JS (no type imports) so Pi's jiti loader needs nothing
- * resolved at runtime.
+ * materialized as a generated extension. Plain JS (no type imports) so
+ * Pi's jiti loader needs nothing resolved at runtime.
+ *
+ * @param cfg - The user's provider/model/credential configuration.
+ * @returns The extension source, or null when no base URL is configured.
  */
 export function buildProviderOverrideExtension(
   cfg: AiProviderConfig,

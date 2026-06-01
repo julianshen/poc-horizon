@@ -25,13 +25,10 @@ describe("buildPiSettings", () => {
     expect(buildPiSettings({ provider: "" })).toEqual({});
   });
 
-  it("includes extensions when provided", () => {
-    expect(
-      buildPiSettings({ provider: "openai" }, ["/cfg/override.mjs"]),
-    ).toEqual({
-      defaultProvider: "openai",
-      extensions: ["/cfg/override.mjs"],
-    });
+  it("does not emit extensions (reconciled by the writer)", () => {
+    expect(buildPiSettings({ provider: "openai" })).not.toHaveProperty(
+      "extensions",
+    );
   });
 });
 

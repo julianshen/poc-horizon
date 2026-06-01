@@ -4,6 +4,10 @@
   directories: {
     output: "release",
   },
+  // Rebuild the bundled Pi binary for each packed arch (see hook). The
+  // `dist*` scripts run `build:pi` first so extraResources has a binary to
+  // copy; this hook then overwrites it with the arch-correct build.
+  afterPack: "./scripts/afterPack-pi.cjs",
   files: [
     "dist",
     "dist-electron",

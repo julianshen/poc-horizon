@@ -1,4 +1,5 @@
-import React from "react";
+import { useCallback } from "react";
+import type { FC } from "react";
 import type { Settings } from "../../types/browser";
 import { Section, Field, Select, TextInput } from "./SettingsPanel.parts";
 
@@ -29,20 +30,20 @@ interface Props {
   update: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
 }
 
-export const AiProviderSettings: React.FC<Props> = ({ settings, update }) => {
-  const onProvider = React.useCallback(
+export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
+  const onProvider = useCallback(
     (v: string) => update("aiProvider", v),
     [update],
   );
-  const onModel = React.useCallback(
+  const onModel = useCallback(
     (v: string) => update("aiModel", v),
     [update],
   );
-  const onApiKey = React.useCallback(
+  const onApiKey = useCallback(
     (v: string) => update("aiApiKey", v),
     [update],
   );
-  const onBaseUrl = React.useCallback(
+  const onBaseUrl = useCallback(
     (v: string) => update("aiBaseUrl", v),
     [update],
   );

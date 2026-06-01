@@ -10,6 +10,7 @@ export default tseslint.config(
       "dist-electron",
       "resources/bin",
       "release",
+      "scripts/**/*.cjs",
       ".electron/main.ts.timestamp-*",
       "coverage",
       "*.config.ts",

@@ -10,9 +10,12 @@
  *   node scripts/build-pi.mjs                # build for the host platform
  *   node scripts/build-pi.mjs --target=bun-linux-x64
  *   node scripts/build-pi.mjs --target=bun-windows-x64
+ *   node scripts/build-pi.mjs --target=bun-darwin-arm64 --out=/path/to/Resources/bin
  *
- * Requires Bun on PATH (https://bun.sh). The pi binary is intentionally
- * git-ignored — it is produced at package time, not committed.
+ * `--out=<dir>` overrides the output directory (used by the
+ * electron-builder afterPack hook to write each arch's binary directly
+ * into the packed app). Requires Bun on PATH (https://bun.sh). The pi
+ * binary is intentionally git-ignored — produced at package time, not committed.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -27,10 +30,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outDir = path.join(repoRoot, "resources", "bin");
 
 const targetArg = process.argv.find((a) => a.startsWith("--target="));
 const target = targetArg ? targetArg.slice("--target=".length) : "";
+const outArg = process.argv.find((a) => a.startsWith("--out="));
+const outDir = outArg
+  ? path.resolve(outArg.slice("--out=".length))
+  : path.join(repoRoot, "resources", "bin");
 const isWindows = target ? target.includes("windows") : process.platform === "win32";
 const binName = isWindows ? "pi.exe" : "pi";
 

@@ -54,24 +54,52 @@ describe("writePiConfig", () => {
     expect(s.defaultProvider).toBe("openai");
   });
 
-  it("removes auth.json when the API key is cleared", () => {
+  it("removes only the managed provider entry when its key is cleared", () => {
+    writeFileSync(
+      authPath(),
+      JSON.stringify({ google: { type: "oauth", key: "tok" } }),
+    );
+    writePiConfig(dir, { provider: "anthropic", apiKey: "sk-1" });
+    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
+      google: { type: "oauth", key: "tok" },
+      anthropic: { type: "api_key", key: "sk-1" },
+    });
+    // Clear the Anthropic key: its entry goes, the OAuth token stays.
+    writePiConfig(dir, { provider: "anthropic", apiKey: "" });
+    expect(JSON.parse(readFileSync(authPath(), "utf-8"))).toEqual({
+      google: { type: "oauth", key: "tok" },
+    });
+  });
+
+  it("deletes auth.json only when it becomes empty after clearing", () => {
     writePiConfig(dir, { provider: "anthropic", apiKey: "sk-1" });
     expect(existsSync(authPath())).toBe(true);
     writePiConfig(dir, { provider: "anthropic", apiKey: "" });
     expect(existsSync(authPath())).toBe(false);
   });
 
-  it("writes a base-URL override extension and prunes it when cleared", () => {
+  it("writes a base-URL override extension and prunes it without dropping others", () => {
+    writeFileSync(
+      settingsPath(),
+      JSON.stringify({ extensions: ["/user/ext.mjs"] }),
+    );
     writePiConfig(dir, {
       provider: "openai",
       baseUrl: "https://proxy.example.com/v1",
     });
     const overridePath = path.join(dir, "horizon-provider-override.mjs");
     expect(existsSync(overridePath)).toBe(true);
-    expect(readSettings().extensions).toEqual([overridePath]);
-    // Clearing the base URL removes the extension and the managed key.
+    expect(readSettings().extensions).toEqual(["/user/ext.mjs", overridePath]);
+    // Clearing the base URL removes only the generated override.
     writePiConfig(dir, { provider: "openai", baseUrl: "" });
     expect(existsSync(overridePath)).toBe(false);
-    expect(readSettings()).not.toHaveProperty("extensions");
+    expect(readSettings().extensions).toEqual(["/user/ext.mjs"]);
+  });
+
+  it("surfaces a malformed settings.json instead of clobbering it", () => {
+    writeFileSync(settingsPath(), "{ not valid json");
+    expect(() => writePiConfig(dir, { provider: "openai" })).toThrow();
+    // The unreadable file is left intact for recovery.
+    expect(readFileSync(settingsPath(), "utf-8")).toBe("{ not valid json");
   });
 });

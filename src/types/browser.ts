@@ -139,13 +139,13 @@ export interface Settings {
   aiPiBinary?: string;
   /** Pi LLM provider id (also the auth.json key). */
   aiProvider?: string;
-  /** Default model id; empty → Pi default. */
-  aiModel?: string;
+  /** Default model id per provider; empty → Pi default. */
+  aiModels?: Record<string, string>;
   /** API keys per provider id; the active provider's key is materialized
    *  into Pi's auth.json. */
   aiApiKeys?: Record<string, string>;
-  /** Optional custom provider endpoint. */
-  aiBaseUrl?: string;
+  /** Optional custom provider endpoint per provider. */
+  aiBaseUrls?: Record<string, string>;
   /** Default target language for page/selection translation. */
   translateTargetLang?: string;
 }

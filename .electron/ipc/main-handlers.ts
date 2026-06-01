@@ -47,9 +47,9 @@ export interface IpcDeps {
 const AI_RESPAWN_KEYS: ReadonlySet<string> = new Set([
   "aiPiBinary",
   "aiProvider",
-  "aiModel",
+  "aiModels",
   "aiApiKeys",
-  "aiBaseUrl",
+  "aiBaseUrls",
 ]);
 
 /** Resolves the per-event WindowContext from the sender's webContents. */

@@ -63,16 +63,16 @@ export const DEFAULT_SETTINGS = {
   aiPiBinary: "pi",
   /** Pi LLM provider id (auth.json key): "anthropic", "openai", "google", … */
   aiProvider: "anthropic",
-  /** Default model id; empty → Pi picks the provider default. */
-  aiModel: "",
+  /** Default model id per provider; empty → Pi picks the provider default. */
+  aiModels: {} as Record<string, string>,
   /**
    * API keys per provider id, e.g. `{ anthropic: "sk-…", openai: "sk-…" }`.
    * Keyed so switching providers never materializes one provider's secret
    * under another. Written to Pi's auth.json (0600) for the active provider.
    */
   aiApiKeys: {} as Record<string, string>,
-  /** Optional custom endpoint for the provider (proxy / gateway / self-host). */
-  aiBaseUrl: "",
+  /** Optional custom endpoint per provider (proxy / gateway / self-host). */
+  aiBaseUrls: {} as Record<string, string>,
   /** Extra flags passed to `pi`. Session persists across app restarts via aiSessionPath. */
   aiPiArgs: ["--mode", "rpc"],
   /**

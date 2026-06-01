@@ -229,13 +229,13 @@ function resolvePiBinary(): string {
 function writePiConfigFromSettings(): void {
   const provider =
     (settingsManager.get("aiProvider" as never) as string) || "anthropic";
-  const apiKeys =
-    (settingsManager.get("aiApiKeys" as never) as Record<string, string>) ?? {};
+  const byProvider = (key: string): Record<string, string> =>
+    (settingsManager.get(key as never) as Record<string, string>) ?? {};
   writePiConfig(piAgentDir, {
     provider,
-    model: (settingsManager.get("aiModel" as never) as string) || undefined,
-    apiKey: apiKeys[provider] || undefined,
-    baseUrl: (settingsManager.get("aiBaseUrl" as never) as string) || undefined,
+    model: byProvider("aiModels")[provider] || undefined,
+    apiKey: byProvider("aiApiKeys")[provider] || undefined,
+    baseUrl: byProvider("aiBaseUrls")[provider] || undefined,
   });
 }
 

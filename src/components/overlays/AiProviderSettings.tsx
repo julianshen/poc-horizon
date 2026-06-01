@@ -33,23 +33,26 @@ interface Props {
 export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
   const provider = settings?.aiProvider ?? "anthropic";
   const apiKeys = settings?.aiApiKeys ?? {};
+  const models = settings?.aiModels ?? {};
+  const baseUrls = settings?.aiBaseUrls ?? {};
   const onProvider = useCallback(
     (v: string) => update("aiProvider", v),
     [update],
   );
+  // Model, key, and base URL are all provider-scoped — write into the
+  // active provider's slot so switching providers never carries one
+  // provider's model/endpoint/secret over to another.
   const onModel = useCallback(
-    (v: string) => update("aiModel", v),
-    [update],
+    (v: string) => update("aiModels", { ...models, [provider]: v }),
+    [update, models, provider],
   );
-  // Keys are stored per provider so switching never carries one provider's
-  // secret over to another; write into the active provider's slot.
   const onApiKey = useCallback(
     (v: string) => update("aiApiKeys", { ...apiKeys, [provider]: v }),
     [update, apiKeys, provider],
   );
   const onBaseUrl = useCallback(
-    (v: string) => update("aiBaseUrl", v),
-    [update],
+    (v: string) => update("aiBaseUrls", { ...baseUrls, [provider]: v }),
+    [update, baseUrls, provider],
   );
 
   return (
@@ -59,7 +62,7 @@ export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
       </Field>
       <Field label="Model">
         <TextInput
-          value={settings?.aiModel ?? ""}
+          value={models[provider] ?? ""}
           onChange={onModel}
           placeholder="provider default"
         />
@@ -74,7 +77,7 @@ export const AiProviderSettings: FC<Props> = ({ settings, update }) => {
       </Field>
       <Field label="Base URL (optional)">
         <TextInput
-          value={settings?.aiBaseUrl ?? ""}
+          value={baseUrls[provider] ?? ""}
           onChange={onBaseUrl}
           placeholder="https://api.example.com/v1"
         />

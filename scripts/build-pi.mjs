@@ -89,6 +89,13 @@ const workerEntry = path.join(distDir, "utils", "image-resize-worker.js");
 const outFile = path.join(outDir, binName);
 const buildArgs = ["build", "--compile"];
 if (target) buildArgs.push(`--target=${target}`);
+// Pi is spawned from the GUI app; on Windows a console executable would
+// flash a Command Prompt window on each spawn. Suppress it — but Bun only
+// accepts this flag when compiling ON Windows (not when cross-compiling a
+// windows target from another host), so gate on the host platform too.
+if (isWindows && process.platform === "win32") {
+  buildArgs.push("--windows-hide-console");
+}
 buildArgs.push(cliEntry, workerEntry, "--outfile", outFile);
 
 console.log(`[build-pi] compiling pi → ${path.relative(repoRoot, outFile)}`);
